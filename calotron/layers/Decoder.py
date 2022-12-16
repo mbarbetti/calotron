@@ -6,16 +6,10 @@ class DecoderLayer(tf.keras.layers.Layer):
   def __init__(self, decoder_depth, num_heads,
                key_dim=None, ff_units=128, dropout_rate=0.1):
     super().__init__()
-    assert decoder_depth > 0
     self._decoder_depth = int(decoder_depth)
-    assert num_heads > 0
     self._num_heads = int(num_heads)
-    if key_dim is not None:
-      assert key_dim > 0
     self._key_dim = int(key_dim) if key_dim else None
-    assert ff_units > 0
     self._ff_units = int(ff_units)
-    assert (dropout_rate >= 0.0) and (dropout_rate <= 1.0)
     self._dropout_rate = float(dropout_rate)
 
     self._csa_layer = CausalSelfAttention(
@@ -63,18 +57,11 @@ class Decoder(tf.keras.layers.Layer):
   def __init__(self, decoder_depth, num_layers, num_heads, 
                key_dim=None, ff_units=128, dropout_rate=0.1):
     super().__init__()
-    assert decoder_depth > 0
     self._decoder_depth = int(decoder_depth)
-    assert num_layers > 0
     self._num_layers = int(num_layers)
-    assert num_heads > 0
     self._num_heads = int(num_heads)
-    if key_dim is not None:
-      assert key_dim > 0
     self._key_dim = int(key_dim) if key_dim else None
-    assert ff_units > 0
     self._ff_units = int(ff_units)
-    assert (dropout_rate >= 0.0) and (dropout_rate <= 1.0)
     self._dropout_rate = float(dropout_rate)
 
     self._dec_layers = [
