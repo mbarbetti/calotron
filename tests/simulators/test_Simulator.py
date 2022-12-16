@@ -20,8 +20,8 @@ model = Transformer(output_depth=target.shape[2],
 
 @pytest.fixture
 def simulator():
-  from calotron.simulators import BaseSimulator
-  sim = BaseSimulator(transformer=model, start_token=target[:batch_size, 0, :])
+  from calotron.simulators import Simulator
+  sim = Simulator(transformer=model, start_token=target[:batch_size, 0, :])
   return sim
 
 
@@ -29,8 +29,8 @@ def simulator():
 
 
 def test_simulator_configuration(simulator):
-  from calotron.simulators import BaseSimulator
-  assert isinstance(simulator, BaseSimulator)
+  from calotron.simulators import Simulator
+  assert isinstance(simulator, Simulator)
   assert isinstance(simulator.transformer, Transformer)
   assert isinstance(simulator.start_token, tf.Tensor)
 
