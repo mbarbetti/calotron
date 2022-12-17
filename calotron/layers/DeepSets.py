@@ -1,10 +1,12 @@
 import tensorflow as tf
 
 
-class LatentMapLayer(tf.keras.layers.Layer):
+class DeepSets(tf.keras.layers.Layer):
   def __init__(self, latent_dim, num_layers, hidden_units=128, dropout_rate=0.1):
     super().__init__()
     self._latent_dim = int(latent_dim)
+    if num_layers < 1:
+      raise ValueError("`num_layers` should be greater than 0")
     self._num_layers = int(num_layers)
     self._hidden_units = int(hidden_units)
     self._dropout_rate = float(dropout_rate)
@@ -19,7 +21,7 @@ class LatentMapLayer(tf.keras.layers.Layer):
   def call(self, x):
     # shape: (batch_size, x_elements, x_depth)
     outputs = list()
-    for i in range(x.shape[1]):
+    for i in range(x.shape[1]):   # TODO: redesign computation (parallel instead serial)
       latent_tensor = x[:, i:i+1, :]   # shape: (batch_size, 1, x_depth)
       for layer in self._seq:
         latent_tensor = layer(latent_tensor)   # shape: (batch_size, 1, latent_dim)
@@ -36,60 +38,6 @@ class LatentMapLayer(tf.keras.layers.Layer):
   @property
   def num_layers(self) -> int:
     return self._latent_dim
-
-  @property
-  def hidden_units(self) -> int:
-    return self._hidden_units
-
-  @property
-  def dropout_rate(self) -> float:
-    return self._dropout_rate
-
-
-class DeepSets(tf.keras.layers.Layer):
-  def __init__(self,
-               output_dim,
-               latent_dim,
-               hidden_layers=3,
-               hidden_units=128,
-               dropout_rate=0.1):
-    super().__init__()
-    self._output_dim = int(output_dim)
-    self._latent_dim = int(latent_dim)
-    self._hidden_layers = int(hidden_layers)
-    self._hidden_units = int(hidden_units)
-    self._dropout_rate = float(dropout_rate)
-
-    self._latent_map = LatentMapLayer(
-        latent_dim=self._latent_dim,
-        num_layers=self._hidden_layers + 1,
-        hidden_units=self._hidden_units,
-        dropout_rate=self._dropout_rate)
-
-    self._seq = [
-        tf.keras.layers.Dense(self._latent_dim, activation="relu"),
-        tf.keras.layers.Dropout(self._dropout_rate),
-        tf.keras.layers.Dense(self._latent_dim, activation="relu"),
-        tf.keras.layers.Dropout(self._dropout_rate)]
-    self._seq += [tf.keras.layers.Dense(self._output_dim)]
-
-  def call(self, x):
-    x = self._latent_map(x)
-    for layer in self._seq:
-      x = layer(x)
-    return x
-
-  @property
-  def output_dim(self) -> int:
-    return self._output_dim
-
-  @property
-  def latent_dim(self) -> int:
-    return self._latent_dim
-
-  @property
-  def hidden_layers(self) -> int:
-    return self._hidden_layers
 
   @property
   def hidden_units(self) -> int:

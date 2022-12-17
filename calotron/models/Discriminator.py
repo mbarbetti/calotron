@@ -4,34 +4,49 @@ from calotron.layers import DeepSets
 
 class Discriminator(tf.keras.Model):
   def __init__(self,
-               output_dim,
                latent_dim,
+               output_units,
+               output_activation=None,
                hidden_layers=3,
                hidden_units=128,
                dropout_rate=0.1):
     super().__init__()
-    self._output_dim = int(output_dim)
     self._latent_dim = int(latent_dim)
+    self._output_units = int(output_units)
+    self._output_activation = output_activation
     self._hidden_layers = int(hidden_layers)
     self._hidden_units = int(hidden_units)
     self._dropout_rate = float(dropout_rate)
 
-    self._deepsets = DeepSets(output_dim=self._output_dim,
-                              latent_dim=self._latent_dim,
-                              hidden_layers=self._hidden_layers,
+    self._deepsets = DeepSets(latent_dim=self._latent_dim,
+                              num_layers=self._hidden_layers,
                               hidden_units=self._hidden_units,
                               dropout_rate=self._dropout_rate)
 
-  def call(self, x):
-    return self._deepsets(x)
+    self._seq = [tf.keras.layers.Dense(self._latent_dim, activation="relu"),
+                 tf.keras.layers.Dropout(self._dropout_rate),
+                 tf.keras.layers.Dense(self._latent_dim, activation="relu"),
+                 tf.keras.layers.Dropout(self._dropout_rate)]
+    self._seq += [tf.keras.layers.Dense(self._output_units,
+                                        activation=self._output_activation)]
 
-  @property
-  def output_dim(self) -> int:
-    return self._output_dim
+  def call(self, x):
+    x = self._deepsets(x)
+    for layer in self._seq:
+      x = layer(x)
+    return x
 
   @property
   def latent_dim(self) -> int:
     return self._latent_dim
+
+  @property
+  def output_units(self) -> int:
+    return self._output_units
+
+  @property
+  def output_activation(self):   # TODO: add Union[None, activation]
+    return self._output_activation
 
   @property
   def hidden_layers(self) -> int:

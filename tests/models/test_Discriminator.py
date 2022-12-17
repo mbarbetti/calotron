@@ -16,8 +16,9 @@ labels = tf.concat([label1, label2], axis=0)
 @pytest.fixture
 def model():
   from calotron.models import Discriminator
-  disc = Discriminator(output_dim=1,
-                       latent_dim=8,
+  disc = Discriminator(latent_dim=8,
+                       output_units=1,
+                       output_activation="sigmoid",
                        hidden_layers=2,
                        hidden_units=32,
                        dropout_rate=0.1)
@@ -30,8 +31,8 @@ def model():
 def test_model_configuration(model):
   from calotron.models import Discriminator
   assert isinstance(model, Discriminator)
-  assert isinstance(model.output_dim, int)
   assert isinstance(model.latent_dim, int)
+  assert isinstance(model.output_units, int)
   assert isinstance(model.hidden_layers, int)
   assert isinstance(model.hidden_units, int)
   assert isinstance(model.dropout_rate, float)
@@ -40,11 +41,19 @@ def test_model_configuration(model):
   assert isinstance(model.deepsets, DeepSets)
 
 
-def test_model_use(model):
+@pytest.mark.parametrize("activation", ["sigmoid", None])
+def test_model_use(activation):
+  from calotron.models import Discriminator
+  model = Discriminator(latent_dim=8,
+                        output_units=1,
+                        output_activation=activation,
+                        hidden_layers=2,
+                        hidden_units=32,
+                        dropout_rate=0.1)
   output = model(inputs)
   model.summary()
   test_shape = [inputs.shape[0]]
-  test_shape.append(model.output_dim)
+  test_shape.append(model.output_units)
   assert output.shape == tuple(test_shape)
 
 
@@ -56,6 +65,6 @@ def test_model_train(model):
           .prefetch(tf.data.AUTOTUNE)
     )
   adam = tf.keras.optimizers.Adam(learning_rate=0.001)
-  bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+  bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)
   model.compile(optimizer=adam, loss=bce)
   model.fit(dataset, epochs=3)
