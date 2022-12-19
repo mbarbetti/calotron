@@ -18,15 +18,19 @@ for units in [16, 16, 16]:
   model.add(tf.keras.layers.Dense(units, activation="relu"))
 model.add(tf.keras.layers.Dense(1))
 
+adam = tf.keras.optimizers.Adam(learning_rate=0.001)
+mse = tf.keras.losses.MeanSquaredError()
+
 
 @pytest.fixture
 def scheduler(cycle=False):
   from calotron.callbacks.schedulers import PolynomialDecay
-  sched = PolynomialDecay(
-              decay_steps=1000,
-              end_learning_rate=0.0001,
-              power=1.0,
-              cycle=cycle)
+  sched = PolynomialDecay(optimizer=adam,
+                          decay_steps=1000,
+                          end_learning_rate=0.0001,
+                          power=1.0,
+                          cycle=cycle,
+                          verbose=False)
   return sched
 
 
@@ -36,6 +40,7 @@ def scheduler(cycle=False):
 def test_sched_configuration(scheduler):
   from calotron.callbacks.schedulers import PolynomialDecay
   assert isinstance(scheduler, PolynomialDecay)
+  assert isinstance(scheduler.optimizer, tf.keras.optimizers.Optimizer)
   assert isinstance(scheduler.decay_steps, int)
   assert isinstance(scheduler.end_learning_rate, float)
   assert isinstance(scheduler.power, float)
@@ -45,13 +50,12 @@ def test_sched_configuration(scheduler):
 @pytest.mark.parametrize("cycle", [False, True])
 def test_sched_use(cycle):
   from calotron.callbacks.schedulers import PolynomialDecay
-  sched = PolynomialDecay(
-              decay_steps=1000,
-              end_learning_rate=0.0001,
-              power=1.0,
-              cycle=cycle)
-  adam = tf.keras.optimizers.Adam(learning_rate=0.001)
-  mse = tf.keras.losses.MeanSquaredError()
+  sched = PolynomialDecay(optimizer=adam,
+                          decay_steps=1000,
+                          end_learning_rate=0.0001,
+                          power=1.0,
+                          cycle=cycle,
+                          verbose=True)
   model.compile(optimizer=adam, loss=mse)
   history = model.fit(X, Y, batch_size=512, epochs=10, callbacks=[sched])
   assert isinstance(sched._dtype, np.dtype)

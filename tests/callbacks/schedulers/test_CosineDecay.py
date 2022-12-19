@@ -18,11 +18,17 @@ for units in [16, 16, 16]:
   model.add(tf.keras.layers.Dense(units, activation="relu"))
 model.add(tf.keras.layers.Dense(1))
 
+adam = tf.keras.optimizers.Adam(learning_rate=0.001)
+mse = tf.keras.losses.MeanSquaredError()
+
 
 @pytest.fixture
 def scheduler():
   from calotron.callbacks.schedulers import CosineDecay
-  sched = CosineDecay(decay_steps=1000, alpha=0.1)
+  sched = CosineDecay(optimizer=adam,
+                      decay_steps=1000,
+                      alpha=0.1,
+                      verbose=True)
   return sched
 
 
@@ -32,13 +38,12 @@ def scheduler():
 def test_sched_configuration(scheduler):
   from calotron.callbacks.schedulers import CosineDecay
   assert isinstance(scheduler, CosineDecay)
+  assert isinstance(scheduler.optimizer, tf.keras.optimizers.Optimizer)
   assert isinstance(scheduler.decay_steps, int)
   assert isinstance(scheduler.alpha, float)
 
 
 def test_sched_use(scheduler):
-  adam = tf.keras.optimizers.Adam(learning_rate=0.001)
-  mse = tf.keras.losses.MeanSquaredError()
   model.compile(optimizer=adam, loss=mse)
   history = model.fit(X, Y, batch_size=512, epochs=10, callbacks=[scheduler])
   assert isinstance(scheduler._dtype, np.dtype)

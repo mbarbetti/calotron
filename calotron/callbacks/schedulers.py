@@ -1,36 +1,46 @@
 import numpy as np
 import tensorflow as tf
 K = tf.keras.backend
-
 from tensorflow.keras.callbacks import Callback
 
 
 class BaseScheduler(Callback):
+  def __init__(self, optimizer, verbose=False):
+    super().__init__()
+    self._optimizer = optimizer
+    self._verbose = bool(verbose)
+
   def on_train_begin(self, logs=None):
-    self._init_lr = K.get_value(self.model.optimizer.learning_rate)
+    self._init_lr = K.get_value(self._optimizer.learning_rate)
     self._dtype = self._init_lr.dtype
     self._step = -1
 
   def on_batch_begin(self, batch, logs=None):
     self._step += 1
     step = tf.cast(self._step, self._dtype)
-    K.set_value(self.model.optimizer.learning_rate, self._scheduled_lr(self._init_lr, step))
+    K.set_value(self._optimizer.learning_rate, self._scheduled_lr(self._init_lr, step))
 
   def _scheduled_lr(self, init_lr, step):
     return init_lr
 
   def on_batch_end(self, batch, logs=None):
     logs = logs or {}
-    logs["lr"] = K.get_value(self.model.optimizer.learning_rate)
+    if self._verbose:
+      logs["lr"] = K.get_value(self.model.optimizer.learning_rate)
 
   def on_epoch_end(self, epoch, logs=None):
     logs = logs or {}
-    logs["lr"] = K.get_value(self.model.optimizer.learning_rate)
+    if self._verbose:
+      logs["lr"] = K.get_value(self.model.optimizer.learning_rate)
+
+  @property
+  def optimizer(self) -> tf.keras.optimizers.Optimizer:
+    return self._optimizer
 
 
 class CosineDecay(BaseScheduler):
-  def __init__(self, decay_steps, alpha=0.0):
-    super().__init__()
+  def __init__(self, optimizer, decay_steps, alpha=0.0, verbose=False):
+    super().__init__(optimizer, verbose)
     assert decay_steps > 0
     self._decay_steps = int(decay_steps)
     assert (alpha) >= 0.0 and (alpha <= 1.0)
@@ -58,8 +68,13 @@ class CosineDecay(BaseScheduler):
 
 
 class ExponentialDecay(BaseScheduler):
-  def __init__(self, decay_rate, decay_steps, staircase=False):
-    super().__init__()
+  def __init__(self,
+               optimizer,
+               decay_rate,
+               decay_steps,
+               staircase=False,
+               verbose=False):
+    super().__init__(optimizer, verbose)
     assert decay_rate > 0.0
     self._decay_rate = float(decay_rate)
     assert decay_steps > 0
@@ -92,8 +107,13 @@ class ExponentialDecay(BaseScheduler):
 
 
 class InverseTimeDecay(BaseScheduler):
-  def __init__(self, decay_rate, decay_steps, staircase=False):
-    super().__init__()
+  def __init__(self,
+               optimizer,
+               decay_rate,
+               decay_steps,
+               staircase=False,
+               verbose=False):
+    super().__init__(optimizer, verbose)
     assert decay_rate > 0.0
     self._decay_rate = float(decay_rate)
     assert decay_steps > 0
@@ -126,8 +146,8 @@ class InverseTimeDecay(BaseScheduler):
 
 
 class PiecewiseConstantDecay(BaseScheduler):
-  def __init__(self, boundaries, values):
-    super().__init__()
+  def __init__(self, optimizer, boundaries, values, verbose=False):
+    super().__init__(optimizer, verbose)
     assert isinstance(boundaries, (list, tuple, np.ndarray))
     assert isinstance(values, (list, tuple, np.ndarray))
     assert len(boundaries) >= 1
@@ -158,11 +178,13 @@ class PiecewiseConstantDecay(BaseScheduler):
 
 class PolynomialDecay(BaseScheduler):
   def __init__(self,
+               optimizer,
                decay_steps,
                end_learning_rate=0.0001,
                power=1.0,
-               cycle=False):
-    super().__init__()
+               cycle=False,
+               verbose=False):
+    super().__init__(optimizer, verbose)
     assert decay_steps > 0
     self._decay_steps = int(decay_steps)
     assert end_learning_rate > 0.0
@@ -210,8 +232,12 @@ class PolynomialDecay(BaseScheduler):
 
 
 class AttentionDecay(BaseScheduler):
-  def __init__(self, d_model, warmup_steps=4000):
-    super().__init__()
+  def __init__(self,
+               optimizer,
+               d_model,
+               warmup_steps=4000,
+               verbose=False):
+    super().__init__(optimizer, verbose)
     assert d_model > 0
     self._d_model = int(d_model)
     assert warmup_steps > 0

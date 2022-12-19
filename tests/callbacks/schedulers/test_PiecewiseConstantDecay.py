@@ -18,11 +18,17 @@ for units in [16, 16, 16]:
   model.add(tf.keras.layers.Dense(units, activation="relu"))
 model.add(tf.keras.layers.Dense(1))
 
+adam = tf.keras.optimizers.Adam(learning_rate=0.001)
+mse = tf.keras.losses.MeanSquaredError()
+
 
 @pytest.fixture
-def scheduler(staircase=False):
+def scheduler():
   from calotron.callbacks.schedulers import PiecewiseConstantDecay
-  sched = PiecewiseConstantDecay(boundaries=[200, 400], values=[0.001, 0.0005, 0.0001])
+  sched = PiecewiseConstantDecay(optimizer=adam,
+                                 boundaries=[200, 400],
+                                 values=[0.001, 0.0005, 0.0001],
+                                 verbose=True)
   return sched
 
 
@@ -32,6 +38,7 @@ def scheduler(staircase=False):
 def test_sched_configuration(scheduler):
   from calotron.callbacks.schedulers import PiecewiseConstantDecay
   assert isinstance(scheduler, PiecewiseConstantDecay)
+  assert isinstance(scheduler.optimizer, tf.keras.optimizers.Optimizer)
   assert isinstance(scheduler.boundaries, list)
   assert isinstance(scheduler.boundaries[0], int)
   assert isinstance(scheduler.values, list)
@@ -40,8 +47,6 @@ def test_sched_configuration(scheduler):
 
 
 def test_sched_use(scheduler):
-  adam = tf.keras.optimizers.Adam(learning_rate=0.001)
-  mse = tf.keras.losses.MeanSquaredError()
   model.compile(optimizer=adam, loss=mse)
   history = model.fit(X, Y, batch_size=512, epochs=10, callbacks=[scheduler])
   assert isinstance(scheduler._dtype, np.dtype)

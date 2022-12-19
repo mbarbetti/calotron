@@ -18,11 +18,18 @@ for units in [16, 16, 16]:
   model.add(tf.keras.layers.Dense(units, activation="relu"))
 model.add(tf.keras.layers.Dense(1))
 
+adam = tf.keras.optimizers.Adam(learning_rate=0.001)
+mse = tf.keras.losses.MeanSquaredError()
+
 
 @pytest.fixture
 def scheduler(staircase=False):
   from calotron.callbacks.schedulers import InverseTimeDecay
-  sched = InverseTimeDecay(decay_rate=0.9, decay_steps=1000, staircase=staircase)
+  sched = InverseTimeDecay(optimizer=adam,
+                           decay_rate=0.9,
+                           decay_steps=1000,
+                           staircase=staircase,
+                           verbose=False)
   return sched
 
 
@@ -32,6 +39,7 @@ def scheduler(staircase=False):
 def test_sched_configuration(scheduler):
   from calotron.callbacks.schedulers import InverseTimeDecay
   assert isinstance(scheduler, InverseTimeDecay)
+  assert isinstance(scheduler.optimizer, tf.keras.optimizers.Optimizer)
   assert isinstance(scheduler.decay_rate, float)
   assert isinstance(scheduler.decay_steps, int)
   assert isinstance(scheduler.staircase, bool)
@@ -40,9 +48,11 @@ def test_sched_configuration(scheduler):
 @pytest.mark.parametrize("staircase", [False, True])
 def test_sched_use(staircase):
   from calotron.callbacks.schedulers import InverseTimeDecay
-  sched = InverseTimeDecay(decay_rate=0.9, decay_steps=1000, staircase=staircase)
-  adam = tf.keras.optimizers.Adam(learning_rate=0.001)
-  mse = tf.keras.losses.MeanSquaredError()
+  sched = InverseTimeDecay(optimizer=adam,
+                           decay_rate=0.9,
+                           decay_steps=1000,
+                           staircase=staircase,
+                           verbose=True)
   model.compile(optimizer=adam, loss=mse)
   history = model.fit(X, Y, batch_size=512, epochs=10, callbacks=[sched])
   assert isinstance(sched._dtype, np.dtype)
