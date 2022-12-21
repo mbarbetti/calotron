@@ -18,7 +18,10 @@ class BinaryCrossentropy(BaseLoss):
                         name=name)
   
   def discriminator_loss(self, y_true, y_pred, **kwargs):
-    return -self._loss(y_true, y_pred, **kwargs)   # loss maximization
+    loss_real = self(tf.ones_like(y_true), y_true, **kwargs)
+    loss_fake = self(tf.zeros_like(y_pred), y_pred, **kwargs)
+    return loss_real + loss_fake
 
   def transformer_loss(self, y_true, y_pred, **kwargs):
-    return self._loss(y_true, y_pred, **kwargs)   # loss minimization
+    loss_fake = self(tf.ones_like(y_pred), y_pred, **kwargs)
+    return loss_fake

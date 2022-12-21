@@ -9,7 +9,7 @@ class MeanSquaredError(BaseLoss):
     self._loss = TF_MSE(reduction=reduction, name=name)
   
   def discriminator_loss(self, y_true, y_pred, **kwargs):
-    return -self._loss(y_true, y_pred, **kwargs)   # loss maximization
+    return -self(y_true, y_pred, **kwargs)   # divergence maximization
 
   def transformer_loss(self, y_true, y_pred, **kwargs):
-    return self._loss(y_true, y_pred, **kwargs)   # loss minimization
+    return self(y_true, y_pred, **kwargs)   # divergence minimization
