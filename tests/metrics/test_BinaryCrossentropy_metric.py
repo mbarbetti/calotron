@@ -3,8 +3,10 @@ import numpy as np
 import tensorflow as tf
 
 
-y_true = [[0, 1], [0, 0]]
-y_pred = [[0.6, 0.4], [0.4, 0.6]]
+np.random.seed(42)
+chunk_size = int(5e4)
+y_true = np.random.uniform(0.5, 1.0, size=(chunk_size,))
+y_pred = np.random.uniform(0.2, 0.8, size=(chunk_size,))
 
 
 @pytest.fixture
@@ -29,11 +31,11 @@ def test_metric_configuration(metric):
 def test_metric_use(metric):
   metric.update_state(y_true, y_pred)
   res = metric.result().numpy()
-  assert (res > 0.81) and (res < 0.82)
+  assert (res > 0.53) and (res < 0.54)
 
 
 def test_metric_kargs(metric):
-  w = [1, 0]
-  metric.update_state(y_true, y_pred, sample_weight=w)
+  w = np.random.uniform(0.0, 1.0, size=(chunk_size,)) > 0.5
+  metric.update_state(y_true, y_pred, sample_weight=w[None,:])
   res = metric.result().numpy()
-  assert (res > 0.91) and (res < 0.92)
+  assert (res > 0.53) and (res < 0.54)
