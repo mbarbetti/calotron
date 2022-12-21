@@ -1,6 +1,6 @@
 import tensorflow as tf
 from calotron.models import Transformer, Discriminator
-from calotron.utils import checkOptimizer
+from calotron.utils import checkLoss, checkMetrics, checkOptimizer
 
 
 class CaloTron(tf.keras.Model):
@@ -30,60 +30,75 @@ class CaloTron(tf.keras.Model):
 
   def compile(self,
               loss,
-              metric=None,
+              metrics=None,
               transformer_optimizer="rmsprop",
-              discriminator_optimizer="rmsprop"):
+              discriminator_optimizer="rmsprop",
+              transformer_upds_per_batch=1,
+              discriminator_upds_per_batch=1):
     super().compile()
-    self._loss = loss
-    self._t_loss_tracker = tf.keras.metrics.Mean(name="t_loss")
-    self._d_loss_tracker = tf.keras.metrics.Mean(name="d_loss")
-    self._metric = metric
-    if metric is not None:
-      self._metric_tracker = tf.keras.metrics.MeanSquaredError(name="mse")
-    else:
-      self._metric_tracker = None
+    self._loss = checkLoss(loss)
+    self._t_loss = tf.keras.metrics.Mean(name=f"t_{self._loss.name}")
+    self._d_loss = tf.keras.metrics.Mean(name=f"d_{self._loss.name}")
+    self._metrics = checkMetrics(metrics)
     self._t_opt = checkOptimizer(transformer_optimizer)
     self._d_opt = checkOptimizer(discriminator_optimizer)
+    if transformer_upds_per_batch < 1:
+      raise ValueError("`transformer_upds_per_batch` should be greater than 0")
+    self._t_upds_per_batch = int(transformer_upds_per_batch)
+    if discriminator_upds_per_batch < 1:
+      raise ValueError("`discriminator_upds_per_batch` should be greater than 0")
+    self._d_upds_per_batch = int(discriminator_upds_per_batch)
 
   def train_step(self, data):
-    self._d_train_step(data)
-    self._t_train_step(data)
+    if len(data) == 3:
+      source, target, sample_weight = data
+    else:
+      source, target = data
+      sample_weight = None
+    target_in, target_out = self._prepare_target(target)
+
+    for _ in range(self._d_upds_per_batch):
+      self._d_train_step(source, target_in, target_out, sample_weight)
+    for _ in range(self._t_upds_per_batch):
+      self._t_train_step(source, target_in, target_out, sample_weight)
+
     train_dict = dict()
-    if self._metric is not None:
-      train_dict.update({self._metric_tracker.name: self._metric_tracker.result()})
-    train_dict.update({"t_loss": self._t_loss_tracker.result(),
-                       "d_loss": self._d_loss_tracker.result()})
+    if self._metrics is not None:
+      for metric in self._metrics:
+        train_dict.update({metric.name: metric.result()})
+    train_dict.update({f"t_{self._loss.name}": self._t_loss.result(),
+                       f"d_{self._loss.name}": self._d_loss.result(),
+                       "t_lr": self._t_opt.learning_rate,
+                       "d_lr": self._d_opt.learning_rate})
     return train_dict
 
-  def _d_train_step(self, data):
-    source, target = data
-    target_in, target_out = self._prepare_target(target)
+  def _d_train_step(self, source, target_in, target_out, sample_weight):
     with tf.GradientTape() as tape:
       target_pred = self._transformer((source, target_in))
       y_pred = self._discriminator(target_pred)
       y_true = self._discriminator(target_out)
-      loss = - self._loss(y_true, y_pred)   # maximize loss
-    self._d_loss_tracker.update_state(loss)
+      loss = self._loss.discriminator_loss(y_true, y_pred, sample_weight=sample_weight)
     grads = tape.gradient(loss, self._discriminator.trainable_weights)
     self._d_opt.apply_gradients(zip(grads, self._discriminator.trainable_weights))
+    self._d_loss.update_state(loss)
 
-  def _t_train_step(self, data):
-    source, target = data
-    target_in, target_out = self._prepare_target(target)
+  def _t_train_step(self, source, target_in, target_out, sample_weight):
     with tf.GradientTape() as tape:
       target_pred = self._transformer((source, target_in))
       y_pred = self._discriminator(target_pred)
       y_true = self._discriminator(target_out)
-      loss = self._loss(y_true, y_pred)   # minimize loss
-    self._t_loss_tracker.update_state(loss)
+      loss = self._loss.transformer_loss(y_true, y_pred, sample_weight=sample_weight)
     grads = tape.gradient(loss, self._transformer.trainable_weights)
     self._t_opt.apply_gradients(zip(grads, self._transformer.trainable_weights))
+    self._t_loss.update_state(loss)
+    if self._metrics is not None:
+      for metric in self._metrics:
+        metric.update_state(y_true, y_pred)
 
   @staticmethod
   def _prepare_target(target):
-    batch_size = target.shape[0]
-    target_depth = target.shape[2]
-    start_token = tf.random.normal(shape=(batch_size, 1, target_depth))
+    start_token = tf.reduce_mean(target, axis=(0,1))[None, None, :]
+    start_token = tf.tile(start_token, (target.shape[0], 1, 1))
     target_in = tf.concat([start_token, target[:, :-1, :]], axis=1)
     target_out = target
     return target_in, target_out
@@ -97,13 +112,11 @@ class CaloTron(tf.keras.Model):
     return self._discriminator
 
   @property
-  def metrics(self):
-    if self._metric is not None:
-      return [self._t_loss_tracker,
-              self._d_loss_tracker,
-              self._metric_tracker]
-    else:
-      return [self._t_loss_tracker, self._d_loss_tracker]
+  def metrics(self) -> list:
+    reset_states = [self._t_loss, self._d_loss]
+    if self._metrics is not None: 
+      reset_states += self._metrics
+    return reset_states
 
   @property
   def transformer_optimizer(self) -> tf.keras.optimizers.Optimizer:
@@ -112,3 +125,11 @@ class CaloTron(tf.keras.Model):
   @property
   def discriminator_optimizer(self) -> tf.keras.optimizers.Optimizer:
     return self._d_opt
+
+  @property
+  def transformer_upds_per_batch(self) -> int:
+    return self._t_upds_per_batch
+
+  @property
+  def discriminator_upds_per_batch(self) -> int:
+    return self._d_upds_per_batch
