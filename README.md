@@ -4,5 +4,5 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/calotron)](https://pypi.python.org/pypi/calotron)
 ![PyPI - Status](https://img.shields.io/pypi/status/calotron)
 ![PyPI - License](https://img.shields.io/pypi/l/calotron)
-![Continuous integration](https://github.com/mbarbetti/calotron/actions/workflows/ci-build.yml/badge.svg?branch=main)
+[![Continuous integration](https://github.com/mbarbetti/calotron/actions/workflows/ci-build.yml/badge.svg?branch=main)](https://github.com/mbarbetti/calotron/actions/workflows/ci-build.yml)
 [![Codecov](https://codecov.io/gh/mbarbetti/calotron/branch/main/graph/badge.svg?token=DRG8BWC9RR)](https://codecov.io/gh/mbarbetti/calotron)
