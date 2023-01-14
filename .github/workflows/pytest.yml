@@ -23,6 +23,8 @@ jobs:
 
       - name: Install calotron
         run: |
+          ls 
+          pwd
           python setup.py bdist_wheel
           python -m pip install dist/* --force-reinstall --no-deps
 
