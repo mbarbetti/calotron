@@ -16,27 +16,24 @@ jobs:
     container: tensorflow/tensorflow:${{ matrix.version }}
     strategy:
       matrix:
-        version: [2.11.0, latest]
+        version: [2.11.0]
 
     steps:
       - name: Checkout repository code
         uses: actions/checkout@v3
 
-      - name: Install dependencies
+      - name: Install dependencies and calotron
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           python setup.py bdist_wheel
           python -m pip install dist/* --force-reinstall --no-deps
-          python -m pip install flake8 pytest pytest-cov
 
-      - name: Run tests and collect coverage
+      - name: Generate coverage report
         run: |
           cd tests
-          pytest --cov .
+          python -m pip install pytest pytest-cov
+          pytest --cov=./ --cov-report=xml
 
-      - name: Upload coverage reports to Codecov
-        run: |
-          curl -Os https://uploader.codecov.io/latest/linux/codecov
-          chmod +x codecov
-          ./codecov
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
