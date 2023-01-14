@@ -19,7 +19,7 @@ def readme():
 
 ## load requirements
 def requirements():
-  requirements_path = path.join(here, "requirements/base.txt")
+  requirements_path = path.join(here, "requirements.txt")
   with open(requirements_path, encoding="utf-8") as f:
     return f.read().splitlines()
 
