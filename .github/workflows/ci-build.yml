@@ -30,6 +30,13 @@ jobs:
           python -m pip install dist/* --force-reinstall --no-deps
           python -m pip install flake8 pytest pytest-cov
 
-      - name: Run test
+      - name: Run tests and collect coverage
         run: |
-          pytest ./tests
+          cd tests
+          pytest --cov .
+
+      - name: Upload coverage reports to Codecov
+        run: |
+          curl -Os https://uploader.codecov.io/latest/linux/codecov
+          chmod +x codecov
+          ./codecov
