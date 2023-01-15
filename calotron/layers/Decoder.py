@@ -3,14 +3,15 @@ from calotron.layers import CausalSelfAttention, CrossAttention, FeedForward
 
 
 class DecoderLayer(tf.keras.layers.Layer):
-  def __init__(self, decoder_depth, num_heads,
-               key_dim=None, ff_units=128, dropout_rate=0.1):
+  def __init__(self, decoder_depth, num_heads, key_dim=None,
+               ff_units=128, dropout_rate=0.1, residual_smoothing=True):
     super().__init__()
     self._decoder_depth = int(decoder_depth)
     self._num_heads = int(num_heads)
     self._key_dim = int(key_dim) if key_dim else None
     self._ff_units = int(ff_units)
     self._dropout_rate = float(dropout_rate)
+    self._residual_smoothing = bool(residual_smoothing)
 
     self._csa_layer = CausalSelfAttention(
         num_heads=self._num_heads,
@@ -24,7 +25,8 @@ class DecoderLayer(tf.keras.layers.Layer):
 
     self._ff_layer = FeedForward(
         output_units=self._decoder_depth, 
-        hidden_units=self._ff_units)
+        hidden_units=self._ff_units,
+        residual_smoothing=self._residual_smoothing)
 
   def call(self, x, context):
     x = self._csa_layer(x=x)                   # shape: (batch_size, x_elements, x_depth)
@@ -52,10 +54,14 @@ class DecoderLayer(tf.keras.layers.Layer):
   def dropout_rate(self) -> float:
     return self._dropout_rate
 
+  @property
+  def residual_smoothing(self) -> bool:
+    return self._residual_smoothing
+
 
 class Decoder(tf.keras.layers.Layer):
-  def __init__(self, decoder_depth, num_layers, num_heads, 
-               key_dim=None, ff_units=128, dropout_rate=0.1):
+  def __init__(self, decoder_depth, num_layers, num_heads, key_dim=None, 
+               ff_units=128, dropout_rate=0.1, residual_smoothing=True):
     super().__init__()
     self._decoder_depth = int(decoder_depth)
     self._num_layers = int(num_layers)
@@ -63,13 +69,15 @@ class Decoder(tf.keras.layers.Layer):
     self._key_dim = int(key_dim) if key_dim else None
     self._ff_units = int(ff_units)
     self._dropout_rate = float(dropout_rate)
+    self._residual_smoothing = bool(residual_smoothing)
 
     self._dec_layers = [
         DecoderLayer(decoder_depth=self._decoder_depth,
                      num_heads=self._num_heads,
                      key_dim=self._key_dim,
                      ff_units=self._ff_units,
-                     dropout_rate=self._dropout_rate)
+                     dropout_rate=self._dropout_rate,
+                     residual_smoothing=self._residual_smoothing)
         for _ in range(self._num_layers)]
 
   def call(self, x, context):
@@ -100,3 +108,7 @@ class Decoder(tf.keras.layers.Layer):
   @property
   def dropout_rate(self) -> float:
     return self._dropout_rate
+
+  @property
+  def residual_smoothing(self) -> bool:
+    return self._residual_smoothing

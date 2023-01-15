@@ -5,7 +5,12 @@ import tensorflow as tf
 @pytest.fixture
 def layer():
   from calotron.layers.Encoder import EncoderLayer
-  enc_layer = EncoderLayer(encoder_depth=16, num_heads=8, key_dim=64, ff_units=128)
+  enc_layer = EncoderLayer(encoder_depth=16,
+                           num_heads=8,
+                           key_dim=64,
+                           ff_units=128,
+                           dropout_rate=0.1,
+                           residual_smoothing=True)
   return enc_layer
 
 
@@ -21,16 +26,24 @@ def test_layer_configuration(layer):
     assert isinstance(layer.key_dim, int)
   assert isinstance(layer.ff_units, int)
   assert isinstance(layer.dropout_rate, float)
+  assert isinstance(layer.residual_smoothing, bool)
 
 
 @pytest.mark.parametrize("key_dim", [None, 64])
-def test_layer_use(key_dim):
+@pytest.mark.parametrize("residual_smoothing", [True, False])
+def test_layer_use(key_dim, residual_smoothing):
+  if residual_smoothing:
+    input_dim, output_dim = (10, 16)
+  else:
+    input_dim, output_dim = (10, 10)
   from calotron.layers.Encoder import EncoderLayer
-  layer = EncoderLayer(encoder_depth=16,
+  layer = EncoderLayer(encoder_depth=output_dim,
                        num_heads=8,
                        key_dim=key_dim,
-                       ff_units=128)
-  input = tf.random.normal(shape=(100, 32, 10))
+                       ff_units=128,
+                       dropout_rate=0.1,
+                       residual_smoothing=residual_smoothing)
+  input = tf.random.normal(shape=(100, 32, input_dim))
   output = layer(input)
   test_shape = list(input.shape)
   test_shape[-1] = layer.encoder_depth

@@ -1,5 +1,6 @@
 import tensorflow as tf
 from calotron.layers import Encoder, Decoder
+from calotron.utils import checkActivations
 
 
 class Transformer(tf.keras.Model):
@@ -10,8 +11,10 @@ class Transformer(tf.keras.Model):
                num_layers, 
                num_heads, 
                key_dim=None,
+               output_activations=None,
                ff_units=128, 
-               dropout_rate=0.1):
+               dropout_rate=0.1,
+               residual_smoothing=True):
     super().__init__()
     self._output_depth = int(output_depth)
     self._encoder_depth = int(encoder_depth)
@@ -21,28 +24,37 @@ class Transformer(tf.keras.Model):
     self._key_dim = int(key_dim) if key_dim else None
     self._ff_units = int(ff_units)
     self._dropout_rate = float(dropout_rate)
+    self._residual_smoothing = bool(residual_smoothing)
 
     self._encoder = Encoder(encoder_depth=self._encoder_depth,
                             num_layers=self._num_layers,
                             num_heads=self._num_heads, 
                             key_dim=self._key_dim,
                             ff_units=self._ff_units,
-                            dropout_rate=self._dropout_rate)
+                            dropout_rate=self._dropout_rate,
+                            residual_smoothing=self._residual_smoothing)
 
     self._decoder = Decoder(decoder_depth=self._decoder_depth,
                             num_layers=self._num_layers,
                             num_heads=self._num_heads,
                             key_dim=self._key_dim,
                             ff_units=self._ff_units,
-                            dropout_rate=self._dropout_rate)
+                            dropout_rate=self._dropout_rate,
+                            residual_smoothing=self._residual_smoothing)
 
     self._final_layer = tf.keras.layers.Dense(self._output_depth)
+    self._output_activations = checkActivations(output_activations, output_depth)
 
   def call(self, inputs):
     source, target = inputs
     context = self._encoder(x=source)                   # shape: (batch_size, source_elements, encoder_depth)
     output = self._decoder(x=target, context=context)   # shape: (batch_size, target_elements, decoder_depth)
     output = self._final_layer(output)                  # shape: (batch_size, target_elements, output_depth)
+    if self._output_activations is not None:
+      concat = list()
+      for i, activation in enumerate(self._output_activations):
+        concat.append(activation(output[:,:,i])[:,:,None])
+      output = tf.concat(concat, axis=2)
     return output
 
   @property
@@ -76,6 +88,10 @@ class Transformer(tf.keras.Model):
   @property
   def dropout_rate(self) -> float:
     return self._dropout_rate
+
+  @property
+  def residual_smoothing(self) -> bool:
+    return self._residual_smoothing
 
   @property
   def encoder(self) -> Encoder:

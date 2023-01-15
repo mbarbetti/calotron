@@ -18,7 +18,8 @@ def model():
                       num_heads=4,
                       key_dim=None,
                       ff_units=16,
-                      dropout_rate=0.1)
+                      dropout_rate=0.1,
+                      residual_smoothing=True)
   return trans
 
 
@@ -37,23 +38,30 @@ def test_model_configuration(model):
     assert isinstance(model.key_dim, int)
   assert isinstance(model.ff_units, int)
   assert isinstance(model.dropout_rate, float)
+  assert isinstance(model.residual_smoothing, bool)
 
   from calotron.layers import Encoder, Decoder
   assert isinstance(model.encoder, Encoder)
   assert isinstance(model.decoder, Decoder)
 
 
-@pytest.mark.parametrize("key_dim", [None, 8])
-def test_model_use(key_dim):
+@pytest.mark.parametrize("key_dim", [None, 64])
+@pytest.mark.parametrize("residual_smoothing", [True, False])
+def test_model_use(key_dim, residual_smoothing):
+  if residual_smoothing:
+    encoder_depth, decoder_depth = (8, 16)
+  else:
+    encoder_depth, decoder_depth = (source.shape[2], target.shape[2])
   from calotron.models import Transformer
   model = Transformer(output_depth=target.shape[2],
-                      encoder_depth=8,
-                      decoder_depth=8,
+                      encoder_depth=encoder_depth,
+                      decoder_depth=decoder_depth,
                       num_layers=2,
                       num_heads=4,
                       key_dim=key_dim,
                       ff_units=16,
-                      dropout_rate=0.1)
+                      dropout_rate=0.1,
+                      residual_smoothing=residual_smoothing)
   output = model((source, target))
   model.summary()
   test_shape = list(target.shape)
