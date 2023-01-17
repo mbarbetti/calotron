@@ -44,7 +44,6 @@ setup (
         python_requires  = ">=3.7, <=3.10",
         classifiers = [
                         "Development Status :: 3 - Alpha",
-                        "Intended Audience :: Education",
                         "Intended Audience :: Developers",
                         "Intended Audience :: Science/Research",
                         "License :: OSI Approved :: MIT License",
@@ -54,7 +53,7 @@ setup (
                         "Programming Language :: Python :: 3.9",
                         "Programming Language :: Python :: 3.10",
                         "Topic :: Scientific/Engineering",
-                        "Topic :: Scientific/Engineering :: Mathematics",
+                        "Topic :: Scientific/Engineering :: Physics",
                         "Topic :: Scientific/Engineering :: Artificial Intelligence",
                         "Topic :: Software Development",
                         "Topic :: Software Development :: Libraries",
