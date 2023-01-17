@@ -16,8 +16,8 @@ def checkMetrics(metrics):
   if metrics is None:
     return None
   else:
-    checked_metrics = list()
     if isinstance(metrics, list):
+      checked_metrics = list()
       for metric in metrics:
         if isinstance(metric, str):
           if metric in METRIC_SHORTCUTS:
@@ -35,4 +35,4 @@ def checkMetrics(metrics):
       return checked_metrics
     else:
       raise TypeError(f"`metrics` should be a list of strings or calotron's "
-                      f"`BaseMetric`, instead {type(metrics)} passed")
+                      f"`BaseMetric`s, instead {type(metrics)} passed")
