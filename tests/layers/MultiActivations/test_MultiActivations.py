@@ -1,12 +1,11 @@
 import pytest
 import tensorflow as tf
-from tensorflow.keras import layers
-from tensorflow.keras import activations
+from tensorflow.keras.layers import Activation, ReLU
+from tensorflow.keras.activations import sigmoid, tanh, relu
+
 
 STR_CASES = ["sigmoid", "tanh", "relu"]
-CLS_CASES = [layers.Activation(activations.sigmoid),
-             layers.Activation(activations.tanh),
-             layers.Activation(activations.relu)]
+CLS_CASES = [Activation(sigmoid), Activation(tanh), Activation(relu)]
 
 
 @pytest.fixture
@@ -32,7 +31,7 @@ def test_layer_configuration(activations):
 
 
 @pytest.mark.parametrize("activations",
-                         [None, "relu", layers.ReLU(), STR_CASES, CLS_CASES])
+                         [None, "relu", ReLU(), STR_CASES, CLS_CASES])
 def test_layer_use(activations):
   from calotron.layers import MultiActivations
   layer = MultiActivations(activations=activations,
