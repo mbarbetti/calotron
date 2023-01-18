@@ -18,8 +18,16 @@ def layer():
 ###########################################################################
 
 
-def test_layer_configuration(layer):
+@pytest.mark.parametrize("key_dim", [None, 64])
+def test_layer_configuration(key_dim):
   from calotron.layers import Decoder
+  layer = Decoder(decoder_depth=16,
+                  num_layers=4, 
+                  num_heads=8,
+                  key_dim=key_dim,
+                  ff_units=128,
+                  dropout_rate=0.1,
+                  residual_smoothing=True)
   assert isinstance(layer, Decoder)
   assert isinstance(layer.decoder_depth, int)
   assert isinstance(layer.num_layers, int)
