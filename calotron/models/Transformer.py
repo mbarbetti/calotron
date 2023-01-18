@@ -1,6 +1,5 @@
 import tensorflow as tf
-from calotron.layers import Encoder, Decoder
-from calotron.utils import checkActivations
+from calotron.layers import Encoder, Decoder, MultiActivations
 
 
 class Transformer(tf.keras.Model):
@@ -43,18 +42,16 @@ class Transformer(tf.keras.Model):
                             residual_smoothing=self._residual_smoothing)
 
     self._final_layer = tf.keras.layers.Dense(self._output_depth)
-    self._output_activations = checkActivations(output_activations, output_depth)
+    self._multi_act_layer = MultiActivations(output_activations, 
+                                             self._output_depth)
+    self._output_activations = self._multi_act_layer.output_activations
 
   def call(self, inputs):
     source, target = inputs
     context = self._encoder(x=source)                   # shape: (batch_size, source_elements, encoder_depth)
     output = self._decoder(x=target, context=context)   # shape: (batch_size, target_elements, decoder_depth)
     output = self._final_layer(output)                  # shape: (batch_size, target_elements, output_depth)
-    if self._output_activations is not None:
-      concat = list()
-      for i, activation in enumerate(self._output_activations):
-        concat.append(activation(output[:,:,i])[:,:,None])
-      output = tf.concat(concat, axis=2)
+    output = self._multi_act_layer(output)              # shape: (batch_size, target_elements, output_depth)
     return output
 
   @property
@@ -80,6 +77,10 @@ class Transformer(tf.keras.Model):
   @property
   def key_dim(self):   # TODO: add Union[int, None]
     return self._key_dim
+
+  @property
+  def output_activations(self):   # TODO: add Union[list, None]
+    return self._output_activations
 
   @property
   def ff_units(self) -> int:

@@ -3,3 +3,4 @@ from .FeedForward import FeedForward
 from .Encoder import Encoder
 from .Decoder import Decoder
 from .DeepSets import DeepSets
+from .MultiActivations import MultiActivations
