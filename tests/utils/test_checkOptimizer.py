@@ -6,13 +6,6 @@ STR_CASES = ["sgd", "rmsprop", "adam"]
 CLS_CASES = [SGD(), RMSprop(), Adam()]
 
 
-@pytest.fixture
-def checker():
-  from calotron.utils import checkOptimizer
-  chk = checkOptimizer
-  return chk
-
-
 ###########################################################################
 
 

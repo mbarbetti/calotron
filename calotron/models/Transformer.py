@@ -41,9 +41,12 @@ class Transformer(tf.keras.Model):
                             dropout_rate=self._dropout_rate,
                             residual_smoothing=self._residual_smoothing)
 
-    self._final_layer = tf.keras.layers.Dense(self._output_depth)
+    self._final_layer = tf.keras.layers.Dense(self._output_depth, name="output_layer")
+
+    # TODO: find a way to remove the whole list of activations from the summary
     self._multi_act_layer = MultiActivations(output_activations, 
-                                             self._output_depth)
+                                             self._output_depth,
+                                             name="ma_layer")
     self._output_activations = self._multi_act_layer.output_activations
 
   def call(self, inputs):
