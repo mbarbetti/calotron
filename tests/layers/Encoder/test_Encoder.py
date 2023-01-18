@@ -2,19 +2,6 @@ import pytest
 import tensorflow as tf
 
 
-@pytest.fixture
-def layer():
-  from calotron.layers import Encoder
-  enc_layer = Encoder(encoder_depth=16,
-                      num_layers=4, 
-                      num_heads=8,
-                      key_dim=64,
-                      ff_units=128,
-                      dropout_rate=0.1,
-                      residual_smoothing=True)
-  return enc_layer
-
-
 ###########################################################################
 
 

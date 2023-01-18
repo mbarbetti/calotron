@@ -21,8 +21,7 @@ def checker():
 
 def test_checker_use_None(checker):
   res = checker(None, OUTPUT_DIM)
-  if res is not None:
-    assert False
+  assert res is None
 
 
 def test_checker_use_string(checker):

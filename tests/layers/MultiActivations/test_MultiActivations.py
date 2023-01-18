@@ -8,14 +8,6 @@ STR_CASES = ["sigmoid", "tanh", "relu"]
 CLS_CASES = [Activation(sigmoid), Activation(tanh), Activation(relu)]
 
 
-@pytest.fixture
-def layer():
-  from calotron.layers import MultiActivations
-  ma = MultiActivations(activations="sigmoid",
-                        output_depth=3)
-  return ma
-
-
 ###########################################################################
 
 

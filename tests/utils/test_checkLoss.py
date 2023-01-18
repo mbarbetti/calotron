@@ -11,13 +11,6 @@ STR_CASES = ["bce", "kl", "js", "mse", "mae"]
 CLS_CASES = [BCE(), KL(), JS(), MSE(), MAE()]
 
 
-@pytest.fixture
-def checker():
-  from calotron.utils import checkLoss
-  chk = checkLoss
-  return chk
-
-
 ###########################################################################
 
 

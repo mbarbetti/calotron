@@ -25,8 +25,7 @@ def checker():
 
 def test_checker_use_None(checker):
   res = checker(None)
-  if res is not None:
-    assert False
+  assert res is None
 
 
 @pytest.mark.parametrize("metrics", [[s] for s in STR_CASES])
