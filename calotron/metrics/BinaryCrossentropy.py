@@ -11,15 +11,10 @@ class BinaryCrossentropy(BaseMetric):
                label_smoothing=0.0):
     super().__init__(name, dtype)
     self._bce = TF_BCE(name=name,
-                          dtype=dtype,
-                          from_logits=from_logits,
-                          label_smoothing=label_smoothing)
+                       dtype=dtype,
+                       from_logits=from_logits,
+                       label_smoothing=label_smoothing)
 
   def update_state(self, y_true, y_pred, sample_weight=None):
-    y_tot = tf.concat([y_true, y_pred], axis=0)
-    if sample_weight is not None:
-      w_tot = tf.concat([sample_weight, sample_weight], axis=0)
-    else:
-      w_tot = None
-    state = self._bce(tf.ones_like(y_tot), y_tot, sample_weight=w_tot)
+    state = self._bce(tf.ones_like(y_pred), y_pred, sample_weight=sample_weight)
     self._metric_values.assign(state)

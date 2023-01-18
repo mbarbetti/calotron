@@ -4,9 +4,9 @@ import tensorflow as tf
 
 
 np.random.seed(42)
-chunk_size = int(5e4)
-y_true = np.random.uniform(0.5, 1.0, size=(chunk_size,))
-y_pred = np.random.uniform(0.2, 0.8, size=(chunk_size,))
+chunk_size = int(1e4)
+y_true = None
+y_pred = np.random.uniform(0.0, 1.0, size=(chunk_size,))
 
 
 @pytest.fixture
@@ -31,11 +31,16 @@ def test_metric_configuration(metric):
 def test_metric_use(metric):
   metric.update_state(y_true, y_pred)
   res = metric.result().numpy()
-  assert (res > 0.53) and (res < 0.54)
+  assert (res > 0.9) and (res < 1.1)
 
 
-def test_metric_kargs(metric):
-  w = np.random.uniform(0.0, 1.0, size=(chunk_size,)) > 0.5
-  metric.update_state(y_true, y_pred, sample_weight=w[None,:])
+@pytest.mark.parametrize("sample_weight", [None, 1.0])
+def test_metric_kargs(sample_weight):
+  from calotron.metrics import BinaryCrossentropy
+  metric = BinaryCrossentropy(name="bce",
+                              dtype=None,
+                              from_logits=False,
+                              label_smoothing=0.0)
+  metric.update_state(y_true, y_pred, sample_weight=sample_weight)
   res = metric.result().numpy()
-  assert (res > 0.53) and (res < 0.54)
+  assert (res > 0.9) and (res < 1.1)
