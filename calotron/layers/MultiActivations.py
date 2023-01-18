@@ -3,8 +3,8 @@ from calotron.utils import checkActivations
 
 
 class MultiActivations(tf.keras.layers.Layer):
-  def __init__(self, activations, output_depth):
-    super().__init__()
+  def __init__(self, activations, output_depth, name=None):
+    super().__init__(name=name)
     self._output_depth = int(output_depth)
     self._output_activations = checkActivations(activations, output_depth)
 

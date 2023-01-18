@@ -2,8 +2,9 @@ import tensorflow as tf
 
 
 class DeepSets(tf.keras.layers.Layer):
-  def __init__(self, latent_dim, num_layers, hidden_units=128, dropout_rate=0.1):
-    super().__init__()
+  def __init__(self, latent_dim, num_layers, hidden_units=128,
+               dropout_rate=0.1, name=None):
+    super().__init__(name=name)
     self._latent_dim = int(latent_dim)
     if num_layers < 1:
       raise ValueError("`num_layers` should be greater than 0")
