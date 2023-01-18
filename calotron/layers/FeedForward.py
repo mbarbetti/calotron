@@ -3,8 +3,8 @@ import tensorflow as tf
 
 class FeedForward(tf.keras.layers.Layer):
   def __init__(self, output_units, hidden_units, dropout_rate=0.1,
-               residual_smoothing=True, name=None):
-    super().__init__(name=name)
+               residual_smoothing=True, name=None, dtype=None):
+    super().__init__(name=name, dtype=dtype)
     self._output_units = int(output_units)
     self._hidden_units = int(hidden_units)
     self._dropout_rate = float(dropout_rate)

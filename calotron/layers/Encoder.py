@@ -5,8 +5,8 @@ from calotron.layers import GlobalSelfAttention, FeedForward
 class EncoderLayer(tf.keras.layers.Layer):
   def __init__(self, encoder_depth, num_heads, 
                key_dim=None, ff_units=128, dropout_rate=0.1,
-               residual_smoothing=True, name=None):
-    super().__init__(name=name)
+               residual_smoothing=True, name=None, dtype=None):
+    super().__init__(name=name, dtype=dtype)
     self._encoder_depth = int(encoder_depth)
     self._num_heads = int(num_heads)
     self._key_dim = int(key_dim) if key_dim else None
@@ -57,8 +57,8 @@ class EncoderLayer(tf.keras.layers.Layer):
 class Encoder(tf.keras.layers.Layer):
   def __init__(self, encoder_depth, num_layers, num_heads,
                key_dim=None, ff_units=128, dropout_rate=0.1,
-               residual_smoothing=True, name=None):
-    super().__init__(name=name)
+               residual_smoothing=True, name=None, dtype=None):
+    super().__init__(name=name, dtype=None)
     self._encoder_depth = int(encoder_depth)
     self._num_layers = int(num_layers)
     self._num_heads = int(num_heads)

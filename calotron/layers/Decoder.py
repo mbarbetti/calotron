@@ -5,8 +5,8 @@ from calotron.layers import CausalSelfAttention, CrossAttention, FeedForward
 class DecoderLayer(tf.keras.layers.Layer):
   def __init__(self, decoder_depth, num_heads, 
                key_dim=None, ff_units=128, dropout_rate=0.1, 
-               residual_smoothing=True, name=None):
-    super().__init__(name=name)
+               residual_smoothing=True, name=None, dtype=None):
+    super().__init__(name=name, dtype=dtype)
     self._decoder_depth = int(decoder_depth)
     self._num_heads = int(num_heads)
     self._key_dim = int(key_dim) if key_dim else None
@@ -63,8 +63,8 @@ class DecoderLayer(tf.keras.layers.Layer):
 class Decoder(tf.keras.layers.Layer):
   def __init__(self, decoder_depth, num_layers, num_heads,
                key_dim=None, ff_units=128, dropout_rate=0.1,
-               residual_smoothing=True, name=None):
-    super().__init__(name=name)
+               residual_smoothing=True, name=None, dtype=None):
+    super().__init__(name=name, dtype=dtype)
     self._decoder_depth = int(decoder_depth)
     self._num_layers = int(num_layers)
     self._num_heads = int(num_heads)
