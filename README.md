@@ -1,5 +1,6 @@
 # calotron
 
+[![TensorFlow versions](https://img.shields.io/badge/tensorflow-2.11-f57000?style=flat)](https://www.tensorflow.org/versions)
 ![PyPI - Python versions](https://img.shields.io/pypi/pyversions/calotron)
 [![PyPI - Version](https://img.shields.io/pypi/v/calotron)](https://pypi.python.org/pypi/calotron)
 ![PyPI - Status](https://img.shields.io/pypi/status/calotron)
