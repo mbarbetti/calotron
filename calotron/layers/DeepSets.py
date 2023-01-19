@@ -14,10 +14,15 @@ class DeepSets(tf.keras.layers.Layer):
 
     self._seq = list()
     for _ in range(self._num_layers - 1):
-      self._seq.append(tf.keras.layers.Dense(self._hidden_units, activation="relu"))
-      self._seq.append(tf.keras.layers.Dropout(self._dropout_rate))
+      self._seq.append(tf.keras.layers.Dense(self._hidden_units,
+                                             activation="relu",
+                                             dtype=self.dtype))
+      self._seq.append(tf.keras.layers.Dropout(self._dropout_rate,
+                                               dtype=self.dtype))
     self._seq += [
-        tf.keras.layers.Dense(self._latent_dim, activation="relu")]
+        tf.keras.layers.Dense(self._latent_dim,
+                              activation="relu",
+                              dtype=self.dtype)]
   
   def call(self, x):
     # shape: (batch_size, x_elements, x_depth)

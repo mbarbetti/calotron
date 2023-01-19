@@ -11,17 +11,22 @@ class FeedForward(tf.keras.layers.Layer):
     self._residual_smoothing = bool(residual_smoothing)
 
     if self._residual_smoothing:
-      self._emb_layer = tf.keras.layers.Dense(self._output_units)
+      self._emb_layer = tf.keras.layers.Dense(self._output_units,
+                                              dtype=self.dtype)
     else:
       self._emb_layer = None
 
     self._seq = tf.keras.Sequential([
-        tf.keras.layers.Dense(self._hidden_units, activation="relu"),
-        tf.keras.layers.Dropout(self._dropout_rate),
-        tf.keras.layers.Dense(self._output_units)])
+        tf.keras.layers.Dense(self._hidden_units,
+                              activation="relu",
+                              dtype=self.dtype),
+        tf.keras.layers.Dropout(self._dropout_rate,
+                                dtype=self.dtype),
+        tf.keras.layers.Dense(self._output_units,
+                              dtype=self.dtype)])
 
     self._add = tf.keras.layers.Add()
-    self._layer_norm = tf.keras.layers.LayerNormalization()
+    self._layer_norm = tf.keras.layers.LayerNormalization(dtype=self.dtype)
 
   def call(self, x):
     if self._emb_layer is not None:

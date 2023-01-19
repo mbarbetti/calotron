@@ -2,11 +2,14 @@ import tensorflow as tf
 from tensorflow.keras.layers import Activation, Layer
 
 
-def checkActivations(activations, output_length):
+def checkActivations(activations, output_length, dtype=None):
   if activations is None:
     return None
   elif isinstance(activations, str):
-    return [Activation(activations) for _ in range(output_length)]
+    return [
+        Activation(activations, dtype=dtype) 
+        for _ in range(output_length)
+      ]
   elif isinstance(activations, Layer):
     return [activations for _ in range(output_length)]
   elif isinstance(activations, list):
@@ -17,7 +20,7 @@ def checkActivations(activations, output_length):
     checked_activations = list()
     for activation in activations:
       if isinstance(activation, str):
-        checked_activations.append(Activation(activation))
+        checked_activations.append(Activation(activation, dtype=dtype))
       elif isinstance(activation, Layer):
         checked_activations.append(activation)
       else:

@@ -6,7 +6,9 @@ class MultiActivations(tf.keras.layers.Layer):
   def __init__(self, activations, output_depth, name=None, dtype=None):
     super().__init__(name=name, dtype=dtype)
     self._output_depth = int(output_depth)
-    self._output_activations = checkActivations(activations, output_depth)
+    self._output_activations = checkActivations(activations,
+                                                output_depth,
+                                                dtype)
 
   def call(self, x):
     if x.shape[2] != self._output_depth:
