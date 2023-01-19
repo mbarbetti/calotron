@@ -23,7 +23,7 @@ def test_loss_configuration(loss):
   assert isinstance(loss.name, str)
 
 
-def test_loss_configuration(loss):
+def test_loss_use(loss):
   out1 = loss.discriminator_loss(y_true, y_pred).numpy()
   out2 = loss.transformer_loss(y_true, y_pred).numpy()
   assert out1 == -out2
