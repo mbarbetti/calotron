@@ -24,9 +24,9 @@ class CaloTron(tf.keras.Model):
     d_output_pred = self._discriminator(output)
     return output, d_output_true, d_output_pred
 
-  def summary(self):
-    self._transformer.summary()
-    self._discriminator.summary()
+  def summary(self, **kwargs):
+    self._transformer.summary(**kwargs)
+    self._discriminator.summary(**kwargs)
 
   def compile(self,
               loss,

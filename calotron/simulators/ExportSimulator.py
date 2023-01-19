@@ -1,6 +1,6 @@
 import tensorflow as tf
 TF_FLOAT = tf.float32
-from calotron.simulators import Simulator
+from calotron.simulators.Simulator import Simulator
 
 
 class ExportSimulator(tf.Module):

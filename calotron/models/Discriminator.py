@@ -9,8 +9,10 @@ class Discriminator(tf.keras.Model):
                output_activation=None,
                hidden_layers=3,
                hidden_units=128,
-               dropout_rate=0.1):
-    super().__init__()
+               dropout_rate=0.1,
+               name=None,
+               dtype=None):
+    super().__init__(name=name, dtype=dtype)
     self._latent_dim = int(latent_dim)
     self._output_units = int(output_units)
     self._output_activation = output_activation
@@ -21,14 +23,22 @@ class Discriminator(tf.keras.Model):
     self._deepsets = DeepSets(latent_dim=self._latent_dim,
                               num_layers=self._hidden_layers,
                               hidden_units=self._hidden_units,
-                              dropout_rate=self._dropout_rate)
+                              dropout_rate=self._dropout_rate,
+                              dtype=self.dtype)
 
-    self._seq = [tf.keras.layers.Dense(self._latent_dim, activation="relu"),
-                 tf.keras.layers.Dropout(self._dropout_rate),
-                 tf.keras.layers.Dense(self._latent_dim, activation="relu"),
-                 tf.keras.layers.Dropout(self._dropout_rate)]
+    self._seq = [tf.keras.layers.Dense(self._latent_dim,
+                                       activation="relu",
+                                       dtype=self.dtype),
+                 tf.keras.layers.Dropout(self._dropout_rate,
+                                         dtype=self.dtype),
+                 tf.keras.layers.Dense(self._latent_dim,
+                                       activation="relu",
+                                       dtype=self.dtype),
+                 tf.keras.layers.Dropout(self._dropout_rate,
+                                         dtype=self.dtype)]
     self._seq += [tf.keras.layers.Dense(self._output_units,
-                                        activation=self._output_activation)]
+                                        activation=self._output_activation,
+                                        dtype=self.dtype)]
 
   def call(self, x):
     x = self._deepsets(x)
