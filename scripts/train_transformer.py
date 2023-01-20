@@ -8,8 +8,8 @@ from calotron.callbacks.schedulers import AttentionDecay
 from calotron.simulators import Simulator
 
 
-ORDER = True
-POSITION = True
+ORDER = False
+POSITION = False
 BATCHSIZE = 128
 EPOCHS = 25
 DTYPE = tf.float32
@@ -30,11 +30,13 @@ photon_shuffled = np.zeros_like(photon)
 cluster_shuffled = np.zeros_like(cluster)
 cluster_labels_shuffled = np.zeros_like(cluster_labels)
 for i in range(chunk_size):
-  photon_order = np.random.permutation(photon.shape[1])
-  photon_shuffled[i] = photon[i, photon_order, :]
-  cluster_order = np.random.permutation(cluster.shape[1])
-  cluster_shuffled[i] = cluster[i, cluster_order, :]
-  cluster_labels_shuffled[i] = cluster_labels[i, cluster_order, :]
+  new_photon_order = np.random.permutation(photon.shape[1])
+  photon_shuffled[i] = photon[i, new_photon_order, :]
+  new_order = np.random.permutation(cluster.shape[1]-1)
+  new_cluster_order = [0] + list(new_order+1)
+  cluster_shuffled[i] = cluster[i, new_cluster_order, :]
+  new_cluster_order = list(new_order) + [cluster.shape[1]-1]
+  cluster_labels_shuffled[i] = cluster_labels[i, new_cluster_order, :]
 
 #print(f"photon SHUFFLED {photon_shuffled.shape}\n", photon_shuffled)
 #print(f"cluster SHUFFLED {cluster_shuffled.shape}\n", cluster_shuffled)
