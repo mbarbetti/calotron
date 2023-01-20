@@ -7,7 +7,7 @@ from calotron.layers.FeedForward import FeedForward
 
 class DecoderLayer(tf.keras.layers.Layer):
   def __init__(self, decoder_depth, num_heads, 
-               key_dim=None, ff_units=128, dropout_rate=0.1, 
+               key_dim=None, ff_units=256, dropout_rate=0.1, 
                residual_smoothing=True, name=None, dtype=None):
     super().__init__(name=name, dtype=dtype)
     self._decoder_depth = int(decoder_depth)
@@ -68,8 +68,8 @@ class DecoderLayer(tf.keras.layers.Layer):
 
 class Decoder(tf.keras.layers.Layer):
   def __init__(self, decoder_depth, num_layers, num_heads,
-               key_dim=None, pos_dim=None, pos_normalization=512,
-               max_length=128, ff_units=128, dropout_rate=0.1,
+               key_dim=None, pos_dim=None, pos_normalization=128,
+               max_length=32, ff_units=256, dropout_rate=0.1,
                pos_sensitive=False, residual_smoothing=True,
                name=None, dtype=None):
     super().__init__(name=name, dtype=dtype)

@@ -2,7 +2,7 @@ import tensorflow as tf
 
 
 class DeepSets(tf.keras.layers.Layer):
-  def __init__(self, latent_dim, num_layers, hidden_units=128,
+  def __init__(self, latent_dim, num_layers, hidden_units=256,
                dropout_rate=0.1, name=None, dtype=None):
     super().__init__(name=name, dtype=dtype)
     self._latent_dim = int(latent_dim)

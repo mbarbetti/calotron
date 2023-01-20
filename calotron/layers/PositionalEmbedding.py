@@ -3,8 +3,8 @@ import tensorflow as tf
 
 
 class PositionalEmbedding(tf.keras.layers.Layer):
-  def __init__(self, output_depth, max_length=128, 
-               encoding_normalization=512, dropout_rate=0.1,
+  def __init__(self, output_depth, max_length=32, 
+               encoding_normalization=128, dropout_rate=0.1,
                name=None, dtype=None):
     super().__init__(name=name, dtype=dtype)
     self._output_depth = int(output_depth)
