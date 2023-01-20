@@ -29,7 +29,6 @@ class PositionalEmbedding(tf.keras.layers.Layer):
     length = tf.shape(x)[1]
     x = self._embedding(x)
     x *= tf.math.sqrt(tf.cast(self._output_depth, self.dtype))   # scale factor
-    tf.print(self._pos_encoding.shape)
     x = x + self._pos_encoding[None, :length, :]
     x = self._dropout(x)
     return x

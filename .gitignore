@@ -1,3 +1,8 @@
+# Data files
+*.root
+*.npz
+*.png
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
