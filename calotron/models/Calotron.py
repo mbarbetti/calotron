@@ -1,9 +1,10 @@
 import tensorflow as tf
-from calotron.models import Transformer, Discriminator
+from calotron.models.Transformer import Transformer
+from calotron.models.Discriminator import Discriminator
 from calotron.utils import checkLoss, checkMetrics, checkOptimizer
 
 
-class CaloTron(tf.keras.Model):
+class Calotron(tf.keras.Model):
   def __init__(self, transformer, discriminator):
     super().__init__()
     if not isinstance(transformer, Transformer):
