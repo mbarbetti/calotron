@@ -136,9 +136,9 @@ plt.savefig(f"img/{version}-{tag}-energy.png")
 
 plt.figure(figsize=(20, 10), dpi=80)
 plt.subplot(1,2,1)
-plt.imshow(Y_labels[:64, :, 2].numpy(), aspect='auto', interpolation='none')
+plt.imshow(Y_labels[:64,:,2].numpy(), aspect='auto', interpolation='none')
 plt.subplot(1,2,2)
-plt.imshow(out[:64, :, 2].numpy(), aspect='auto', interpolation='none')
+plt.imshow(out[:64,:,2].numpy(), aspect='auto', interpolation='none')
 plt.savefig(f"img/{version}-{tag}-energy-map.png")
 
 print("All figures exported correctly!")
