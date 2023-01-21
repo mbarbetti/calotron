@@ -11,14 +11,16 @@ class BaseScheduler(Callback):
     self._verbose = bool(verbose)
 
   def on_train_begin(self, logs=None):
-    self._init_lr = K.get_value(self._optimizer.learning_rate)
+    init_lr = K.get_value(self._optimizer.learning_rate)
+    self._init_lr = tf.identity(init_lr)
     self._dtype = self._init_lr.dtype
     self._step = -1
 
   def on_batch_begin(self, batch, logs=None):
     self._step += 1
     step = tf.cast(self._step, self._dtype)
-    K.set_value(self._optimizer.learning_rate, self._scheduled_lr(self._init_lr, step))
+    K.set_value(self._optimizer.learning_rate,
+                self._scheduled_lr(self._init_lr, step))
 
   def _scheduled_lr(self, init_lr, step):
     return init_lr

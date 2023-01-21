@@ -9,7 +9,7 @@ from calotron.metrics import RootMeanSquaredError as RMSE
 from calotron.metrics import MeanAbsoluteError as MAE
 
 
-STR_CASES = ["accuracy", "bce", "kl", "js", "mse", "rmse", "mae"]
+STR_CASES = ["accuracy", "bce", "kl_div", "js_div", "mse", "rmse", "mae"]
 CLS_CASES = [Accuracy(), BCE(), KL(), JS(), MSE(), RMSE(), MAE()]
 
 

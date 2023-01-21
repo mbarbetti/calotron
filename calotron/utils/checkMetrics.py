@@ -8,7 +8,7 @@ from calotron.metrics import RootMeanSquaredError as RMSE
 from calotron.metrics import MeanAbsoluteError as MAE
 
 
-METRIC_SHORTCUTS = ["accuracy", "bce", "kl", "js", "mse", "rmse", "mae"]
+METRIC_SHORTCUTS = ["accuracy", "bce", "kl_div", "js_div", "mse", "rmse", "mae"]
 CALOTRON_METRICS = [Accuracy(), BCE(), KL(), JS(), MSE(), RMSE(), MAE()]
 
 

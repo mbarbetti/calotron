@@ -26,7 +26,7 @@ class Simulator(tf.Module):
     start_token = tf.cast(self._start_token, dtype=source.dtype)
     target = tf.expand_dims(start_token, axis=1)
     for _ in tf.range(max_length):
-      predictions = self.transformer([source, target], training=False)
+      predictions = self.transformer((source, target), training=False)
       target = tf.concat([target, predictions[:, -1:, :]], axis=1)
 
     assert target.shape[1] == max_length + 1
