@@ -3,3 +3,4 @@ from .KLDivergence import KLDivergence
 from .JSDivergence import JSDivergence
 from .MeanSquaredError import MeanSquaredError
 from .MeanAbsoluteError import MeanAbsoluteError
+from .CaloLoss import CaloLoss

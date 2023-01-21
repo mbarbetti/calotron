@@ -14,14 +14,21 @@ class BinaryCrossentropy(BaseLoss):
     self._loss = TF_BCE(from_logits=from_logits,
                         label_smoothing=label_smoothing,
                         axis=axis,
-                        reduction=reduction,
-                        name=name)
+                        reduction=reduction)
   
-  def discriminator_loss(self, y_true, y_pred, **kwargs):
-    loss_real = self(tf.ones_like(y_true), y_true, **kwargs)
-    loss_fake = self(tf.zeros_like(y_pred), y_pred, **kwargs)
+  def discriminator_loss(self, discriminator, target_true,
+                         target_pred, sample_weight=None):
+    y_true = discriminator(target_true)
+    y_pred = discriminator(target_pred)
+    loss_real = self._loss(tf.ones_like(y_true), y_true,
+                           sample_weight=sample_weight)
+    loss_fake = self._loss(tf.zeros_like(y_pred), y_pred,
+                           sample_weight=sample_weight)
     return loss_real + loss_fake
 
-  def transformer_loss(self, y_true, y_pred, **kwargs):
-    loss_fake = self(tf.ones_like(y_pred), y_pred, **kwargs)
+  def transformer_loss(self, discriminator, target_true,
+                       target_pred, sample_weight=None):
+    y_pred = discriminator(target_pred)
+    loss_fake = self._loss(tf.ones_like(y_pred), y_pred,
+                           sample_weight=sample_weight)
     return loss_fake
