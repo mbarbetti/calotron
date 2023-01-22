@@ -27,18 +27,13 @@ def test_metric_configuration(metric):
   assert isinstance(metric.name, str)
 
 
-def test_metric_use(metric):
-  metric.update_state(y_true, y_pred)
+def test_metric_use_no_weights(metric):
+  metric.update_state(y_true, y_pred, sample_weight=None)
   res = metric.result().numpy()
   assert (res > 0.48) and (res < 0.52)
 
 
-@pytest.mark.parametrize("sample_weight", [None, 1.0])
-def test_metric_kargs(sample_weight):
-  from calotron.metrics import Accuracy
-  metric = Accuracy(name="accuracy",
-                    dtype=None,
-                    threshold=0.5)
-  metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+def test_metric_use_with_weights(metric):
+  metric.update_state(y_true, y_pred, sample_weight=1.0)
   res = metric.result().numpy()
   assert (res > 0.48) and (res < 0.52)

@@ -23,13 +23,13 @@ def test_metric_configuration(metric):
   assert isinstance(metric.name, str)
 
 
-def test_metric_use(metric):
-  metric.update_state(y_true, y_pred)
+def test_metric_use_no_weights(metric):
+  metric.update_state(y_true, y_pred, sample_weight=None)
   res = metric.result().numpy()
   assert res == 0.25
 
 
-def test_metric_kargs(metric):
+def test_metric_use_with_weights(metric):
   w = [1, 0]
   metric.update_state(y_true, y_pred, sample_weight=w)
   res = metric.result().numpy()
