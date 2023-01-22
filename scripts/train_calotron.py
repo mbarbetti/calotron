@@ -9,6 +9,7 @@ from calotron.callbacks.schedulers import ExponentialDecay
 from calotron.simulators import Simulator
 
 
+ALPHA = 0.05
 ORDER = True
 POSITION = True
 BATCHSIZE = 128
@@ -98,8 +99,8 @@ model.summary()
 t_opt = tf.keras.optimizers.Adam(1e-3)
 d_opt = tf.keras.optimizers.RMSprop(1e-4)
 
-model.compile(loss=CaloLoss(alpha=0.05),
-              metrics=["bce"],
+model.compile(loss=CaloLoss(alpha=ALPHA),
+              metrics=["accuracy"],
               transformer_optimizer=t_opt,
               discriminator_optimizer=d_opt,
               transformer_upds_per_batch=5,
@@ -122,6 +123,10 @@ for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
   version += time + unit   # YYYYMMDD-HHhMMmSSs
 
 tag = ""
+if ALPHA == 0.0:
+  tag += "noadv"
+else:
+  tag += "adv"
 if ORDER:
   tag += "ord"
 else:
