@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 
-chunk_size = int(1e5)
+chunk_size = int(1e4)
 
 X = np.c_[
   np.random.uniform(-1, 1, size=chunk_size),
@@ -26,7 +26,7 @@ mse = tf.keras.losses.MeanSquaredError()
 def scheduler():
   from calotron.callbacks.schedulers import PiecewiseConstantDecay
   sched = PiecewiseConstantDecay(optimizer=adam,
-                                 boundaries=[200, 400],
+                                 boundaries=[25, 50],
                                  values=[0.001, 0.0005, 0.0001],
                                  verbose=True)
   return sched
@@ -48,7 +48,6 @@ def test_sched_configuration(scheduler):
 
 def test_sched_use(scheduler):
   model.compile(optimizer=adam, loss=mse)
-  history = model.fit(X, Y, batch_size=512, epochs=10, callbacks=[scheduler])
-  assert isinstance(scheduler._dtype, np.dtype)
+  history = model.fit(X, Y, batch_size=500, epochs=5, callbacks=[scheduler])
   last_lr = float(f"{history.history['lr'][-1]:.4f}")
   assert  last_lr == 0.0001

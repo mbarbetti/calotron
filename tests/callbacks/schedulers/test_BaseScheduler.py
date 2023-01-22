@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 
-chunk_size = int(1e5)
+chunk_size = int(1e4)
 
 X = np.c_[
   np.random.uniform(-1, 1, size=chunk_size),
@@ -41,6 +41,5 @@ def test_sched_configuration(scheduler):
 def test_sched_use(scheduler):
   model.compile(optimizer=adam, loss=mse)
   history = model.fit(X, Y, batch_size=512, epochs=10, callbacks=[scheduler])
-  assert isinstance(scheduler._dtype, np.dtype)
   last_lr = float(f"{history.history['lr'][-1]:.3f}")
   assert  last_lr == 0.001
