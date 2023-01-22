@@ -3,8 +3,14 @@ import numpy as np
 import tensorflow as tf
 
 
-y_true = [[0, 1], [0, 0]]
-y_pred = [[0.6, 0.4], [0.4, 0.6]]
+np.random.seed(42)
+chunk_size = int(1e4)
+target_true = np.random.uniform(0.5, 1.0, size=(chunk_size, 5))
+target_pred = np.random.uniform(0.2, 0.8, size=(chunk_size, 5))
+
+model = tf.keras.Sequential([
+    tf.keras.layers.Dense(8, activation="relu"),
+    tf.keras.layers.Dense(1, activation="sigmoid")])
 
 
 @pytest.fixture
@@ -23,25 +29,26 @@ def test_loss_configuration(loss):
   assert isinstance(loss.name, str)
 
 
-def test_loss_use(loss):
-  out1 = loss.discriminator_loss(y_true, y_pred).numpy()
-  out2 = loss.transformer_loss(y_true, y_pred).numpy()
-  assert out1 == -out2
+def test_loss_use_no_weights(loss):
+  out1 = loss.discriminator_loss(discriminator=model,
+                                 target_true=target_true,
+                                 target_pred=target_pred,
+                                 sample_weight=None)
+  out2 = loss.transformer_loss(discriminator=model,
+                               target_true=target_true,
+                               target_pred=target_pred,
+                               sample_weight=None)
+  assert out1.numpy() == -out2.numpy()
 
 
-@pytest.mark.parametrize("reduction",
-                         [tf.keras.losses.Reduction.SUM,
-                          tf.keras.losses.Reduction.NONE])
-def test_loss_reduction(reduction):
-  from calotron.losses import KLDivergence
-  loss = KLDivergence(reduction=reduction, name="kl_loss")
-  out1 = loss.discriminator_loss(y_true, y_pred).numpy()
-  out2 = loss.transformer_loss(y_true, y_pred).numpy()
-  assert np.all(np.equal(out1, -out2))
-
-
-def test_loss_kargs(loss):
-  w = [0.8, 0.2]
-  out1 = loss.discriminator_loss(y_true, y_pred, sample_weight=w).numpy()
-  out2 = loss.transformer_loss(y_true, y_pred, sample_weight=w).numpy()
-  assert out1 == - out2
+def test_loss_use_with_weights(loss):
+  w = np.random.uniform(0.0, 1.0, size=(chunk_size,1)) > 0.5
+  out1 = loss.discriminator_loss(discriminator=model,
+                                 target_true=target_true,
+                                 target_pred=target_pred,
+                                 sample_weight=w)
+  out2 = loss.transformer_loss(discriminator=model,
+                               target_true=target_true,
+                               target_pred=target_pred,
+                               sample_weight=w)
+  assert out1.numpy() == -out2.numpy()
