@@ -4,10 +4,10 @@ from calotron.metrics.BaseMetric import BaseMetric
 
 
 class KLDivergence(BaseMetric):
-  def __init__(self, name="kl_div", dtype=None):
-    super().__init__(name, dtype)
-    self._kl_div = TF_KLDivergence(name=name, dtype=dtype)
+    def __init__(self, name="kl_div", dtype=None):
+        super().__init__(name, dtype)
+        self._kl_div = TF_KLDivergence(name=name, dtype=dtype)
 
-  def update_state(self, y_true, y_pred, sample_weight=None):
-    state = self._kl_div(y_true, y_pred, sample_weight=sample_weight)
-    self._metric_values.assign(state)
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        state = self._kl_div(y_true, y_pred, sample_weight=sample_weight)
+        self._metric_values.assign(state)

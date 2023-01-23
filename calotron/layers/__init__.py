@@ -1,6 +1,4 @@
-from .Attention import (CrossAttention,
-                        GlobalSelfAttention,
-                        CausalSelfAttention)
+from .Attention import CrossAttention, GlobalSelfAttention, CausalSelfAttention
 from .PositionalEmbedding import PositionalEmbedding
 from .MultiActivations import MultiActivations
 from .FeedForward import FeedForward

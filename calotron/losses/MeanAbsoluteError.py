@@ -4,18 +4,24 @@ from calotron.losses.BaseLoss import BaseLoss
 
 
 class MeanAbsoluteError(BaseLoss):
-  def __init__(self, reduction="auto", name="mae_loss"):
-    super().__init__(name)
-    self._loss = TF_MAE(reduction=reduction)
-  
-  def discriminator_loss(self, discriminator, target_true, 
-                         target_pred, sample_weight=None):
-    y_true = discriminator(target_true)
-    y_pred = discriminator(target_pred)
-    return -self._loss(y_true, y_pred, sample_weight=sample_weight)   # error maximization
+    def __init__(self, reduction="auto", name="mae_loss"):
+        super().__init__(name)
+        self._loss = TF_MAE(reduction=reduction)
 
-  def transformer_loss(self, discriminator, target_true, 
-                       target_pred, sample_weight=None):
-    y_true = discriminator(target_true)
-    y_pred = discriminator(target_pred)
-    return self._loss(y_true, y_pred, sample_weight=sample_weight)   # error minimization
+    def discriminator_loss(
+        self, discriminator, target_true, target_pred, sample_weight=None
+    ):
+        y_true = discriminator(target_true)
+        y_pred = discriminator(target_pred)
+        return -self._loss(
+            y_true, y_pred, sample_weight=sample_weight
+        )  # error maximization
+
+    def transformer_loss(
+        self, discriminator, target_true, target_pred, sample_weight=None
+    ):
+        y_true = discriminator(target_true)
+        y_pred = discriminator(target_pred)
+        return self._loss(
+            y_true, y_pred, sample_weight=sample_weight
+        )  # error minimization
