@@ -1,7 +1,6 @@
-import pytest
 import numpy as np
+import pytest
 import tensorflow as tf
-
 
 y_true = [[0, 1], [0, 0]]
 y_pred = [[1, 1], [0, 0]]

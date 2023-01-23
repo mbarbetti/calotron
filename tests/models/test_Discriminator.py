@@ -1,7 +1,6 @@
 import pytest
 import tensorflow as tf
 
-
 chunk_size = int(5e4)
 
 input1 = tf.random.normal(shape=(chunk_size, 4, 10), mean=1.0)

@@ -1,8 +1,8 @@
 import tensorflow as tf
-from calotron.layers.PositionalEmbedding import PositionalEmbedding
-from calotron.layers.Attention import CausalSelfAttention
-from calotron.layers.Attention import CrossAttention
+
+from calotron.layers.Attention import CausalSelfAttention, CrossAttention
 from calotron.layers.FeedForward import FeedForward
+from calotron.layers.PositionalEmbedding import PositionalEmbedding
 
 
 class DecoderLayer(tf.keras.layers.Layer):

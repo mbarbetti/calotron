@@ -1,6 +1,5 @@
 import pytest
-from tensorflow.keras.optimizers import Optimizer, SGD, RMSprop, Adam
-
+from tensorflow.keras.optimizers import SGD, Adam, Optimizer, RMSprop
 
 STR_CASES = ["sgd", "rmsprop", "adam"]
 CLS_CASES = [SGD(), RMSprop(), Adam()]

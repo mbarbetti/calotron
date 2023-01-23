@@ -1,8 +1,7 @@
 import pytest
 import tensorflow as tf
+from tensorflow.keras.activations import relu, sigmoid, tanh
 from tensorflow.keras.layers import Activation, ReLU
-from tensorflow.keras.activations import sigmoid, tanh, relu
-
 
 STR_CASES = ["sigmoid", "tanh", "relu"]
 CLS_CASES = [Activation(sigmoid), Activation(tanh), Activation(relu)]

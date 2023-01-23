@@ -1,13 +1,13 @@
 import pytest
-from calotron.metrics.BaseMetric import BaseMetric
+
 from calotron.metrics import Accuracy
 from calotron.metrics import BinaryCrossentropy as BCE
-from calotron.metrics import KLDivergence as KL
 from calotron.metrics import JSDivergence as JS
+from calotron.metrics import KLDivergence as KL
+from calotron.metrics import MeanAbsoluteError as MAE
 from calotron.metrics import MeanSquaredError as MSE
 from calotron.metrics import RootMeanSquaredError as RMSE
-from calotron.metrics import MeanAbsoluteError as MAE
-
+from calotron.metrics.BaseMetric import BaseMetric
 
 STR_CASES = ["accuracy", "bce", "kl_div", "js_div", "mse", "rmse", "mae"]
 CLS_CASES = [Accuracy(), BCE(), KL(), JS(), MSE(), RMSE(), MAE()]

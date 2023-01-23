@@ -1,7 +1,7 @@
 import pytest
 import tensorflow as tf
-from calotron.models import Transformer
 
+from calotron.models import Transformer
 
 chunk_size = int(1e5)
 batch_size = 100

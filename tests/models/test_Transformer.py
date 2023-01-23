@@ -1,7 +1,6 @@
 import pytest
 import tensorflow as tf
 
-
 chunk_size = int(1e4)
 
 source = tf.random.normal(shape=(chunk_size, 16, 3))
@@ -84,7 +83,7 @@ def test_model_configuration(
     if model.output_activations is not None:
         assert isinstance(model.output_activations, list)
 
-    from calotron.layers import Encoder, Decoder
+    from calotron.layers import Decoder, Encoder
 
     assert isinstance(model.encoder, Encoder)
     assert isinstance(model.decoder, Decoder)

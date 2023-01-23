@@ -1,6 +1,7 @@
 import tensorflow as tf
-from calotron.models.Transformer import Transformer
+
 from calotron.models.Discriminator import Discriminator
+from calotron.models.Transformer import Transformer
 from calotron.utils import checkLoss, checkMetrics, checkOptimizer
 
 

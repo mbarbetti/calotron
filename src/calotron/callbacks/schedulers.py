@@ -2,7 +2,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
 
-
 K = tf.keras.backend
 
 

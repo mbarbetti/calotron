@@ -1,7 +1,8 @@
 import tensorflow as tf
-from calotron.layers.PositionalEmbedding import PositionalEmbedding
+
 from calotron.layers.Attention import GlobalSelfAttention
 from calotron.layers.FeedForward import FeedForward
+from calotron.layers.PositionalEmbedding import PositionalEmbedding
 
 
 class EncoderLayer(tf.keras.layers.Layer):

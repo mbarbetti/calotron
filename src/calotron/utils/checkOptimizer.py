@@ -1,6 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.optimizers import Optimizer, SGD, RMSprop, Adam
-
+from tensorflow.keras.optimizers import SGD, Adam, Optimizer, RMSprop
 
 OPT_SHORTCUTS = ["sgd", "rmsprop", "adam"]
 TF_OPTIMIZERS = [SGD(), RMSprop(), Adam()]

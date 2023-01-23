@@ -1,8 +1,7 @@
 import pytest
 import tensorflow as tf
-from tensorflow.keras.layers import Layer, Activation, ReLU
-from tensorflow.keras.activations import sigmoid, tanh, relu
-
+from tensorflow.keras.activations import relu, sigmoid, tanh
+from tensorflow.keras.layers import Activation, Layer, ReLU
 
 OUTPUT_DIM = 3
 STR_CASES = ["sigmoid", "tanh", "relu"]

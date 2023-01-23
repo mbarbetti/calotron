@@ -1,6 +1,7 @@
 import tensorflow as tf
-from tensorflow.keras.losses import MeanSquaredError as TF_MSE
 from tensorflow.keras.losses import BinaryCrossentropy as TF_BCE
+from tensorflow.keras.losses import MeanSquaredError as TF_MSE
+
 from calotron.losses.BaseLoss import BaseLoss
 
 

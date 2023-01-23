@@ -1,5 +1,6 @@
 import tensorflow as tf
-from calotron.layers import Encoder, Decoder, MultiActivations
+
+from calotron.layers import Decoder, Encoder, MultiActivations
 
 
 class Transformer(tf.keras.Model):

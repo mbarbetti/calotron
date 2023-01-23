@@ -1,11 +1,11 @@
 import tensorflow as tf
-from calotron.losses.BaseLoss import BaseLoss
-from calotron.losses import BinaryCrossentropy as BCE
-from calotron.losses import KLDivergence as KL
-from calotron.losses import JSDivergence as JS
-from calotron.losses import MeanSquaredError as MSE
-from calotron.losses import MeanAbsoluteError as MAE
 
+from calotron.losses import BinaryCrossentropy as BCE
+from calotron.losses import JSDivergence as JS
+from calotron.losses import KLDivergence as KL
+from calotron.losses import MeanAbsoluteError as MAE
+from calotron.losses import MeanSquaredError as MSE
+from calotron.losses.BaseLoss import BaseLoss
 
 LOSS_SHORTCUTS = ["bce", "kl", "js", "mse", "mae"]
 CALOTRON_LOSSES = [BCE(), KL(), JS(), MSE(), MAE()]
