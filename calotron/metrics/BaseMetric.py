@@ -10,8 +10,8 @@ class BaseMetric(tf.keras.metrics.Metric):
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         raise NotImplementedError(
-            f"Only `BaseMetric` subclasses have the "
-            f"`update_state()` method implemented."
+            "Only `BaseMetric` subclasses have the "
+            "`update_state()` method implemented."
         )
 
     def result(self):

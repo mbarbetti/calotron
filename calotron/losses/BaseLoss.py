@@ -11,16 +11,16 @@ class BaseLoss:
         self, discriminator, target_true, target_pred, sample_weight=None
     ):
         raise NotImplementedError(
-            f"Only `BaseLoss` subclasses have the "
-            f"`discriminator_loss()` method implemented."
+            "Only `BaseLoss` subclasses have the "
+            "`discriminator_loss()` method implemented."
         )
 
     def transformer_loss(
         self, discriminator, target_true, target_pred, sample_weight=None
     ):
         raise NotImplementedError(
-            f"Only `BaseLoss` subclasses have the "
-            f"`transformer_loss()` method implemented."
+            "Only `BaseLoss` subclasses have the "
+            "`transformer_loss()` method implemented."
         )
 
     @property
