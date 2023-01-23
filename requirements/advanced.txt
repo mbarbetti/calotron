@@ -1,0 +1,7 @@
+numpy
+pandas
+uproot
+matplotlib
+scikit-learn
+hopaas_client
+html-reports>=0.2
