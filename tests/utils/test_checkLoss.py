@@ -16,13 +16,15 @@ CLS_CASES = [BCE(), KL(), JS(), MSE(), MAE()]
 
 @pytest.mark.parametrize("loss", STR_CASES)
 def test_checker_use_strings(loss):
-  from calotron.utils import checkLoss
-  res = checkLoss(loss)
-  assert isinstance(res, BaseLoss)
+    from calotron.utils import checkLoss
+
+    res = checkLoss(loss)
+    assert isinstance(res, BaseLoss)
 
 
 @pytest.mark.parametrize("loss", CLS_CASES)
 def test_checker_use_classes(loss):
-  from calotron.utils import checkLoss
-  res = checkLoss(loss)
-  assert isinstance(res, BaseLoss)
+    from calotron.utils import checkLoss
+
+    res = checkLoss(loss)
+    assert isinstance(res, BaseLoss)
