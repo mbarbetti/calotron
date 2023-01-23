@@ -1,17 +1,19 @@
-# ci-build.yml
+# tests.yml
 
-name: CI
+name: Tests
 
 on:
   push:
     branches:
       - main
+      - release**
   pull_request:
     branches:
       - main
+      - release**
 
 jobs:
-  test:
+  pytest:
     runs-on: ubuntu-latest
     container: tensorflow/tensorflow:${{ matrix.version }}
     strategy:
@@ -19,20 +21,19 @@ jobs:
         version: [2.11.0]
 
     steps:
-      - name: Checkout repository code
+      - name: Clone repository
         uses: actions/checkout@v3
 
       - name: Install dependencies and calotron
         run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          python setup.py bdist_wheel
-          python -m pip install dist/* --force-reinstall --no-deps
+          pip install --upgrade pip build
+          pip install -r requirements/base.txt -r requirements/tests.txt
+          python -m build
+          pip install dist/*.whl --force-reinstall --no-deps
 
-      - name: Generate coverage report
+      - name: Run pytest checks
         run: |
-          python -m pip install pytest pytest-cov
-          pytest --cov tests
+          pytest --cov --cov-fail-under=95 tests
 
       - name: Upload coverage to Codecov
         run: |
