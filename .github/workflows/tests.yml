@@ -28,12 +28,14 @@ jobs:
         run: |
           pip install --upgrade pip build
           pip install -r requirements/base.txt -r requirements/tests.txt
+          sudo apt-get update
+          sudo apt-get -y upgrade
+          sudo apt-get install -y python3-venv
           python -m build
           pip install dist/*.whl --force-reinstall --no-deps
 
       - name: Run pytest checks
         run: |
-          sudo apt install python3.8-venv
           pytest --cov tests/
 
       - name: Upload coverage to Codecov
