@@ -28,7 +28,9 @@ jobs:
         run: |
           pip install --upgrade pip build
           pip install -r requirements/base.txt -r requirements/tests.txt
-          apt install -y python3-venv
+          apt-get update
+          apt-get -y upgrade
+          apt-get install -y python3-venv
           python -m build
           pip install dist/*.whl --force-reinstall --no-deps
 
