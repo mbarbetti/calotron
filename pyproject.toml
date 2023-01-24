@@ -2,6 +2,75 @@
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "calotron"
+dynamic = ["version"]
+description = "Transformer-based model to fast-simulate the LHCb ECAL detector"
+readme = "README.md"
+requires-python = ">=3.7, <=3.10"
+license = {text = "MIT License"}
+authors = [
+  {name = "Matteo Barbetti", email = "matteo.barbetti@fi.infn.it"},
+  {name = "Lucio Anderlini", email = "lucio.anderlini@fi.infn.it"},
+]
+keywords = [
+  "tensorflow",
+  "machine learning",
+  "deep learning",
+  "transformer",
+  "lhcb experiment",
+  "lamarr",
+  "ultra-fast simulation",
+  "calorimeter",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Topic :: Scientific/Engineering :: Physics",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "tensorflow>=2.11",
+]
+
+[project.optional-dependencies]
+standard = [
+  "numpy",
+  "pandas",
+  "uproot",
+  "matplotlib",
+  "scikit-learn",
+]
+advanced = [
+  "numpy",
+  "pandas",
+  "uproot",
+  "matplotlib",
+  "scikit-learn",
+  "hopaas_client",
+  "html-reports>=0.2",
+]
+style = [
+  "black",
+  "flake8",
+  "isort[colors]",
+]
+tests = [
+  "pytest>=6.0",
+  "pytest-cov",
+]
+
+[project.urls]
+repository = "https://github.com/mbarbetti/calotron"
+
+[tool.setuptools.dynamic]
+version = {attr = "calotron.__version__"}
+
 [tool.black]
 target-version = ["py37", "py38", "py39", "py310"]
 color = true
