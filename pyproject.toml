@@ -52,7 +52,7 @@ advanced = [
   "uproot",
   "matplotlib",
   "scikit-learn",
-  "hopaas_client",
+  # "hopaas-client",   # to be released on PyPI
   "html-reports>=0.2",
 ]
 style = [
