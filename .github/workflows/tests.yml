@@ -1,6 +1,6 @@
 # tests.yml
 
-name: Tests
+name: tests
 
 on:
   push:

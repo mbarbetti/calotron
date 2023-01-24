@@ -1,6 +1,6 @@
 # style.yml
 
-name: Style
+name: style
 
 on:
   push:
