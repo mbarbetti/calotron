@@ -36,6 +36,7 @@ jobs:
 
       - name: Run pytest checks
         run: |
+          python tests/config/config.py --no-interactive -t ${HOPAAS_TOKEN}
           pytest --cov tests/
 
       - name: Upload coverage to Codecov
