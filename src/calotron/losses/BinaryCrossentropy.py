@@ -24,12 +24,18 @@ class BinaryCrossentropy(BaseLoss):
     def discriminator_loss(
         self, discriminator, target_true, target_pred, sample_weight=None
     ):
-        y_true = discriminator(target_true)
-        y_pred = discriminator(target_pred)
-        loss_real = self._loss(
+        rnd_true = tf.random.normal(
+            tf.shape(target_true), stddev=0.05, dtype=target_true.dtype
+        )
+        y_true = discriminator(target_true + rnd_true)
+        loss_real = self._bce_loss(
             tf.ones_like(y_true), y_true, sample_weight=sample_weight
         )
-        loss_fake = self._loss(
+        rnd_pred = tf.random.normal(
+            tf.shape(target_pred), stddev=0.05, dtype=target_pred.dtype
+        )
+        y_pred = discriminator(target_pred + rnd_pred)
+        loss_fake = self._bce_loss(
             tf.zeros_like(y_pred), y_pred, sample_weight=sample_weight
         )
         return loss_real + loss_fake
@@ -37,7 +43,10 @@ class BinaryCrossentropy(BaseLoss):
     def transformer_loss(
         self, discriminator, target_true, target_pred, sample_weight=None
     ):
-        y_pred = discriminator(target_pred)
+        rnd_pred = tf.random.normal(
+            tf.shape(target_pred), stddev=0.05, dtype=target_pred.dtype
+        )
+        y_pred = discriminator(target_pred + rnd_pred)
         loss_fake = self._loss(
             tf.ones_like(y_pred), y_pred, sample_weight=sample_weight
         )
