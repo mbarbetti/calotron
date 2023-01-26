@@ -36,6 +36,7 @@ classifiers = [
 ]
 dependencies = [
   "tensorflow>=2.11",
+  "pyyaml"
 ]
 
 [project.optional-dependencies]
