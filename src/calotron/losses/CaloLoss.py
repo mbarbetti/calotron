@@ -47,9 +47,7 @@ class CaloLoss(BaseLoss):
     def transformer_loss(
         self, discriminator, target_true, target_pred, sample_weight=None
     ):
-        mse_loss = self._mse_loss(
-            target_true, target_pred, sample_weight=sample_weight
-        )
+        mse_loss = self._mse_loss(target_true, target_pred, sample_weight=sample_weight)
         rnd_pred = tf.random.normal(
             tf.shape(target_pred), stddev=0.05, dtype=target_pred.dtype
         )
