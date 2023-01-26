@@ -1,3 +1,8 @@
+import pprint
+
+import yaml
+
+
 class HPSingleton:
     def __init__(self, **kwargs):
         self._hparams = dict(**kwargs)
@@ -24,28 +29,25 @@ class HPSingleton:
     def __del__(self):
         for key in self._hparams.keys():
             if key not in self._used_keys:
-                print(
-                    f"[WARNING] The hyperparameter {key} was defined but never used"
-                )
+                print(f"[WARNING] The hyperparameter {key} was defined but never used")
                 print(self._used_keys)
 
     def __str__(self):
-        import pprint
         return pprint.pformat(self._hparams)
 
     def get_dict(self):
         return dict(**self._hparams)
 
     def dump(self, filename):
-        import yaml
         with open(filename, "w") as file:
             yaml.dump(self.get_dict(), file)
 
 
-__HPARAMS__ = None 
+__HPARAMS__ = None
+
 
 def initHPSingleton() -> HPSingleton:
-  global __HPARAMS__
-  if __HPARAMS__ is None:
-    __HPARAMS__ = HPSingleton()
-  return __HPARAMS__
+    global __HPARAMS__
+    if __HPARAMS__ is None:
+        __HPARAMS__ = HPSingleton()
+    return __HPARAMS__

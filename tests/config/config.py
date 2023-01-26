@@ -1,7 +1,7 @@
 import os
-import yaml
 from argparse import ArgumentParser
 
+import yaml
 
 here = os.path.dirname(__file__)
 parser = ArgumentParser(description="tests configuration")
