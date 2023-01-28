@@ -1,20 +1,21 @@
 import yaml
+import socket
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
 from datetime import datetime
 from html_reports import Report
+from sklearn.utils import shuffle
 
 from calotron.losses import CaloLoss
 from calotron.simulators import Simulator
 from calotron.utils import initHPSingleton, getModelSummary
 from calotron.models import Transformer, Discriminator, Calotron
-from calotron.callbacks.schedulers import PolynomialDecay, ExponentialDecay
+from calotron.callbacks.schedulers import ExponentialDecay
 
 
-ALPHA = 0.1
-ORDER = True
+ALPHA = 0.02
 POSITION = True
 BATCHSIZE = 128
 EPOCHS = 500
@@ -38,56 +39,40 @@ report_dir = config["report_dir"]
 # |   Data loading   |
 # +------------------+
 
-npzfile = np.load(f"{data_dir}/train-data-demo.npz")
-photon = npzfile["photon"][:, ::-1, :]
-cluster = npzfile["cluster"]
-cluster_labels = npzfile["cluster_labels"]
+npzfile = np.load(f"{data_dir}/train-data-demo-medium-0.npz")
+photon = npzfile["photon"][:,::-1]
+cluster = npzfile["cluster"][:,::-1]
 
 #print(f"photon {photon.shape}\n", photon)
 #print(f"cluster {cluster.shape}\n", cluster)
-#print(f"cluster labels {cluster_labels.shape}\n", cluster_labels)
+
+photon, cluster = shuffle(photon, cluster)
 
 chunk_size = photon.shape[0]
-
-photon_shuffled = np.zeros_like(photon)
-cluster_shuffled = np.zeros_like(cluster)
-cluster_labels_shuffled = np.zeros_like(cluster_labels)
-for i in range(chunk_size):
-  new_photon_order = np.random.permutation(photon.shape[1])
-  photon_shuffled[i] = photon[i, new_photon_order, :]
-  new_order = np.random.permutation(cluster.shape[1]-1)
-  new_cluster_order = [0] + list(new_order+1)
-  cluster_shuffled[i] = cluster[i, new_cluster_order, :]
-  new_cluster_order = list(new_order) + [cluster.shape[1]-1]
-  cluster_labels_shuffled[i] = cluster_labels[i, new_cluster_order, :]
-
-#print(f"photon SHUFFLED {photon_shuffled.shape}\n", photon_shuffled)
-#print(f"cluster SHUFFLED {cluster_shuffled.shape}\n", cluster_shuffled)
-#print(f"cluster labels SHUFFLED {cluster_labels_shuffled.shape}\n", cluster_labels_shuffled)
-
-if ORDER:
-  photon_final = photon
-  cluster_final = cluster
-  cluster_labels_final = cluster_labels
-else:
-  photon_final = photon_shuffled
-  cluster_final = cluster_shuffled
-  cluster_labels_final = cluster_labels_shuffled
+#train_size = int(0.75 * chunk_size)
 
 # +-------------------------+
 # |   Dataset preparation   |
 # +-------------------------+
 
-with tf.device("/gpu:0"):
-  X = tf.cast(photon_final, dtype=DTYPE)
-  # Y = tf.cast(cluster_final, dtype=DTYPE)
-  Y = tf.cast(cluster_labels_final, dtype=DTYPE)
+X = tf.cast(photon, dtype=DTYPE)
+Y = tf.cast(cluster, dtype=DTYPE)
+
+#with tf.device("/gpu:0"):
+#  X_train = X[:train_size]
+#  Y_train = Y[:train_size]
+#  X_val = X[train_size:]
+#  Y_val = Y[train_size:]
 
 train_ds = (tf.data.Dataset.from_tensor_slices((X, Y))
-            .shuffle(hp.get("chunk_size", chunk_size))
             .batch(hp.get("batch_size", BATCHSIZE), drop_remainder=True)
             .cache()
             .prefetch(tf.data.AUTOTUNE))
+
+#val_ds = (tf.data.Dataset.from_tensor_slices((X_val, Y_val))
+#            .batch(BATCHSIZE, drop_remainder=True)
+#            .cache()
+#            .prefetch(tf.data.AUTOTUNE))
 
 # +------------------------+
 # |   Model construction   |
@@ -99,8 +84,8 @@ transformer = Transformer(output_depth=hp.get("t_output_depth", Y.shape[2]),
                           num_layers=hp.get("t_num_layers", 5),
                           num_heads=hp.get("t_num_heads", 4),
                           key_dim=hp.get("t_key_dim", 64),
-                          encoder_pos_dim=hp.get("t_encoder_pos_dim", 16),
-                          decoder_pos_dim=hp.get("t_decoder_pos_dim", 16),
+                          encoder_pos_dim=hp.get("t_encoder_pos_dim", 32),
+                          decoder_pos_dim=hp.get("t_decoder_pos_dim", 32),
                           encoder_pos_normalization=hp.get("t_encoder_pos_normalization", 128),
                           decoder_pos_normalization=hp.get("t_decoder_pos_normalization", 128),
                           encoder_max_length=hp.get("t_encoder_max_length", X.shape[1]),
@@ -110,6 +95,7 @@ transformer = Transformer(output_depth=hp.get("t_output_depth", Y.shape[2]),
                           pos_sensitive=hp.get("t_pos_sensitive", POSITION),
                           residual_smoothing=hp.get("t_residual_smoothing", True),
                           output_activations=hp.get("t_output_activations", ["linear", "linear", "sigmoid"]),
+                          start_token_initializer=hp.get("t_start_toke_initializer", "zeros"),
                           dtype=DTYPE)
 
 discriminator = Discriminator(latent_dim=hp.get("d_latent_dim", 64),
@@ -134,7 +120,7 @@ t_opt = tf.keras.optimizers.RMSprop(t_lr0)
 hp.get("t_optimizer", "RMSprop")
 hp.get("t_lr0", t_lr0)
 
-d_lr0 = 1e-4
+d_lr0 = 1e-3
 d_opt = tf.keras.optimizers.RMSprop(d_lr0)
 hp.get("d_optimizer", "RMSprop")
 hp.get("d_lr0", d_lr0)
@@ -148,24 +134,24 @@ hp.get("loss", loss.name)
 hp.get("loss_alpha", loss._alpha)
 
 model.compile(loss=loss,
-              metrics=hp.get("metrics", ["accuracy"]),
+              metrics=hp.get("metrics", ["accuracy", "bce"]),
               transformer_optimizer=t_opt,
               discriminator_optimizer=d_opt,
-              transformer_upds_per_batch=hp.get("transformer_upds_per_batch", 5),
+              transformer_upds_per_batch=hp.get("transformer_upds_per_batch", 4),
               discriminator_upds_per_batch=hp.get("discriminator_upds_per_batch", 1))
 
 # +------------------------------+
 # |   Learning rate scheduling   |
 # +------------------------------+
 
-t_sched = PolynomialDecay(model.transformer_optimizer,
-                          decay_steps=10000,
-                          end_learning_rate=1e-4)
-hp.get("t_sched", "PolynomialDecay")
+t_sched = ExponentialDecay(model.transformer_optimizer,
+                           decay_rate=0.10,
+                           decay_steps=50_000)
+hp.get("t_sched", "ExponentialDecay")
 
 d_sched = ExponentialDecay(model.discriminator_optimizer,
-                           decay_rate=0.10,
-                           decay_steps=20000)
+                           decay_rate=0.20,
+                           decay_steps=20_000)
 hp.get("d_sched", "ExponentialDecay")
 
 # +------------------------+
@@ -176,6 +162,7 @@ start = datetime.now()
 train = model.fit(
   train_ds,
   epochs=hp.get("epochs", EPOCHS),
+  validation_data=None,
   callbacks=[t_sched, d_sched]
 )
 stop = datetime.now()
@@ -211,8 +198,9 @@ for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
 
 report.add_markdown(
   f"""
-    - Report generated on {date} at {hour}
+    - Script executed on {socket.gethostname()}
     - Model training completed in {duration}
+    - Report generated on {date} at {hour}
   """
 )
 report.add_markdown("---")
@@ -255,13 +243,14 @@ plt.xlabel("Training epochs", fontsize=12)
 plt.ylabel("Loss", fontsize=12)
 plt.plot(
   np.array(train.history["t_calo_loss"]), 
-  lw=1.5, color="dodgerblue", label="transformer [x1]"
+  lw=1.5, color="dodgerblue", label="transformer"
 )
 plt.plot(
-  np.array(train.history["d_calo_loss"])/10,
-  lw=1.5, color="coral", label="discriminator [x10$^{-1}$]"
+  np.array(train.history["d_calo_loss"]),
+  lw=1.5, color="coral", label="discriminator"
 )
-plt.legend(loc="lower left", fontsize=10)
+plt.yscale("log")
+plt.legend(loc="upper left", fontsize=10)
 plt.savefig(fname=f"{images_dir}/{prefix}_learn-curves.png")
 report.add_figure(options="width=45%")
 plt.close()
@@ -285,7 +274,7 @@ plt.savefig(fname=f"{images_dir}/{prefix}_lr-sched.png")
 report.add_figure(options="width=45%")
 plt.close()
 
-#### Metric curves
+#### Accuracy curves
 plt.figure(figsize=(8,5), dpi=100)
 plt.title("Metric curves", fontsize=14)
 plt.xlabel("Training epochs", fontsize=12)
@@ -294,8 +283,22 @@ plt.plot(
   np.array(train.history["accuracy"]),
   lw=1.5, color="forestgreen", label="training set"
 )
-plt.legend(loc="lower right", fontsize=10)
-plt.savefig(fname=f"{images_dir}/{prefix}_metric-curves.png")
+plt.legend(loc="upper right", fontsize=10)
+plt.savefig(fname=f"{images_dir}/{prefix}_metric-curves-0.png")
+report.add_figure(options="width=45%")
+plt.close()
+
+#### BCE curves
+plt.figure(figsize=(8,5), dpi=100)
+plt.title("Metric curves", fontsize=14)
+plt.xlabel("Training epochs", fontsize=12)
+plt.ylabel("Binary cross-entropy", fontsize=12)
+plt.plot(
+  np.array(train.history["bce"]),
+  lw=1.5, color="forestgreen", label="training set"
+)
+plt.legend(loc="upper right", fontsize=10)
+plt.savefig(fname=f"{images_dir}/{prefix}_metric-curves-1.png")
 report.add_figure(options="width=45%")
 plt.close()
 
@@ -342,6 +345,38 @@ plt.savefig(f"{images_dir}/{prefix}_y-coord.png")
 report.add_figure(options="width=45%")
 plt.close()
 
+#### Photon/cluster coordinates
+for i in range(4):
+  evt = int(np.random.uniform(0, chunk_size))
+  plt.figure(figsize=(8,5), dpi=100)
+  plt.xlabel("$x$ coordinate", fontsize=12)
+  plt.ylabel("$y$ coordinate", fontsize=12)
+  plt.scatter(
+    X[evt,:,0].numpy().flatten(),
+    X[evt,:,1].numpy().flatten(),
+    s=50 * X[evt,:,2].numpy().flatten() / Y[evt,:,2].numpy().flatten().max(),
+    marker="o", facecolors="none", edgecolors="r", linewidth=0.5,
+    label="True photon"
+  )
+  plt.scatter(
+    Y[evt,:,0].numpy().flatten(),
+    Y[evt,:,1].numpy().flatten(),
+    s=50 * Y[evt,:,2].numpy().flatten() / Y[evt,:,2].numpy().flatten().max(),
+    marker="s", facecolors="none", edgecolors="b", linewidth=0.5,
+    label="Calo neutral cluster"
+  )
+  plt.scatter(
+    out[evt,:,0].numpy().flatten(),
+    out[evt,:,1].numpy().flatten(),
+    s=50 * out[evt,:,2].numpy().flatten() / Y[evt,:,2].numpy().flatten().max(),
+    marker="^", facecolors="none", edgecolors="g", linewidth=0.5,
+    label="Calotron output"
+  )
+  plt.legend()
+  plt.savefig(f"{images_dir}/{prefix}_photon-cluster-coord-{i}.png")
+  report.add_figure(options="width=45%")
+plt.close()
+
 #### Energy
 plt.figure(figsize=(8,5), dpi=100)
 plt.xlabel("Preprocessed energy [a.u]", fontsize=12)
@@ -368,7 +403,7 @@ plt.title("Training data", fontsize=14)
 plt.xlabel("Cluster energy deposits", fontsize=12)
 plt.ylabel("Events", fontsize=12)
 plt.imshow(
-  Y[:100,:,2].numpy(),
+  Y[:128,:,2].numpy(),
   aspect="auto", interpolation="none"
 )
 plt.subplot(1,2,2)
@@ -376,7 +411,7 @@ plt.title("Calotron output", fontsize=14)
 plt.xlabel("Cluster energy deposits", fontsize=12)
 plt.ylabel("Events", fontsize=12)
 plt.imshow(
-  out[:100,:,2].numpy(),
+  out[:128,:,2].numpy(),
   aspect="auto", interpolation="none"
 )
 plt.savefig(f"{images_dir}/{prefix}_energy-matrix.png")
