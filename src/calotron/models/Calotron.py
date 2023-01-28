@@ -1,13 +1,19 @@
 import tensorflow as tf
 
-from calotron.models.Discriminator import Discriminator
 from calotron.models.Transformer import Transformer
+from calotron.models.Discriminator import Discriminator
 from calotron.utils import checkLoss, checkMetrics, checkOptimizer
 
 
 class Calotron(tf.keras.Model):
-    def __init__(self, transformer, discriminator):
-        super().__init__()
+    def __init__(
+        self,
+        transformer,
+        discriminator,
+        name=None,
+        dtype=None,
+    ):
+        super().__init__(name=name, dtype=dtype)
         if not isinstance(transformer, Transformer):
             raise TypeError(
                 f"`transformer` should be a calotron's "
@@ -64,12 +70,11 @@ class Calotron(tf.keras.Model):
         else:
             source, target = data
             sample_weight = None
-        target_in, target_out = self._prepare_target(target)
 
         for _ in range(self._d_upds_per_batch):
-            self._d_train_step(source, target_in, target_out, sample_weight)
+            self._d_train_step(source, target, sample_weight)
         for _ in range(self._t_upds_per_batch):
-            self._t_train_step(source, target_in, target_out, sample_weight)
+            self._t_train_step(source, target, sample_weight)
 
         train_dict = dict()
         if self._metrics is not None:
@@ -85,50 +90,47 @@ class Calotron(tf.keras.Model):
         )
         return train_dict
 
-    @staticmethod
-    def _prepare_target(target):
-        start_token = tf.reduce_mean(target, axis=(0, 1))[None, None, :]
-        start_token = tf.tile(start_token, (target.shape[0], 1, 1))
-        target_in = tf.concat([start_token, target[:, :-1, :]], axis=1)
-        target_out = target
-        return target_in, target_out
-
-    def _d_train_step(self, source, target_in, target_out, sample_weight):
+    def _d_train_step(self, source, target, sample_weight):
         with tf.GradientTape() as tape:
-            target_pred = self._transformer((source, target_in))
+            output = self._transformer((source, target), training=False)
             loss = self._loss.discriminator_loss(
-                self._discriminator,
-                target_out,
-                target_pred,
+                discriminator=self._discriminator,
+                target_true=target,
+                target_pred=output,
                 sample_weight=sample_weight,
+                training=True,
             )
-        grads = tape.gradient(loss, self._discriminator.trainable_weights)
-        self._d_opt.apply_gradients(zip(grads, self._discriminator.trainable_weights))
+        trainable_vars = self._discriminator.trainable_variables
+        gradients = tape.gradient(loss, trainable_vars)
+        self._d_opt.apply_gradients(zip(gradients, trainable_vars))
         self._d_loss.update_state(loss)
 
-    def _t_train_step(self, source, target_in, target_out, sample_weight):
+    def _t_train_step(self, source, target, sample_weight):
         with tf.GradientTape() as tape:
-            target_pred = self._transformer((source, target_in))
+            output = self._transformer((source, target), training=True)
             loss = self._loss.transformer_loss(
-                self._discriminator,
-                target_out,
-                target_pred,
+                discriminator=self._discriminator,
+                target_true=target,
+                target_pred=output,
                 sample_weight=sample_weight,
+                training=False,
             )
-        grads = tape.gradient(loss, self._transformer.trainable_weights)
-        self._t_opt.apply_gradients(zip(grads, self._transformer.trainable_weights))
+        trainable_vars = self._transformer.trainable_variables
+        gradients = tape.gradient(loss, trainable_vars)
+        self._t_opt.apply_gradients(zip(gradients, trainable_vars))
         self._t_loss.update_state(loss)
         if self._metrics is not None:
-            y_pred = self._discriminator(target_pred)
-            y_true = self._discriminator(target_out)
+            y_pred = self._discriminator(output, training=False)
+            y_true = self._discriminator(target, training=False)
             for metric in self._metrics:
-                metric.update_state(y_true, y_pred)
+                metric.update_state(
+                    y_true=y_true, 
+                    y_pred=y_pred, 
+                    sample_weight=sample_weight
+                )
 
-    @staticmethod
-    def get_start_token(target):
-        start_token = tf.reduce_mean(target, axis=(0, 1))[None, :]
-        start_token = tf.tile(start_token, (target.shape[0], 1))
-        return start_token
+    def get_start_token(self, target) -> tf.Tensor:
+        return self._transformer.get_start_token(target)
 
     @property
     def transformer(self) -> Transformer:

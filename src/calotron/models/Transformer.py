@@ -2,6 +2,8 @@ import tensorflow as tf
 
 from calotron.layers import Decoder, Encoder, MultiActivations
 
+START_TOKEN_INITIALIZERS = ["zeros", "ones", "means"]
+
 
 class Transformer(tf.keras.Model):
     def __init__(
@@ -23,6 +25,7 @@ class Transformer(tf.keras.Model):
         pos_sensitive=False,
         residual_smoothing=True,
         output_activations=None,
+        start_token_initializer="zeros",
         name=None,
         dtype=None,
     ):
@@ -46,6 +49,11 @@ class Transformer(tf.keras.Model):
         self._dropout_rate = float(dropout_rate)
         self._pos_sensitive = bool(pos_sensitive)
         self._residual_smoothing = bool(residual_smoothing)
+        if start_token_initializer not in START_TOKEN_INITIALIZERS:
+            raise ValueError("`start_token_initializer` should be selected "
+                             f"in {START_TOKEN_INITIALIZERS}, instead "
+                             f"'{start_token_initializer}' passed")
+        self._start_token_initializer = start_token_initializer
 
         self._encoder = Encoder(
             encoder_depth=self._encoder_depth,
@@ -94,7 +102,8 @@ class Transformer(tf.keras.Model):
             self._output_activations = None
 
     def call(self, inputs):
-        source, target = inputs
+        source = inputs[0]
+        target = self._prepare_input_target(inputs[1])
         context = self._encoder(
             x=source
         )  # shape: (batch_size, source_elements, encoder_depth)
@@ -109,6 +118,26 @@ class Transformer(tf.keras.Model):
                 output
             )  # shape: (batch_size, target_elements, output_depth)
         return output
+
+    def _prepare_input_target(self, target):
+        if self._start_token_initializer == "zeros":
+            start_token = tf.zeros((target.shape[0], 1, target.shape[2]))
+        elif self._start_token_initializer == "ones":
+            start_token = tf.ones((target.shape[0], 1, target.shape[2]))
+        elif self._start_token_initializer == "means":
+            start_token = tf.reduce_mean(target, axis=(0, 1))[None, None, :]
+            start_token = tf.tile(start_token, (target.shape[0], 1, 1))
+        return tf.concat([start_token, target[:, :-1, :]], axis=1)
+
+    def get_start_token(self, target) -> tf.Tensor:
+        if self._start_token_initializer == "zeros":
+            start_token = tf.zeros((target.shape[0], target.shape[2]))
+        elif self._start_token_initializer == "ones":
+            start_token = tf.ones((target.shape[0], target.shape[2]))
+        elif self._start_token_initializer == "means":
+            start_token = tf.reduce_mean(target, axis=(0, 1))[None, :]
+            start_token = tf.tile(start_token, (target.shape[0], 1))
+        return start_token
 
     @property
     def output_depth(self) -> int:
@@ -163,13 +192,9 @@ class Transformer(tf.keras.Model):
         return self._residual_smoothing
 
     @property
+    def start_token_initializer(self) -> str:
+        return self._start_token_initializer
+
+    @property
     def output_activations(self):  # TODO: add Union[list, None]
         return self._output_activations
-
-    @property
-    def encoder(self) -> Encoder:
-        return self._encoder
-
-    @property
-    def decoder(self) -> Decoder:
-        return self._decoder
