@@ -26,32 +26,42 @@ class CaloLoss(BaseLoss):
         )
 
     def discriminator_loss(
-        self, discriminator, target_true, target_pred, sample_weight=None
+        self,
+        discriminator,
+        target_true,
+        target_pred,
+        sample_weight=None,
+        training=True,
     ):
         rnd_true = tf.random.normal(
             tf.shape(target_true), stddev=0.05, dtype=target_true.dtype
         )
-        y_true = discriminator(target_true + rnd_true)
+        y_true = discriminator(target_true + rnd_true, training=training)
         loss_real = self._bce_loss(
             tf.ones_like(y_true), y_true, sample_weight=sample_weight
         )
         rnd_pred = tf.random.normal(
             tf.shape(target_pred), stddev=0.05, dtype=target_pred.dtype
         )
-        y_pred = discriminator(target_pred + rnd_pred)
+        y_pred = discriminator(target_pred + rnd_pred, training=training)
         loss_fake = self._bce_loss(
             tf.zeros_like(y_pred), y_pred, sample_weight=sample_weight
         )
-        return loss_real + loss_fake
+        return (loss_real + loss_fake) / 2.
 
     def transformer_loss(
-        self, discriminator, target_true, target_pred, sample_weight=None
+        self,
+        discriminator,
+        target_true,
+        target_pred,
+        sample_weight=None,
+        training=False,
     ):
         mse_loss = self._mse_loss(target_true, target_pred, sample_weight=sample_weight)
         rnd_pred = tf.random.normal(
             tf.shape(target_pred), stddev=0.05, dtype=target_pred.dtype
         )
-        y_pred = discriminator(target_pred + rnd_pred)
+        y_pred = discriminator(target_pred + rnd_pred, training=training)
         bce_loss = self._bce_loss(
             tf.ones_like(y_pred), y_pred, sample_weight=sample_weight
         )

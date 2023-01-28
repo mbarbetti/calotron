@@ -10,19 +10,29 @@ class MeanAbsoluteError(BaseLoss):
         self._loss = TF_MAE(reduction=reduction)
 
     def discriminator_loss(
-        self, discriminator, target_true, target_pred, sample_weight=None
+        self,
+        discriminator,
+        target_true,
+        target_pred,
+        sample_weight=None,
+        training=True,
     ):
-        y_true = discriminator(target_true)
-        y_pred = discriminator(target_pred)
+        y_true = discriminator(target_true, training=training)
+        y_pred = discriminator(target_pred, training=training)
         return -self._loss(
             y_true, y_pred, sample_weight=sample_weight
         )  # error maximization
 
     def transformer_loss(
-        self, discriminator, target_true, target_pred, sample_weight=None
+        self,
+        discriminator,
+        target_true,
+        target_pred,
+        sample_weight=None,
+        training=False,
     ):
-        y_true = discriminator(target_true)
-        y_pred = discriminator(target_pred)
+        y_true = discriminator(target_true, training=training)
+        y_pred = discriminator(target_pred, training=training)
         return self._loss(
             y_true, y_pred, sample_weight=sample_weight
         )  # error minimization
