@@ -35,7 +35,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-  "tensorflow>=2.11",
+  "tensorflow>=2.10",
   "pyyaml"
 ]
 
