@@ -6,13 +6,7 @@ from calotron.utils import checkLoss, checkMetrics, checkOptimizer
 
 
 class Calotron(tf.keras.Model):
-    def __init__(
-        self,
-        transformer,
-        discriminator,
-        name=None,
-        dtype=None,
-    ):
+    def __init__(self, transformer, discriminator, name=None, dtype=None):
         super().__init__(name=name, dtype=dtype)
         if not isinstance(transformer, Transformer):
             raise TypeError(
@@ -124,9 +118,7 @@ class Calotron(tf.keras.Model):
             y_true = self._discriminator(target, training=False)
             for metric in self._metrics:
                 metric.update_state(
-                    y_true=y_true, 
-                    y_pred=y_pred, 
-                    sample_weight=sample_weight
+                    y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
                 )
 
     def get_start_token(self, target) -> tf.Tensor:

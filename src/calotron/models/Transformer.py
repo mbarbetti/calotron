@@ -50,9 +50,11 @@ class Transformer(tf.keras.Model):
         self._pos_sensitive = bool(pos_sensitive)
         self._residual_smoothing = bool(residual_smoothing)
         if start_token_initializer not in START_TOKEN_INITIALIZERS:
-            raise ValueError("`start_token_initializer` should be selected "
-                             f"in {START_TOKEN_INITIALIZERS}, instead "
-                             f"'{start_token_initializer}' passed")
+            raise ValueError(
+                "`start_token_initializer` should be selected "
+                f"in {START_TOKEN_INITIALIZERS}, instead "
+                f"'{start_token_initializer}' passed"
+            )
         self._start_token_initializer = start_token_initializer
 
         self._encoder = Encoder(

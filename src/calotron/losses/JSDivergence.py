@@ -10,12 +10,7 @@ class JSDivergence(BaseLoss):
         self._kl_div = TF_KLDivergence(reduction=reduction)
 
     def discriminator_loss(
-        self,
-        discriminator,
-        target_true,
-        target_pred,
-        sample_weight=None,
-        training=True,
+        self, discriminator, target_true, target_pred, sample_weight=None, training=True
     ):
         y_true = discriminator(target_true, training=training)
         y_pred = discriminator(target_pred, training=training)

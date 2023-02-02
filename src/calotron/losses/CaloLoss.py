@@ -26,12 +26,7 @@ class CaloLoss(BaseLoss):
         )
 
     def discriminator_loss(
-        self,
-        discriminator,
-        target_true,
-        target_pred,
-        sample_weight=None,
-        training=True,
+        self, discriminator, target_true, target_pred, sample_weight=None, training=True
     ):
         rnd_true = tf.random.normal(
             tf.shape(target_true), stddev=0.05, dtype=target_true.dtype
@@ -47,7 +42,7 @@ class CaloLoss(BaseLoss):
         loss_fake = self._bce_loss(
             tf.zeros_like(y_pred), y_pred, sample_weight=sample_weight
         )
-        return (loss_real + loss_fake) / 2.
+        return (loss_real + loss_fake) / 2.0
 
     def transformer_loss(
         self,
