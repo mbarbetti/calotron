@@ -1,16 +1,6 @@
 import pytest
-
-from calotron.metrics import Accuracy
-from calotron.metrics import BinaryCrossentropy as BCE
-from calotron.metrics import JSDivergence as JS
-from calotron.metrics import KLDivergence as KL
-from calotron.metrics import MeanAbsoluteError as MAE
-from calotron.metrics import MeanSquaredError as MSE
-from calotron.metrics import RootMeanSquaredError as RMSE
 from calotron.metrics.BaseMetric import BaseMetric
-
-STR_CASES = ["accuracy", "bce", "kl_div", "js_div", "mse", "rmse", "mae"]
-CLS_CASES = [Accuracy(), BCE(), KL(), JS(), MSE(), RMSE(), MAE()]
+from calotron.utils.checkMetrics import METRIC_SHORTCUTS, CALOTRON_METRICS
 
 
 @pytest.fixture
@@ -29,7 +19,7 @@ def test_checker_use_None(checker):
     assert res is None
 
 
-@pytest.mark.parametrize("metrics", [[s] for s in STR_CASES])
+@pytest.mark.parametrize("metrics", [[s] for s in METRIC_SHORTCUTS])
 def test_checker_use_strings(metrics):
     from calotron.utils import checkMetrics
 
@@ -40,7 +30,7 @@ def test_checker_use_strings(metrics):
         assert isinstance(r, BaseMetric)
 
 
-@pytest.mark.parametrize("metrics", [[c] for c in CLS_CASES])
+@pytest.mark.parametrize("metrics", [[c] for c in CALOTRON_METRICS])
 def test_checker_use_classes(metrics):
     from calotron.utils import checkMetrics
 
@@ -52,8 +42,8 @@ def test_checker_use_classes(metrics):
 
 
 def test_checker_use_mixture(checker):
-    res = checker(STR_CASES + CLS_CASES)
+    res = checker(METRIC_SHORTCUTS + CALOTRON_METRICS)
     assert isinstance(res, list)
-    assert len(res) == len(STR_CASES) + len(CLS_CASES)
+    assert len(res) == len(METRIC_SHORTCUTS) + len(CALOTRON_METRICS)
     for r in res:
         assert isinstance(r, BaseMetric)

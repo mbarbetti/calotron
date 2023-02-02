@@ -1,20 +1,12 @@
 import pytest
-
-from calotron.losses import BinaryCrossentropy as BCE
-from calotron.losses import JSDivergence as JS
-from calotron.losses import KLDivergence as KL
-from calotron.losses import MeanAbsoluteError as MAE
-from calotron.losses import MeanSquaredError as MSE
 from calotron.losses.BaseLoss import BaseLoss
-
-STR_CASES = ["bce", "kl", "js", "mse", "mae"]
-CLS_CASES = [BCE(), KL(), JS(), MSE(), MAE()]
+from calotron.utils.checkLoss import LOSS_SHORTCUTS, CALOTRON_LOSSES
 
 
 ###########################################################################
 
 
-@pytest.mark.parametrize("loss", STR_CASES)
+@pytest.mark.parametrize("loss", LOSS_SHORTCUTS)
 def test_checker_use_strings(loss):
     from calotron.utils import checkLoss
 
@@ -22,7 +14,7 @@ def test_checker_use_strings(loss):
     assert isinstance(res, BaseLoss)
 
 
-@pytest.mark.parametrize("loss", CLS_CASES)
+@pytest.mark.parametrize("loss", CALOTRON_LOSSES)
 def test_checker_use_classes(loss):
     from calotron.utils import checkLoss
 

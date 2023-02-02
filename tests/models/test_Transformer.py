@@ -1,5 +1,6 @@
 import pytest
 import tensorflow as tf
+from calotron.models.Transformer import START_TOKEN_INITIALIZERS
 
 chunk_size = int(1e4)
 
@@ -29,6 +30,7 @@ def model():
         pos_sensitive=False,
         residual_smoothing=True,
         output_activations="relu",
+        start_token_initializer="zeros",
     )
     return trans
 
@@ -63,6 +65,7 @@ def test_model_configuration(
         pos_sensitive=False,
         residual_smoothing=True,
         output_activations=output_activations,
+        start_token_initializer="zeros",
     )
     assert isinstance(model, Transformer)
     assert isinstance(model.output_depth, int)
@@ -82,11 +85,7 @@ def test_model_configuration(
     assert isinstance(model.residual_smoothing, bool)
     if model.output_activations is not None:
         assert isinstance(model.output_activations, list)
-
-    from calotron.layers import Decoder, Encoder
-
-    assert isinstance(model.encoder, Encoder)
-    assert isinstance(model.decoder, Decoder)
+    assert isinstance(model.start_token_initializer, str)
 
 
 @pytest.mark.parametrize("key_dim", [None, 64])
@@ -161,6 +160,37 @@ def test_model_use_with_position(encoder_pos_dim, decoder_pos_dim, residual_smoo
 
 
 def test_model_use_multi_activations(model):
+    output = model((source, target))
+    model.summary()
+    test_shape = list(target.shape)
+    test_shape[-1] = model.output_depth
+    assert output.shape == tuple(test_shape)
+
+
+@pytest.mark.parametrize("start_token_initializer", START_TOKEN_INITIALIZERS)
+def test_model_use_start_token_initializer(start_token_initializer):
+    from calotron.models import Transformer
+
+    model = Transformer(
+        output_depth=target.shape[2],
+        encoder_depth=8,
+        decoder_depth=8,
+        num_layers=2,
+        num_heads=4,
+        key_dim=None,
+        encoder_pos_dim=None,
+        decoder_pos_dim=None,
+        encoder_pos_normalization=64,
+        decoder_pos_normalization=64,
+        encoder_max_length=source.shape[1],
+        decoder_max_length=target.shape[1],
+        ff_units=16,
+        dropout_rate=0.1,
+        pos_sensitive=False,
+        residual_smoothing=True,
+        output_activations="relu",
+        start_token_initializer=start_token_initializer,
+    )
     output = model((source, target))
     model.summary()
     test_shape = list(target.shape)

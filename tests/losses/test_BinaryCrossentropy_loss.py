@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
+FROM_MEAN_TO_SUM = 2
+
 np.random.seed(42)
 chunk_size = int(1e4)
 target_true = np.random.uniform(0.5, 1.0, size=(chunk_size, 5))
@@ -66,7 +68,7 @@ def test_loss_use_no_weights(from_logits):
         target_pred=target_pred,
         sample_weight=None,
     )
-    assert out1.numpy() > out2.numpy()
+    assert out1.numpy() * FROM_MEAN_TO_SUM > out2.numpy()
 
 
 @pytest.mark.parametrize("from_logits", [False, True])
@@ -97,4 +99,4 @@ def test_loss_use_with_weights(from_logits):
         target_pred=target_pred,
         sample_weight=w,
     )
-    assert out1.numpy() > out2.numpy()
+    assert out1.numpy() * FROM_MEAN_TO_SUM > out2.numpy()

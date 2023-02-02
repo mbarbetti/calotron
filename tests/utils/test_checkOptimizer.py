@@ -1,14 +1,12 @@
 import pytest
-from tensorflow.keras.optimizers import SGD, Adam, Optimizer, RMSprop
-
-STR_CASES = ["sgd", "rmsprop", "adam"]
-CLS_CASES = [SGD(), RMSprop(), Adam()]
+from tensorflow.keras.optimizers import Optimizer
+from calotron.utils.checkOptimizer import OPT_SHORTCUTS, TF_OPTIMIZERS
 
 
 ###########################################################################
 
 
-@pytest.mark.parametrize("optimizer", STR_CASES)
+@pytest.mark.parametrize("optimizer", OPT_SHORTCUTS)
 def test_checker_use_strings(optimizer):
     from calotron.utils import checkOptimizer
 
@@ -16,7 +14,7 @@ def test_checker_use_strings(optimizer):
     assert isinstance(res, Optimizer)
 
 
-@pytest.mark.parametrize("optimizer", CLS_CASES)
+@pytest.mark.parametrize("optimizer", TF_OPTIMIZERS)
 def test_checker_use_classes(optimizer):
     from calotron.utils import checkOptimizer
 
