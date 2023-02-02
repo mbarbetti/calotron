@@ -1,7 +1,7 @@
 import pytest
-from calotron.losses.BaseLoss import BaseLoss
-from calotron.utils.checkLoss import LOSS_SHORTCUTS, CALOTRON_LOSSES
 
+from calotron.losses.BaseLoss import BaseLoss
+from calotron.utils.checkLoss import CALOTRON_LOSSES, LOSS_SHORTCUTS
 
 ###########################################################################
 

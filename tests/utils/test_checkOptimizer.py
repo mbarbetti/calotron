@@ -1,7 +1,7 @@
 import pytest
 from tensorflow.keras.optimizers import Optimizer
-from calotron.utils.checkOptimizer import OPT_SHORTCUTS, TF_OPTIMIZERS
 
+from calotron.utils.checkOptimizer import OPT_SHORTCUTS, TF_OPTIMIZERS
 
 ###########################################################################
 

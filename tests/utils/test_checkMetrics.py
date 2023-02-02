@@ -1,6 +1,7 @@
 import pytest
+
 from calotron.metrics.BaseMetric import BaseMetric
-from calotron.utils.checkMetrics import METRIC_SHORTCUTS, CALOTRON_METRICS
+from calotron.utils.checkMetrics import CALOTRON_METRICS, METRIC_SHORTCUTS
 
 
 @pytest.fixture

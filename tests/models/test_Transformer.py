@@ -1,5 +1,6 @@
 import pytest
 import tensorflow as tf
+
 from calotron.models.Transformer import START_TOKEN_INITIALIZERS
 
 chunk_size = int(1e4)
