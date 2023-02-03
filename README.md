@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="calotron logo" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/calotron-logo.png" width="400"/>
+  <img alt="calotron logo" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/calotron-logo.png" width="600"/>
 </div>
 
 <h3 align="center">
@@ -7,7 +7,7 @@
 </h3>
 
 <p align="center">
-  <a href="https://www.tensorflow.org/versions"><img alt="TensorFlow versions" src="https://img.shields.io/badge/tensorflow-2.10%20|%202.11-f57000?style=flat"></a
+  <a href="https://www.tensorflow.org/versions"><img alt="TensorFlow versions" src="https://img.shields.io/badge/tensorflow-2.10%20|%202.11-f57000?style=flat"></a>
   <a href="https://pypi.python.org/pypi/calotron"><img alt="PyPI - Python versions" src="https://img.shields.io/pypi/pyversions/calotron"></a>
   <a href="https://pypi.python.org/pypi/calotron"><img alt="PyPI - Version" src="https://img.shields.io/pypi/v/calotron"></a>
   <!--
