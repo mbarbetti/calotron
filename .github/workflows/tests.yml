@@ -35,13 +35,15 @@ jobs:
           pip install dist/*.whl --force-reinstall --no-deps
 
       - name: Run pytest checks
+        with:
+          HOPAAS_TOKEN: ${{ secrets.HOPAAS_TOKEN }}
         run: |
-          echo ${HOPAAS_TOKEN}
-          # python tests/config/config.py --no-interactive -t ${HOPAAS_TOKEN}
-          python tests/config/config.py --no-interactive -t user-api-token
+          python tests/config/config.py --no-interactive -t ${HOPAAS_TOKEN}
           pytest --cov tests/
 
       - name: Upload coverage to Codecov
+        with:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: |
           curl https://keybase.io/codecovsecurity/pgp_keys.asc | gpg --no-default-keyring --keyring trustedkeys.gpg --import # One-time step
           curl -Os https://uploader.codecov.io/latest/linux/codecov
