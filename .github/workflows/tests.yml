@@ -25,6 +25,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install dependencies and calotron
+        shell: bash
         run: |
           pip install --upgrade pip build
           pip install -r requirements/base.txt -r requirements/tests.txt
@@ -35,14 +36,16 @@ jobs:
           pip install dist/*.whl --force-reinstall --no-deps
 
       - name: Run pytest checks
-        with:
+        shell: bash
+        env:
           HOPAAS_TOKEN: ${{ secrets.HOPAAS_TOKEN }}
         run: |
-          python tests/config/config.py --no-interactive -t ${HOPAAS_TOKEN}
+          python tests/config/config.py --no-interactive -t "$HOPAAS_TOKEN"
           pytest --cov tests/
 
       - name: Upload coverage to Codecov
-        with:
+        shell: bash
+        env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: |
           curl https://keybase.io/codecovsecurity/pgp_keys.asc | gpg --no-default-keyring --keyring trustedkeys.gpg --import # One-time step
@@ -53,4 +56,4 @@ jobs:
           shasum -a 256 -c codecov.SHA256SUM
 
           chmod +x codecov
-          ./codecov -R . -t ${CODECOV_TOKEN}
+          ./codecov -R . -t "$CODECOV_TOKEN"
