@@ -29,12 +29,13 @@ jobs:
         run: |
           pip install --upgrade pip build
           pip install -r requirements/base.txt -r requirements/tests.txt
-          pip install git+https://github.com/landerlini/hopaas_client.git   # hopaas-client not yet on PyPI
           apt-get update
           apt-get -y upgrade
           apt-get install -y python3-venv
           python -m build
           pip install dist/*.whl --force-reinstall --no-deps
+          apt-get install -y git-all
+          pip install git+https://github.com/landerlini/hopaas_client.git   # hopaas-client not yet on PyPI
 
       - name: Run pytest checks
         shell: bash
