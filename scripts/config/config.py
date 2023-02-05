@@ -12,7 +12,7 @@ parser.set_defaults(interactive=True)
 
 parser.add_argument("-D", "--data_dir", default="./data")
 parser.add_argument("-E", "--export_dir", default="./models")
-parser.add_argument("-I", "--images_dir", default="./img")
+parser.add_argument("-I", "--images_dir", default="./images")
 parser.add_argument("-R", "--report_dir", default="./html")
 config_dir = dict()
 
