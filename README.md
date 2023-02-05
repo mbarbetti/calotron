@@ -3,7 +3,7 @@
 </div>
 
 <h3 align="center">
-  <em>Transformer-based model to fast-simulate the LHCb ECAL detector</em>
+  <em>Transformer-based models to fast-simulate the LHCb ECAL detector</em>
 </h3>
 
 <p align="center">
