@@ -2,9 +2,9 @@
   <img alt="calotron logo" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/calotron-logo.png" width="500"/>
 </div>
 
-<h3 align="center">
+<h2 align="center">
   <em>Transformer-based models to fast-simulate the LHCb ECAL detector</em>
-</h3>
+</h2>
 
 <p align="center">
   <a href="https://www.tensorflow.org/versions"><img alt="TensorFlow versions" src="https://img.shields.io/badge/tensorflow-2.10–2.11-f57000?style=flat"></a>
