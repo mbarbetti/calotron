@@ -1,23 +1,24 @@
-<div align="left">
-  <img alt="calotron logo" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/calotron-logo.png" width="400"/>
+<div align="center">
+  <img alt="calotron logo" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/calotron-logo.png" width="500"/>
 </div>
 
+<h3 align="center">
+  <em>Transformer-based models to fast-simulate the LHCb ECAL detector</em>
+</h3>
 
-# `Calotron`: Transformer-based models to fast-simulate the LHCb ECAL detector
+<p align="center">
+  <a href="https://www.tensorflow.org/versions"><img alt="TensorFlow versions" src="https://img.shields.io/badge/tensorflow-2.10–2.11-f57000?style=flat"></a>
+  <a href="https://www.python.org"><img alt="Python versions" src="https://img.shields.io/badge/python-3.7–3.10-blue?style=flat"></a>
+  <a href="https://pypi.python.org/pypi/calotron"><img alt="PyPI - Version" src="https://img.shields.io/pypi/v/calotron"></a>
+  <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img alt="GitHub - License" src="https://img.shields.io/github/license/mbarbetti/calotron"></a>
+</p>
 
-[![TensorFlow versions](https://img.shields.io/badge/tensorflow-2.5–2.11-f57000?style=flat)](https://www.tensorflow.org/versions)
-[![Python versions](https://img.shields.io/badge/python-3.7–3.10-blue?style=flat)](https://www.python.org)
-[![PyPI - Version](https://img.shields.io/pypi/v/calotron)](https://pypi.python.org/pypi/calotron)
-[![GitHub - License](https://img.shields.io/github/license/mbarbetti/calotron)](https://www.gnu.org/licenses/gpl-3.0.html)
+<p align="center">
+  <a href="https://github.com/mbarbetti/calotron/actions/workflows/tests.yml"><img alt="GitHub - Tests" src="https://github.com/mbarbetti/calotron/actions/workflows/tests.yml/badge.svg?branch=main"></a>
+  <a href="https://codecov.io/gh/mbarbetti/calotron"><img alt="Codecov" src="https://codecov.io/gh/mbarbetti/calotron/branch/main/graph/badge.svg?token=DRG8BWC9RR"></a>
+</p>
 
-[![GitHub - Tests](https://github.com/mbarbetti/calotron/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/mbarbetti/calotron/actions/workflows/tests.yml)
-[![Codecov](https://codecov.io/gh/mbarbetti/calotron/branch/main/graph/badge.svg?token=DRG8BWC9RR)](https://codecov.io/gh/mbarbetti/calotron)
-
-[![GitHub - Style](https://github.com/mbarbetti/calotron/actions/workflows/style.yml/badge.svg?branch=main)](https://github.com/mbarbetti/calotron/actions/workflows/style.yml)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-
-<!--
-## License
-
-[GPL License 3.0](LICENSE)
--->
+<p align="center">
+  <a href="https://github.com/mbarbetti/calotron/actions/workflows/style.yml"><img alt="GitHub - Style" src="https://github.com/mbarbetti/calotron/actions/workflows/style.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
+</p>
