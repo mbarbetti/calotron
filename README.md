@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="calotron logo" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/calotron-logo.png" width="500"/>
+  <img alt="calotron logo" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/calotron-logo.png" width="600"/>
 </div>
 
 <h2 align="center">
