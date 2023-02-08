@@ -10,7 +10,7 @@
   <a href="https://www.tensorflow.org/versions"><img alt="TensorFlow versions" src="https://img.shields.io/badge/tensorflow-2.10–2.11-f57000?style=flat"></a>
   <a href="https://www.python.org/downloads"><img alt="Python versions" src="https://img.shields.io/badge/python-3.7–3.10-blue?style=flat"></a>
   <a href="https://pypi.python.org/pypi/calotron"><img alt="PyPI - Version" src="https://img.shields.io/pypi/v/calotron"></a>
-  <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img alt="GitHub - License" src="https://img.shields.io/github/license/mbarbetti/calotron"></a>
+  <a href="LICENSE"><img alt="GitHub - License" src="https://img.shields.io/github/license/mbarbetti/calotron"></a>
 </p>
 
 <p align="center">
