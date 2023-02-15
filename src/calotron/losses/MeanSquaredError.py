@@ -10,24 +10,19 @@ class MeanSquaredError(BaseLoss):
         self._loss = TF_MSE(reduction=reduction)
 
     def discriminator_loss(
-        self, discriminator, target_true, target_pred, sample_weight=None, training=True
+        self, discriminator, target_true, target_pred, sample_weight=None
     ):
-        y_true = discriminator(target_true, training=training)
-        y_pred = discriminator(target_pred, training=training)
+        y_true = discriminator(target_true, training=True)
+        y_pred = discriminator(target_pred, training=True)
         return -self._loss(
             y_true, y_pred, sample_weight=sample_weight
         )  # error maximization
 
     def transformer_loss(
-        self,
-        discriminator,
-        target_true,
-        target_pred,
-        sample_weight=None,
-        training=False,
+        self, discriminator, target_true, target_pred, sample_weight=None
     ):
-        y_true = discriminator(target_true, training=training)
-        y_pred = discriminator(target_pred, training=training)
+        y_true = discriminator(target_true, training=False)
+        y_pred = discriminator(target_pred, training=False)
         return self._loss(
             y_true, y_pred, sample_weight=sample_weight
         )  # error minimization
