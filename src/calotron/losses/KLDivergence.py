@@ -14,19 +14,15 @@ class KLDivergence(BaseLoss):
     ):
         y_true = discriminator(target_true, training=True)
         y_pred = discriminator(target_pred, training=True)
-        loss = self._loss(
-            y_true, y_pred, sample_weight=sample_weight
-        )
+        loss = self._loss(y_true, y_pred, sample_weight=sample_weight)
         loss = tf.cast(loss, dtype=target_true.dtype)
-        return -loss   # divergence maximization
+        return -loss  # divergence maximization
 
     def transformer_loss(
         self, discriminator, target_true, target_pred, sample_weight=None
     ):
         y_true = discriminator(target_true, training=False)
         y_pred = discriminator(target_pred, training=False)
-        loss = self._loss(
-            y_true, y_pred, sample_weight=sample_weight
-        )
+        loss = self._loss(y_true, y_pred, sample_weight=sample_weight)
         loss = tf.cast(loss, dtype=target_true.dtype)
-        return loss   # divergence minimization
+        return loss  # divergence minimization
