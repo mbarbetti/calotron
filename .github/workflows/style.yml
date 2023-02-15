@@ -22,7 +22,7 @@ jobs:
     - name: Set-up python version
       uses: actions/setup-python@v4
       with:
-        python-version: "3.8"   # tensorflow:2.11.0 python version
+        python-version: "3.8"   # supported by all tensorflow versions
     - name: Install dependencies
       run: |
         pip install --upgrade pip
@@ -39,7 +39,7 @@ jobs:
     - name: Set-up python version
       uses: actions/setup-python@v4
       with:
-        python-version: "3.8"   # tensorflow:2.11.0 python version
+        python-version: "3.8"   # supported by all tensorflow versions
     - name: Install dependencies
       run: |
         pip install --upgrade pip
@@ -56,7 +56,7 @@ jobs:
     - name: Set-up python version
       uses: actions/setup-python@v4
       with:
-        python-version: "3.8"   # tensorflow:2.11.0 python version
+        python-version: "3.8"   # supported by all tensorflow versions
     - name: Install dependencies
       run: |
         pip install --upgrade pip
