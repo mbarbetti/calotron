@@ -40,14 +40,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-standard = [
-  "numpy",
-  "pandas",
-  "uproot",
-  "matplotlib",
-  "scikit-learn",
-]
-advanced = [
+lamarr = [
   "numpy",
   "pandas",
   "uproot",
