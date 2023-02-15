@@ -1,4 +1,4 @@
-def getModelSummary(model) -> tuple:
+def getSummaryHTML(model) -> tuple:
     headers = ["Layer (type)", "Output shape", "Param #"]
     heads_html = "<tr>\n" + "".join([f"<th>{h}</th>\n" for h in headers]) + "</tr>\n"
 

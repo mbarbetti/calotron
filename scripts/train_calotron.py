@@ -10,7 +10,7 @@ from sklearn.utils import shuffle
 
 from calotron.losses import CaloLoss
 from calotron.simulators import Simulator
-from calotron.utils import initHPSingleton, getModelSummary
+from calotron.utils import initHPSingleton, getSummaryHTML
 from calotron.models import Transformer, Discriminator, Calotron
 from calotron.callbacks.schedulers import ExponentialDecay
 
@@ -215,14 +215,14 @@ report.add_markdown("---")
 
 ## Transformer architecture
 report.add_markdown('<h2 align="center">Transformer architecture</h2>')
-html_table, num_params = getModelSummary(model.transformer)
+html_table, num_params = getSummaryHTML(model.transformer)
 report.add_markdown(html_table)
 report.add_markdown(f"**Total params** : {num_params}")
 report.add_markdown("---")
 
 ## Discriminator architecture
 report.add_markdown('<h2 align="center">Discriminator architecture</h2>')
-html_table, num_params = getModelSummary(model.discriminator)
+html_table, num_params = getSummaryHTML(model.discriminator)
 report.add_markdown(html_table)
 report.add_markdown(f"**Total params** : {num_params}")
 report.add_markdown("---")
