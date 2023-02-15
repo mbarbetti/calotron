@@ -31,6 +31,7 @@ class BinaryCrossentropy(BaseLoss):
         loss_real = self._loss(
             tf.ones_like(y_true), y_true, sample_weight=sample_weight
         )
+        loss_real = tf.cast(loss_real, dtype=target_true.dtype)
         rnd_pred = tf.random.normal(
             tf.shape(target_pred), stddev=0.05, dtype=target_pred.dtype
         )
@@ -38,6 +39,7 @@ class BinaryCrossentropy(BaseLoss):
         loss_fake = self._loss(
             tf.zeros_like(y_pred), y_pred, sample_weight=sample_weight
         )
+        loss_fake = tf.cast(loss_fake, dtype=target_pred.dtype)
         return (loss_real + loss_fake) / 2.0
 
     def transformer_loss(
@@ -50,4 +52,5 @@ class BinaryCrossentropy(BaseLoss):
         loss_fake = self._loss(
             tf.ones_like(y_pred), y_pred, sample_weight=sample_weight
         )
+        loss_fake = tf.cast(loss_fake, dtype=target_pred.dtype)
         return loss_fake
