@@ -1,0 +1,106 @@
+import numpy as np
+import pytest
+import tensorflow as tf
+
+FROM_MEAN_TO_SUM = 2
+ALPHA_TO_INF = 1e4
+
+np.random.seed(42)
+chunk_size = int(1e4)
+target_true = np.random.uniform(0.5, 1.0, size=(chunk_size, 5))
+target_pred = np.random.uniform(0.2, 0.8, size=(chunk_size, 5))
+
+model = tf.keras.Sequential(
+    [
+        tf.keras.layers.Dense(8, activation="relu"),
+        tf.keras.layers.Dense(8, activation="relu"),
+    ]
+)
+
+
+@pytest.fixture
+def loss():
+    from calotron.losses import CaloLoss
+
+    loss_ = CaloLoss(
+        alpha=0.1,
+        from_logits=False,
+        label_smoothing=0.0,
+        axis=-1,
+        reduction="auto",
+        name="calo_loss",
+    )
+    return loss_
+
+
+###########################################################################
+
+
+def test_loss_configuration(loss):
+    from calotron.losses import CaloLoss
+
+    assert isinstance(loss, CaloLoss)
+    assert isinstance(loss.name, str)
+
+
+@pytest.mark.parametrize("from_logits", [False, True])
+def test_loss_use_no_weights(from_logits):
+    from calotron.losses import CaloLoss
+
+    loss = CaloLoss(
+        alpha=ALPHA_TO_INF,
+        from_logits=from_logits,
+        label_smoothing=0.0,
+        axis=-1,
+        reduction="auto",
+        name="calo_loss",
+    )
+    if from_logits:
+        model.add(tf.keras.layers.Dense(1, activation="tanh"))
+    else:
+        model.add(tf.keras.layers.Dense(1, activation="sigmoid"))
+    out1 = loss.discriminator_loss(
+        discriminator=model,
+        target_true=target_true,
+        target_pred=target_pred,
+        sample_weight=None,
+    )
+    out2 = loss.transformer_loss(
+        discriminator=model,
+        target_true=target_true,
+        target_pred=target_pred,
+        sample_weight=None,
+    )
+    assert out1.numpy() * FROM_MEAN_TO_SUM > out2.numpy() / ALPHA_TO_INF
+
+
+@pytest.mark.parametrize("from_logits", [False, True])
+def test_loss_use_with_weights(from_logits):
+    w = np.random.uniform(0.0, 1.0, size=(chunk_size, 1)) > 0.5
+    from calotron.losses import CaloLoss
+
+    loss = CaloLoss(
+        alpha=ALPHA_TO_INF,
+        from_logits=from_logits,
+        label_smoothing=0.0,
+        axis=-1,
+        reduction="auto",
+        name="calo_loss",
+    )
+    if from_logits:
+        model.add(tf.keras.layers.Dense(1, activation="tanh"))
+    else:
+        model.add(tf.keras.layers.Dense(1, activation="sigmoid"))
+    out1 = loss.discriminator_loss(
+        discriminator=model,
+        target_true=target_true,
+        target_pred=target_pred,
+        sample_weight=w,
+    )
+    out2 = loss.transformer_loss(
+        discriminator=model,
+        target_true=target_true,
+        target_pred=target_pred,
+        sample_weight=w,
+    )
+    assert out1.numpy() * FROM_MEAN_TO_SUM > out2.numpy() / ALPHA_TO_INF
