@@ -77,7 +77,6 @@ def test_callback_use(enable_pruning):
 
     for _ in range(NUM_TRIALS):
         with study.trial() as trial:
-
             adam = tf.keras.optimizers.Adam(learning_rate=trial.learning_rate)
             mse = tf.keras.losses.MeanSquaredError()
 

@@ -35,6 +35,10 @@ class HopaasReporter(Callback):
         return float(monitor_value)
 
     @property
+    def trial(self):  # TODO: add Any
+        return self._trial
+
+    @property
     def loss_name(self) -> str:
         return self._loss_name
 
