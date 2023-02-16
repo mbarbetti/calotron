@@ -3,11 +3,11 @@ import tensorflow as tf
 
 from calotron.models import Transformer
 
-chunk_size = int(1e5)
-batch_size = 100
+CHUNK_SIZE = int(1e5)
+BATCH_SIZE = 100
 
-source = tf.random.normal(shape=(chunk_size, 2, 5))
-target = tf.random.normal(shape=(chunk_size, 4, 10))
+source = tf.random.normal(shape=(CHUNK_SIZE, 2, 5))
+target = tf.random.normal(shape=(CHUNK_SIZE, 4, 10))
 model = Transformer(
     output_depth=target.shape[2],
     encoder_depth=8,
@@ -24,7 +24,7 @@ model = Transformer(
 def simulator():
     from calotron.simulators import Simulator
 
-    sim = Simulator(transformer=model, start_token=target[:batch_size, 0, :])
+    sim = Simulator(transformer=model, start_token=target[:BATCH_SIZE, 0, :])
     return sim
 
 
@@ -40,7 +40,7 @@ def test_simulator_configuration(simulator):
 
 
 def test_simulator_use(simulator):
-    output = simulator(source=source[:batch_size], max_length=target.shape[1])
+    output = simulator(source=source[:BATCH_SIZE], max_length=target.shape[1])
     test_shape = list(target.shape)
-    test_shape[0] = batch_size
+    test_shape[0] = BATCH_SIZE
     assert output.shape == tuple(test_shape)

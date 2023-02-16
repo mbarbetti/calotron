@@ -3,10 +3,10 @@ import tensorflow as tf
 
 from calotron.models.Transformer import START_TOKEN_INITIALIZERS
 
-chunk_size = int(1e4)
+CHUNK_SIZE = int(1e4)
 
-source = tf.random.normal(shape=(chunk_size, 16, 3))
-target = tf.random.normal(shape=(chunk_size, 32, 9))
+source = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
+target = tf.random.normal(shape=(CHUNK_SIZE, 32, 9))
 
 
 @pytest.fixture

@@ -2,10 +2,10 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-np.random.seed(42)
-chunk_size = int(1e4)
+CHUNK_SIZE = int(1e4)
+
 y_true = None
-y_pred = np.random.uniform(0.0, 1.0, size=(chunk_size,))
+y_pred = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE,))
 
 
 @pytest.fixture

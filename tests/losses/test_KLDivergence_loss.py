@@ -2,10 +2,10 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-np.random.seed(42)
-chunk_size = int(1e4)
-target_true = np.random.uniform(0.5, 1.0, size=(chunk_size, 5))
-target_pred = np.random.uniform(0.2, 0.8, size=(chunk_size, 5))
+CHUNK_SIZE = int(1e4)
+
+target_true = np.random.uniform(0.5, 1.0, size=(CHUNK_SIZE, 5))
+target_pred = np.random.uniform(0.2, 0.8, size=(CHUNK_SIZE, 5))
 
 model = tf.keras.Sequential(
     [
@@ -50,7 +50,7 @@ def test_loss_use_no_weights(loss):
 
 
 def test_loss_use_with_weights(loss):
-    w = np.random.uniform(0.0, 1.0, size=(chunk_size, 1)) > 0.5
+    w = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE, 1)) > 0.5
     out1 = loss.discriminator_loss(
         discriminator=model,
         target_true=target_true,

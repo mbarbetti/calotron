@@ -1,14 +1,14 @@
 import pytest
 import tensorflow as tf
 
-chunk_size = int(5e4)
+CHUNK_SIZE = int(5e4)
 
-input1 = tf.random.normal(shape=(chunk_size, 4, 10), mean=1.0)
-input2 = tf.random.normal(shape=(chunk_size, 4, 10), mean=2.0)
+input1 = tf.random.normal(shape=(CHUNK_SIZE, 4, 10), mean=1.0)
+input2 = tf.random.normal(shape=(CHUNK_SIZE, 4, 10), mean=2.0)
 inputs = tf.concat([input1, input2], axis=0)
 
-label1 = tf.zeros(shape=(chunk_size,))
-label2 = tf.ones(shape=(chunk_size,))
+label1 = tf.zeros(shape=(CHUNK_SIZE,))
+label2 = tf.ones(shape=(CHUNK_SIZE,))
 labels = tf.concat([label1, label2], axis=0)
 
 

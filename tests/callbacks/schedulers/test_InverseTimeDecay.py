@@ -2,12 +2,12 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-chunk_size = int(1e4)
+CHUNK_SIZE = int(1e4)
 
 X = np.c_[
-    np.random.uniform(-1, 1, size=chunk_size),
-    np.random.normal(0, 1, size=chunk_size),
-    np.random.exponential(5, size=chunk_size),
+    np.random.uniform(-1, 1, size=CHUNK_SIZE),
+    np.random.normal(0, 1, size=CHUNK_SIZE),
+    np.random.exponential(5, size=CHUNK_SIZE),
 ]
 Y = np.tanh(X[:, 0]) + 2 * X[:, 1] * X[:, 2]
 
