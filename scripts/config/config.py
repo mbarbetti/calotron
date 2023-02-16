@@ -16,8 +16,7 @@ parser.add_argument("-I", "--images_dir", default="./images")
 parser.add_argument("-R", "--report_dir", default="./html")
 config_dir = dict()
 
-parser.add_argument("-a", "--address", default="http://hopaas.cloud.infn.it")
-parser.add_argument("-p", "--port", default=80)
+parser.add_argument("-s", "--server", default="https://hopaas.cloud.infn.it")
 parser.add_argument("-t", "--token", default="user-api-token")
 config_hopaas = dict()
 
@@ -36,13 +35,10 @@ if args.interactive:
     report_dir = input(f"Path for the report directory (default: '{args.report_dir}'): ")
     config_dir["report_dir"] = report_dir if not (report_dir == "") else args.report_dir
 
-    address = input(f"Address for the Hopaas service (default: '{args.address}'): ")
-    config_hopaas["address"] = address if not (address == "") else args.address
+    server = input(f"Address of the Hopaas service (default: '{args.server}'): ")
+    config_hopaas["server"] = server if not (server == "") else args.server
 
-    port = input(f"Port for the Hopaas service (default: '{args.port}'): ")
-    config_hopaas["port"] = port if not (port == "") else args.port
-
-    token = input(f"API token for the Hopaas service (default: '{args.token}'): ")
+    token = input(f"API token to access the Hopaas service (default: '{args.token}'): ")
     config_hopaas["token"] = token if not (token == "") else args.token
 else:
     config_dir["data_dir"] = args.data_dir
@@ -50,8 +46,7 @@ else:
     config_dir["images_dir"] = args.images_dir
     config_dir["report_dir"] = args.report_dir
 
-    config_hopaas["address"] = args.address
-    config_hopaas["port"] = args.port
+    config_hopaas["server"] = args.server
     config_hopaas["token"] = args.token
 
 with open(f"{here}/directories.yml", "w") as file:
