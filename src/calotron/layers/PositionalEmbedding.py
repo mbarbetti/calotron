@@ -13,9 +13,13 @@ class PositionalEmbedding(tf.keras.layers.Layer):
         dtype=None,
     ):
         super().__init__(name=name, dtype=dtype)
+        assert output_depth >= 1
         self._output_depth = int(output_depth)
+        assert max_length >= 1
         self._max_length = int(max_length)
+        assert encoding_normalization > 0.0
         self._encoding_normalization = float(encoding_normalization)
+        assert dropout_rate >= 0.0
         self._dropout_rate = float(dropout_rate)
 
         self._embedding = tf.keras.layers.Dense(

@@ -12,10 +12,14 @@ class FeedForward(tf.keras.layers.Layer):
         dtype=None,
     ):
         super().__init__(name=name, dtype=dtype)
+        assert output_units >= 1
         self._output_units = int(output_units)
+        assert hidden_units >= 1
         self._hidden_units = int(hidden_units)
+        assert dropout_rate >= 0.0
         self._dropout_rate = float(dropout_rate)
-        self._residual_smoothing = bool(residual_smoothing)
+        assert isinstance(residual_smoothing, bool)
+        self._residual_smoothing = residual_smoothing
 
         if self._residual_smoothing:
             self._emb_layer = tf.keras.layers.Dense(
@@ -42,7 +46,7 @@ class FeedForward(tf.keras.layers.Layer):
             x = self._emb_layer(x)
         x = self._add([x, self._seq(x)])
         x = self._layer_norm(x)
-        return x  # shape (batch_size, x_elements, output_units)
+        return x  # (batch_size, x_elements, output_units)
 
     @property
     def output_units(self) -> int:

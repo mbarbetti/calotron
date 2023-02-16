@@ -18,12 +18,19 @@ class DecoderLayer(tf.keras.layers.Layer):
         dtype=None,
     ):
         super().__init__(name=name, dtype=dtype)
+        assert decoder_depth >= 1
         self._decoder_depth = int(decoder_depth)
+        assert num_heads >= 1
         self._num_heads = int(num_heads)
+        if key_dim:
+            assert key_dim >= 1
         self._key_dim = int(key_dim) if key_dim else None
+        assert ff_units >= 1
         self._ff_units = int(ff_units)
+        assert dropout_rate >= 0.0
         self._dropout_rate = float(dropout_rate)
-        self._residual_smoothing = bool(residual_smoothing)
+        assert isinstance(residual_smoothing, bool)
+        self._residual_smoothing = residual_smoothing
 
         self._csa_layer = CausalSelfAttention(
             num_heads=self._num_heads,
@@ -47,11 +54,9 @@ class DecoderLayer(tf.keras.layers.Layer):
         )
 
     def call(self, x, context):
-        x = self._csa_layer(x=x)  # shape: (batch_size, x_elements, x_depth)
-        x = self._ca_layer(
-            x=x, context=context
-        )  # shape: (batch_size, x_elements, x_depth)
-        x = self._ff_layer(x)  # shape: (batch_size, x_elements, decoder_depth)
+        x = self._csa_layer(x=x)  # (batch_size, x_elements, x_depth)
+        x = self._ca_layer(x=x, context=context)  # (batch_size, x_elements, x_depth)
+        x = self._ff_layer(x)  # (batch_size, x_elements, decoder_depth)
         return x
 
     @property
@@ -97,17 +102,30 @@ class Decoder(tf.keras.layers.Layer):
         dtype=None,
     ):
         super().__init__(name=name, dtype=dtype)
+        assert decoder_depth >= 1
         self._decoder_depth = int(decoder_depth)
+        assert num_layers >= 1
         self._num_layers = int(num_layers)
+        assert num_heads >= 1
         self._num_heads = int(num_heads)
+        if key_dim:
+            assert key_dim >= 1
         self._key_dim = int(key_dim) if key_dim else None
+        if pos_dim:
+            assert pos_dim >= 1
         self._pos_dim = int(pos_dim) if pos_dim else None
+        assert pos_normalization > 0.0
         self._pos_normalization = float(pos_normalization)
+        assert max_length >= 1
         self._max_length = int(max_length)
+        assert ff_units >= 1
         self._ff_units = int(ff_units)
+        assert dropout_rate >= 0.0
         self._dropout_rate = float(dropout_rate)
-        self._pos_sensitive = bool(pos_sensitive)
-        self._residual_smoothing = bool(residual_smoothing)
+        assert isinstance(pos_sensitive, bool)
+        self._pos_sensitive = pos_sensitive
+        assert isinstance(residual_smoothing, bool)
+        self._residual_smoothing = residual_smoothing
 
         if self._pos_sensitive:
             self._pos_embedding = PositionalEmbedding(
@@ -135,10 +153,10 @@ class Decoder(tf.keras.layers.Layer):
 
     def call(self, x, context):
         if self._pos_embedding is not None:
-            x = self._pos_embedding(x)  # shape: (batch_size, x_elements, pos_dim)
+            x = self._pos_embedding(x)  # (batch_size, x_elements, pos_dim)
         for i in range(self._num_layers):
             x = self._dec_layers[i](x, context)
-        return x  # shape: (batch_size, x_elements, decoder_depth)
+        return x  # (batch_size, x_elements, decoder_depth)
 
     @property
     def decoder_depth(self) -> int:

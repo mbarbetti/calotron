@@ -30,25 +30,46 @@ class Transformer(tf.keras.Model):
         dtype=None,
     ):
         super().__init__(name=name, dtype=dtype)
+        assert output_depth >= 1
         self._output_depth = int(output_depth)
+        assert encoder_depth >= 1
         self._encoder_depth = int(encoder_depth)
+        assert decoder_depth >= 1
         self._decoder_depth = int(decoder_depth)
+        assert num_layers >= 1
         self._num_layers = int(num_layers)
+        assert num_heads >= 1
         self._num_heads = int(num_heads)
+        if key_dim:
+            assert key_dim >= 1
         self._key_dim = int(key_dim) if key_dim else None
+        if encoder_pos_dim:
+            assert encoder_pos_dim >= 1
+        if decoder_pos_dim:
+            assert decoder_pos_dim >= 1
         self._pos_dim = (
             int(encoder_pos_dim) if encoder_pos_dim else None,
             int(decoder_pos_dim) if decoder_pos_dim else None,
         )
+        if encoder_pos_normalization:
+            assert encoder_pos_normalization > 0.0
+        if decoder_pos_normalization:
+            assert decoder_pos_normalization > 0.0
         self._pos_normalization = (
             float(encoder_pos_normalization),
             float(decoder_pos_normalization),
         )
+        assert encoder_max_length >= 1
+        assert decoder_max_length >= 1
         self._max_length = (int(encoder_max_length), int(decoder_max_length))
+        assert ff_units >= 1
         self._ff_units = int(ff_units)
+        assert dropout_rate >= 0.0
         self._dropout_rate = float(dropout_rate)
-        self._pos_sensitive = bool(pos_sensitive)
-        self._residual_smoothing = bool(residual_smoothing)
+        assert isinstance(pos_sensitive, bool)
+        self._pos_sensitive = pos_sensitive
+        assert isinstance(residual_smoothing, bool)
+        self._residual_smoothing = residual_smoothing
         if start_token_initializer not in START_TOKEN_INITIALIZERS:
             raise ValueError(
                 "`start_token_initializer` should be selected "
@@ -92,7 +113,6 @@ class Transformer(tf.keras.Model):
         )
 
         if output_activations is not None:
-            # TODO: find a way to remove the whole list of activations from the summary
             self._multi_act_layer = MultiActivations(
                 output_activations,
                 self._output_depth,
@@ -108,17 +128,17 @@ class Transformer(tf.keras.Model):
         target = self._prepare_input_target(inputs[1])
         context = self._encoder(
             x=source
-        )  # shape: (batch_size, source_elements, encoder_depth)
+        )  # (batch_size, source_elements, encoder_depth)
         output = self._decoder(
             x=target, context=context
-        )  # shape: (batch_size, target_elements, decoder_depth)
+        )  # (batch_size, target_elements, decoder_depth)
         output = self._final_layer(
             output
-        )  # shape: (batch_size, target_elements, output_depth)
+        )  # (batch_size, target_elements, output_depth)
         if self._output_activations is not None:
             output = self._multi_act_layer(
                 output
-            )  # shape: (batch_size, target_elements, output_depth)
+            )  # (batch_size, target_elements, output_depth)
         return output
 
     def _prepare_input_target(self, target):

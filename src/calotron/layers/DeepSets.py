@@ -12,11 +12,13 @@ class DeepSets(tf.keras.layers.Layer):
         dtype=None,
     ):
         super().__init__(name=name, dtype=dtype)
+        assert latent_dim >= 1
         self._latent_dim = int(latent_dim)
-        if num_layers < 1:
-            raise ValueError("`num_layers` should be greater than 0")
+        assert num_layers >= 1
         self._num_layers = int(num_layers)
+        assert hidden_units >= 1
         self._hidden_units = int(hidden_units)
+        assert dropout_rate >= 0.0
         self._dropout_rate = float(dropout_rate)
 
         self._seq = list()
@@ -34,22 +36,17 @@ class DeepSets(tf.keras.layers.Layer):
         ]
 
     def call(self, x):
-        # shape: (batch_size, x_elements, x_depth)
         outputs = list()
-        for i in range(
-            x.shape[1]
-        ):  # TODO: redesign computation (parallel instead serial)
-            latent_tensor = x[:, i : i + 1, :]  # shape: (batch_size, 1, x_depth)
+        for i in range(x.shape[1]):
+            latent_tensor = x[:, i : i + 1, :]  # (batch_size, 1, x_depth)
             for layer in self._seq:
-                latent_tensor = layer(
-                    latent_tensor
-                )  # shape: (batch_size, 1, latent_dim)
+                latent_tensor = layer(latent_tensor)  # (batch_size, 1, latent_dim)
             outputs.append(latent_tensor)
 
         concat = tf.keras.layers.Concatenate(axis=1)(
             outputs
-        )  # shape: (batch_size, x_elements, latent_dim)
-        output = tf.reduce_sum(concat, axis=1)  # shape: (batch_size, latent_dim)
+        )  # (batch_size, x_elements, latent_dim)
+        output = tf.reduce_sum(concat, axis=1)  # (batch_size, latent_dim)
         return output
 
     @property

@@ -45,7 +45,7 @@ class BaseScheduler(Callback):
 class CosineDecay(BaseScheduler):
     def __init__(self, optimizer, decay_steps, alpha=0.0, verbose=False):
         super().__init__(optimizer, verbose)
-        assert decay_steps > 0
+        assert decay_steps >= 1
         self._decay_steps = int(decay_steps)
         assert (alpha) >= 0.0 and (alpha <= 1.0)
         self._alpha = float(alpha)
@@ -78,7 +78,7 @@ class ExponentialDecay(BaseScheduler):
         super().__init__(optimizer, verbose)
         assert decay_rate > 0.0
         self._decay_rate = float(decay_rate)
-        assert decay_steps > 0
+        assert decay_steps >= 1
         self._decay_steps = int(decay_steps)
         assert isinstance(staircase, bool)
         self._staircase = staircase
@@ -114,7 +114,7 @@ class InverseTimeDecay(BaseScheduler):
         super().__init__(optimizer, verbose)
         assert decay_rate > 0.0
         self._decay_rate = float(decay_rate)
-        assert decay_steps > 0
+        assert decay_steps >= 1
         self._decay_steps = int(decay_steps)
         assert isinstance(staircase, bool)
         self._staircase = staircase
@@ -185,7 +185,7 @@ class PolynomialDecay(BaseScheduler):
         verbose=False,
     ):
         super().__init__(optimizer, verbose)
-        assert decay_steps > 0
+        assert decay_steps >= 1
         self._decay_steps = int(decay_steps)
         assert end_learning_rate > 0.0
         self._end_learning_rate = float(end_learning_rate)
@@ -234,9 +234,9 @@ class PolynomialDecay(BaseScheduler):
 class AttentionDecay(BaseScheduler):
     def __init__(self, optimizer, d_model, warmup_steps=4000, verbose=False):
         super().__init__(optimizer, verbose)
-        assert d_model > 0
+        assert d_model >= 1
         self._d_model = int(d_model)
-        assert warmup_steps > 0
+        assert warmup_steps >= 1
         self._warmup_steps = int(warmup_steps)
 
     def on_train_begin(self, logs=None):

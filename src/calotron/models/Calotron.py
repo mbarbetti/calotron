@@ -10,16 +10,14 @@ class Calotron(tf.keras.Model):
         super().__init__(name=name, dtype=dtype)
         if not isinstance(transformer, Transformer):
             raise TypeError(
-                f"`transformer` should be a calotron's "
-                f"`Transformer`, instead "
-                f"{type(transformer)} passed"
+                f"`transformer` should be a calotron's `Transformer`, "
+                f"instead {type(transformer)} passed"
             )
         self._transformer = transformer
         if not isinstance(discriminator, Discriminator):
             raise TypeError(
-                f"`discriminator` should be a calotron's "
-                f"`Discriminator`, instead "
-                f"{type(discriminator)} passed"
+                f"`discriminator` should be a calotron's `Discriminator`, "
+                f"instead {type(discriminator)} passed"
             )
         self._discriminator = discriminator
 
@@ -51,11 +49,9 @@ class Calotron(tf.keras.Model):
         self._metrics = checkMetrics(metrics)
         self._t_opt = checkOptimizer(transformer_optimizer)
         self._d_opt = checkOptimizer(discriminator_optimizer)
-        if transformer_upds_per_batch < 1:
-            raise ValueError("`transformer_upds_per_batch` should be greater than 0")
+        assert transformer_upds_per_batch >= 1
         self._t_upds_per_batch = int(transformer_upds_per_batch)
-        if discriminator_upds_per_batch < 1:
-            raise ValueError("`discriminator_upds_per_batch` should be greater than 0")
+        assert discriminator_upds_per_batch >= 1
         self._d_upds_per_batch = int(discriminator_upds_per_batch)
 
     def train_step(self, data):

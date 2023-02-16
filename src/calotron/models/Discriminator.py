@@ -16,11 +16,16 @@ class Discriminator(tf.keras.Model):
         dtype=None,
     ):
         super().__init__(name=name, dtype=dtype)
+        assert latent_dim >= 1
         self._latent_dim = int(latent_dim)
+        assert output_units >= 1
         self._output_units = int(output_units)
         self._output_activation = output_activation
+        assert hidden_layers >= 1
         self._hidden_layers = int(hidden_layers)
+        assert hidden_units >= 1
         self._hidden_units = int(hidden_units)
+        assert dropout_rate >= 0.0
         self._dropout_rate = float(dropout_rate)
 
         self._deepsets = DeepSets(
