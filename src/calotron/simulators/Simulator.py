@@ -4,34 +4,48 @@ from calotron.models import Transformer
 
 
 class Simulator(tf.Module):
-    def __init__(self, transformer, start_token):
-        super().__init__()
+    def __init__(self, transformer, start_token, name=None):
+        super().__init__(name=name)
         if not isinstance(transformer, Transformer):
             raise TypeError(
-                f"`transformer` should be a calotron's "
-                f"`{type(Transformer).__name__}`, instead "
-                f"{type(transformer)} passed"
+                "`transformer` should be a calotron's `Transformer`, "
+                f"instead {type(transformer)} passed"
             )
         self._transformer = transformer
-        if not isinstance(start_token, tf.Tensor):
-            raise TypeError(
-                f"`start_token` should be a TensorFlow "
-                f"`Tensor`, instead {type(start_token)} passed"
+        self._dtype = self._transformer.dtype
+
+        start_token = tf.convert_to_tensor(start_token, dtype=self._dtype)
+        if len(start_token.shape) > 2:
+            raise ValueError(
+                "`start_token` shape should match with "
+                "(batch_size, target_depth) or (target_depth,)"
+            )
+        if start_token.shape[-1] != self._transformer.output_depth:
+            raise ValueError(
+                "`start_token` elements should match with "
+                "the `transformer` output depth, instead "
+                f"{start_token.shape[-1]} passed"
             )
         self._start_token = start_token
 
     def __call__(self, source, max_length):
-        if not isinstance(source, tf.Tensor):
-            raise TypeError(
-                f"`source` should be a TensorFlow "
-                f"`Tensor`, instead {type(source)} passed"
-            )
-        if max_length < 1:
-            raise ValueError("`max_length` should be greater than 0")
+        source = tf.convert_to_tensor(source, dtype=self._dtype)
+        assert max_length >= 1
         max_length = int(max_length)
 
-        start_token = tf.cast(self._start_token, dtype=source.dtype)
-        target = tf.expand_dims(start_token, axis=1)
+        if len(self._start_token.shape) == 1:
+            start_token = self._start_token[None, :]
+            start_token = tf.tile(start_token, (source.shape[0], 1))
+            target = tf.expand_dims(start_token, axis=1)
+        else:
+            if source.shape[0] != self._start_token.shape[0]:
+                raise ValueError(
+                    "`source` and `start_token` batch-sizes should "
+                    f"match, instead {source.shape[0]} and "
+                    f"{self._start_token.shape[0]} passed"
+                )
+            else:
+                target = tf.expand_dims(self._start_token, axis=1)
         for _ in tf.range(max_length):
             predictions = self.transformer((source, target), training=False)
             target = tf.concat([target, predictions[:, -1:, :]], axis=1)

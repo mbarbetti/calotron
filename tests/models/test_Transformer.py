@@ -4,6 +4,8 @@ import tensorflow as tf
 from calotron.models.Transformer import START_TOKEN_INITIALIZERS
 
 CHUNK_SIZE = int(1e4)
+BATCH_SIZE = 500
+
 
 source = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
 target = tf.random.normal(shape=(CHUNK_SIZE, 32, 9))
@@ -197,12 +199,15 @@ def test_model_use_start_token_initializer(start_token_initializer):
     test_shape = list(target.shape)
     test_shape[-1] = model.output_depth
     assert output.shape == tuple(test_shape)
+    start_token = model.get_start_token(target[:BATCH_SIZE])
+    test_shape = [BATCH_SIZE, target.shape[2]]
+    assert start_token.shape == tuple(test_shape)
 
 
 def test_model_train(model):
     dataset = (
         tf.data.Dataset.from_tensor_slices(((source, target), target))
-        .batch(batch_size=512, drop_remainder=True)
+        .batch(batch_size=BATCH_SIZE, drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
     )
