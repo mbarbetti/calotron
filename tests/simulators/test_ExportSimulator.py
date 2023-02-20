@@ -1,4 +1,5 @@
 import os
+
 import numpy as np
 import pytest
 import tensorflow as tf
@@ -37,8 +38,7 @@ model = Transformer(
 )
 
 simulator = Simulator(
-    transformer=model,
-    start_token=model.get_start_token(target[:BATCH_SIZE]),
+    transformer=model, start_token=model.get_start_token(target[:BATCH_SIZE])
 )
 
 
@@ -46,10 +46,7 @@ simulator = Simulator(
 def export_simulator():
     from calotron.simulators import ExportSimulator
 
-    sim = ExportSimulator(
-        simulator=simulator,
-        max_length=target.shape[1],
-    )
+    sim = ExportSimulator(simulator=simulator, max_length=target.shape[1])
     return sim
 
 
@@ -72,5 +69,5 @@ def test_export_use(export_simulator):
     tf.saved_model.save(export_simulator, export_dir=export_dir)
     reloaded = tf.saved_model.load(export_dir)
     output_reloaded = reloaded(source=source[:BATCH_SIZE])
-    comparison = (output.numpy() == output_reloaded.numpy())
+    comparison = output.numpy() == output_reloaded.numpy()
     assert comparison.all()
