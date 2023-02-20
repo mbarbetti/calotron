@@ -2,7 +2,7 @@ import tensorflow as tf
 
 from calotron.models.Discriminator import Discriminator
 from calotron.models.Transformer import Transformer
-from calotron.utils import checkLoss, checkMetrics, checkOptimizer
+from calotron.utils.checks import checkLoss, checkMetrics, checkOptimizer
 
 
 class Calotron(tf.keras.Model):

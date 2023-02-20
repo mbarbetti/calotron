@@ -1,12 +1,12 @@
 import pytest
 
 from calotron.metrics.BaseMetric import BaseMetric
-from calotron.utils.checkMetrics import CALOTRON_METRICS, METRIC_SHORTCUTS
+from calotron.utils.checks.checkMetrics import CALOTRON_METRICS, METRIC_SHORTCUTS
 
 
 @pytest.fixture
 def checker():
-    from calotron.utils import checkMetrics
+    from calotron.utils.checks import checkMetrics
 
     chk = checkMetrics
     return chk
@@ -22,7 +22,7 @@ def test_checker_use_None(checker):
 
 @pytest.mark.parametrize("metrics", [[s] for s in METRIC_SHORTCUTS])
 def test_checker_use_strings(metrics):
-    from calotron.utils import checkMetrics
+    from calotron.utils.checks import checkMetrics
 
     res = checkMetrics(metrics)
     assert isinstance(res, list)
@@ -33,7 +33,7 @@ def test_checker_use_strings(metrics):
 
 @pytest.mark.parametrize("metrics", [[c] for c in CALOTRON_METRICS])
 def test_checker_use_classes(metrics):
-    from calotron.utils import checkMetrics
+    from calotron.utils.checks import checkMetrics
 
     res = checkMetrics(metrics)
     assert isinstance(res, list)

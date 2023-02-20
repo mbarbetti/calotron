@@ -10,7 +10,7 @@ CLS_CASES = [Activation(sigmoid), Activation(tanh), Activation(relu)]
 
 @pytest.fixture
 def checker():
-    from calotron.utils import checkActivations
+    from calotron.utils.checks import checkActivations
 
     chk = checkActivations
     return chk

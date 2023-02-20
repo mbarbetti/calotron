@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from calotron.utils import checkActivations
+from calotron.utils.checks import checkActivations
 
 
 class MultiActivations(tf.keras.layers.Layer):
