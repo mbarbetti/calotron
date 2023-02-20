@@ -11,7 +11,7 @@ CHUNK_SIZE = int(1e4)
 BATCH_SIZE = 100
 
 here = os.path.dirname(__file__)
-export_dir = f"{here}/export"
+export_dir = f"{here}/tmp/simulator"
 
 source = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
 target = tf.random.normal(shape=(CHUNK_SIZE, 32, 9))

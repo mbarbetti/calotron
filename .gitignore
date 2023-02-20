@@ -5,7 +5,7 @@
 *.svg
 *.pdf
 *.html
-tests/*/export/
+tests/*/tmp/
 
 # VS Code
 .vscode
