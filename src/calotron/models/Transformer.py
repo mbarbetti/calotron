@@ -28,7 +28,7 @@ class Transformer(tf.keras.Model):
         start_token_initializer="zeros",
         name=None,
         dtype=None,
-    ):
+    ) -> None:
         super().__init__(name=name, dtype=dtype)
         assert output_depth >= 1
         self._output_depth = int(output_depth)
@@ -123,9 +123,9 @@ class Transformer(tf.keras.Model):
         else:
             self._output_activations = None
 
-    def call(self, inputs):
-        source = inputs[0]
-        target = self._prepare_input_target(inputs[1])
+    def call(self, inputs) -> tf.Tensor:
+        source, target = inputs
+        target = self._prepare_input_target(target)
         context = self._encoder(
             x=source
         )  # (batch_size, source_elements, encoder_depth)
@@ -141,24 +141,24 @@ class Transformer(tf.keras.Model):
             )  # (batch_size, target_elements, output_depth)
         return output
 
-    def _prepare_input_target(self, target):
+    def _prepare_input_target(self, target) -> tf.Tensor:
         if self._start_token_initializer == "zeros":
-            start_token = tf.zeros((target.shape[0], 1, target.shape[2]))
+            start_token = tf.zeros((tf.shape(target)[0], 1, tf.shape(target)[2]))
         elif self._start_token_initializer == "ones":
-            start_token = tf.ones((target.shape[0], 1, target.shape[2]))
+            start_token = tf.ones((tf.shape(target)[0], 1, tf.shape(target)[2]))
         elif self._start_token_initializer == "means":
             start_token = tf.reduce_mean(target, axis=(0, 1))[None, None, :]
-            start_token = tf.tile(start_token, (target.shape[0], 1, 1))
+            start_token = tf.tile(start_token, (tf.shape(target)[0], 1, 1))
         return tf.concat([start_token, target[:, :-1, :]], axis=1)
 
     def get_start_token(self, target) -> tf.Tensor:
         if self._start_token_initializer == "zeros":
-            start_token = tf.zeros((target.shape[0], target.shape[2]))
+            start_token = tf.zeros((tf.shape(target)[0], tf.shape(target)[2]))
         elif self._start_token_initializer == "ones":
-            start_token = tf.ones((target.shape[0], target.shape[2]))
+            start_token = tf.ones((tf.shape(target)[0], tf.shape(target)[2]))
         elif self._start_token_initializer == "means":
             start_token = tf.reduce_mean(target, axis=(0, 1))[None, :]
-            start_token = tf.tile(start_token, (target.shape[0], 1))
+            start_token = tf.tile(start_token, (tf.shape(target)[0], 1))
         return start_token
 
     @property
