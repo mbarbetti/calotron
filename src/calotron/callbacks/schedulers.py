@@ -6,33 +6,33 @@ K = tf.keras.backend
 
 
 class BaseScheduler(Callback):
-    def __init__(self, optimizer, verbose=False):
+    def __init__(self, optimizer, verbose=False) -> None:
         super().__init__()
         self._optimizer = optimizer
         self._verbose = bool(verbose)
 
-    def on_train_begin(self, logs=None):
+    def on_train_begin(self, logs=None) -> None:
         init_lr = K.get_value(self._optimizer.learning_rate)
         self._init_lr = tf.identity(init_lr)
         self._dtype = self._init_lr.dtype
         self._step = -1
 
-    def on_batch_begin(self, batch, logs=None):
+    def on_batch_begin(self, batch, logs=None) -> None:
         self._step += 1
         step = tf.cast(self._step, self._dtype)
         K.set_value(
             self._optimizer.learning_rate, self._scheduled_lr(self._init_lr, step)
         )
 
-    def _scheduled_lr(self, init_lr, step):
+    def _scheduled_lr(self, init_lr, step) -> tf.Tensor:
         return init_lr
 
-    def on_batch_end(self, batch, logs=None):
+    def on_batch_end(self, batch, logs=None) -> None:
         logs = logs or {}
         if self._verbose:
             logs["lr"] = K.get_value(self.model.optimizer.learning_rate)
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch, logs=None) -> None:
         logs = logs or {}
         if self._verbose:
             logs["lr"] = K.get_value(self.model.optimizer.learning_rate)
@@ -43,19 +43,19 @@ class BaseScheduler(Callback):
 
 
 class CosineDecay(BaseScheduler):
-    def __init__(self, optimizer, decay_steps, alpha=0.0, verbose=False):
+    def __init__(self, optimizer, decay_steps, alpha=0.0, verbose=False) -> None:
         super().__init__(optimizer, verbose)
         assert decay_steps >= 1
         self._decay_steps = int(decay_steps)
         assert (alpha) >= 0.0 and (alpha <= 1.0)
         self._alpha = float(alpha)
 
-    def on_train_begin(self, logs=None):
+    def on_train_begin(self, logs=None) -> None:
         super().on_train_begin(logs=logs)
         self._tf_decay_steps = tf.cast(self._decay_steps, self._dtype)
         self._tf_alpha = tf.cast(self._alpha, self._dtype)
 
-    def _scheduled_lr(self, init_lr, step):
+    def _scheduled_lr(self, init_lr, step) -> tf.Tensor:
         step = tf.minimum(step, self._tf_decay_steps)
         p = tf.divide(step, self._tf_decay_steps)
         cosine_decay = 0.5 * (1 + tf.cos(tf.constant(np.pi) * p))
@@ -74,7 +74,7 @@ class CosineDecay(BaseScheduler):
 class ExponentialDecay(BaseScheduler):
     def __init__(
         self, optimizer, decay_rate, decay_steps, staircase=False, verbose=False
-    ):
+    ) -> None:
         super().__init__(optimizer, verbose)
         assert decay_rate > 0.0
         self._decay_rate = float(decay_rate)
@@ -83,12 +83,12 @@ class ExponentialDecay(BaseScheduler):
         assert isinstance(staircase, bool)
         self._staircase = staircase
 
-    def on_train_begin(self, logs=None):
+    def on_train_begin(self, logs=None) -> None:
         super().on_train_begin(logs=logs)
         self._tf_decay_rate = tf.cast(self._decay_rate, self._dtype)
         self._tf_decay_steps = tf.cast(self._decay_steps, self._dtype)
 
-    def _scheduled_lr(self, init_lr, step):
+    def _scheduled_lr(self, init_lr, step) -> tf.Tensor:
         p = tf.divide(step, self._tf_decay_steps)
         if self._staircase:
             p = tf.floor(p)
@@ -110,7 +110,7 @@ class ExponentialDecay(BaseScheduler):
 class InverseTimeDecay(BaseScheduler):
     def __init__(
         self, optimizer, decay_rate, decay_steps, staircase=False, verbose=False
-    ):
+    ) -> None:
         super().__init__(optimizer, verbose)
         assert decay_rate > 0.0
         self._decay_rate = float(decay_rate)
@@ -119,12 +119,12 @@ class InverseTimeDecay(BaseScheduler):
         assert isinstance(staircase, bool)
         self._staircase = staircase
 
-    def on_train_begin(self, logs=None):
+    def on_train_begin(self, logs=None) -> None:
         super().on_train_begin(logs=logs)
         self._tf_decay_rate = tf.cast(self._decay_rate, self._dtype)
         self._tf_decay_steps = tf.cast(self._decay_steps, self._dtype)
 
-    def _scheduled_lr(self, init_lr, step):
+    def _scheduled_lr(self, init_lr, step) -> tf.Tensor:
         p = tf.divide(step, self._tf_decay_steps)
         if self._staircase:
             p = tf.floor(p)
@@ -144,7 +144,7 @@ class InverseTimeDecay(BaseScheduler):
 
 
 class PiecewiseConstantDecay(BaseScheduler):
-    def __init__(self, optimizer, boundaries, values, verbose=False):
+    def __init__(self, optimizer, boundaries, values, verbose=False) -> None:
         super().__init__(optimizer, verbose)
         assert isinstance(boundaries, (list, tuple, np.ndarray))
         assert isinstance(values, (list, tuple, np.ndarray))
@@ -154,12 +154,12 @@ class PiecewiseConstantDecay(BaseScheduler):
         self._boundaries = [0] + [int(b) for b in boundaries]
         self._values = [float(v) for v in values]
 
-    def on_train_begin(self, logs=None):
+    def on_train_begin(self, logs=None) -> None:
         super().on_train_begin(logs=logs)
         self._tf_boundaries = tf.cast(self._boundaries, self._dtype)
         self._tf_values = tf.cast(self._values, self._dtype)
 
-    def _scheduled_lr(self, init_lr, step):
+    def _scheduled_lr(self, init_lr, step) -> tf.Tensor:
         for i in range(len(self._boundaries) - 1):
             if (step >= self._tf_boundaries[i]) and (step < self._tf_boundaries[i + 1]):
                 return self._tf_values[i]
@@ -183,7 +183,7 @@ class PolynomialDecay(BaseScheduler):
         power=1.0,
         cycle=False,
         verbose=False,
-    ):
+    ) -> None:
         super().__init__(optimizer, verbose)
         assert decay_steps >= 1
         self._decay_steps = int(decay_steps)
@@ -194,13 +194,13 @@ class PolynomialDecay(BaseScheduler):
         assert isinstance(cycle, bool)
         self._cycle = cycle
 
-    def on_train_begin(self, logs=None):
+    def on_train_begin(self, logs=None) -> None:
         super().on_train_begin(logs=logs)
         self._tf_decay_steps = tf.cast(self._decay_steps, self._dtype)
         self._tf_end_learning_rate = tf.cast(self._end_learning_rate, self._dtype)
         self._tf_power = tf.cast(self._power, self._dtype)
 
-    def _scheduled_lr(self, init_lr, step):
+    def _scheduled_lr(self, init_lr, step) -> tf.Tensor:
         if not self._cycle:
             step = tf.minimum(step, self._tf_decay_steps)
             decay_steps = self._tf_decay_steps
@@ -232,19 +232,19 @@ class PolynomialDecay(BaseScheduler):
 
 
 class AttentionDecay(BaseScheduler):
-    def __init__(self, optimizer, d_model, warmup_steps=4000, verbose=False):
+    def __init__(self, optimizer, d_model, warmup_steps=4000, verbose=False) -> None:
         super().__init__(optimizer, verbose)
         assert d_model >= 1
         self._d_model = int(d_model)
         assert warmup_steps >= 1
         self._warmup_steps = int(warmup_steps)
 
-    def on_train_begin(self, logs=None):
+    def on_train_begin(self, logs=None) -> None:
         super().on_train_begin(logs=logs)
         self._tf_d_model = tf.cast(self._d_model, self._dtype)
         self._tf_warmup_steps = tf.cast(self._warmup_steps, self._dtype)
 
-    def _scheduled_lr(self, init_lr, step):
+    def _scheduled_lr(self, init_lr, step) -> tf.Tensor:
         arg1 = tf.math.rsqrt(step)
         arg2 = tf.multiply(step, tf.pow(self._tf_warmup_steps, -1.5))
         return tf.multiply(tf.math.rsqrt(self._tf_d_model), tf.math.minimum(arg1, arg2))

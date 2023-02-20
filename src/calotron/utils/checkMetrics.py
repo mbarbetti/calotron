@@ -11,7 +11,7 @@ METRIC_SHORTCUTS = ["accuracy", "bce", "kl_div", "js_div", "mse", "rmse", "mae"]
 CALOTRON_METRICS = [Accuracy(), BCE(), KL(), JS(), MSE(), RMSE(), MAE()]
 
 
-def checkMetrics(metrics):
+def checkMetrics(metrics):  # TODO: add Union[list, None]
     if metrics is None:
         return None
     else:

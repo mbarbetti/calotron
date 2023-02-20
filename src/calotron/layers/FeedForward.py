@@ -10,7 +10,7 @@ class FeedForward(tf.keras.layers.Layer):
         residual_smoothing=True,
         name=None,
         dtype=None,
-    ):
+    ) -> None:
         super().__init__(name=name, dtype=dtype)
         assert output_units >= 1
         self._output_units = int(output_units)
@@ -41,7 +41,7 @@ class FeedForward(tf.keras.layers.Layer):
         self._add = tf.keras.layers.Add()
         self._layer_norm = tf.keras.layers.LayerNormalization(dtype=self.dtype)
 
-    def call(self, x):
+    def call(self, x) -> tf.Tensor:
         if self._emb_layer is not None:
             x = self._emb_layer(x)
         x = self._add([x, self._seq(x)])

@@ -14,7 +14,7 @@ class CaloLoss(BaseLoss):
         axis=-1,
         reduction="auto",
         name="calo_loss",
-    ):
+    ) -> None:
         super().__init__(name)
         self._alpha = float(alpha)
         self._mse_loss = TF_MSE(reduction=reduction)
@@ -27,7 +27,7 @@ class CaloLoss(BaseLoss):
 
     def discriminator_loss(
         self, discriminator, target_true, target_pred, sample_weight=None
-    ):
+    ) -> tf.Tensor:
         rnd_true = tf.random.normal(
             tf.shape(target_true), stddev=0.05, dtype=target_true.dtype
         )
@@ -48,7 +48,7 @@ class CaloLoss(BaseLoss):
 
     def transformer_loss(
         self, discriminator, target_true, target_pred, sample_weight=None
-    ):
+    ) -> tf.Tensor:
         mse_loss = self._mse_loss(target_true, target_pred, sample_weight=sample_weight)
         mse_loss = tf.cast(mse_loss, dtype=target_true.dtype)
         rnd_pred = tf.random.normal(

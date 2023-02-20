@@ -10,7 +10,7 @@ class DeepSets(tf.keras.layers.Layer):
         dropout_rate=0.1,
         name=None,
         dtype=None,
-    ):
+    ) -> None:
         super().__init__(name=name, dtype=dtype)
         assert latent_dim >= 1
         self._latent_dim = int(latent_dim)
@@ -35,7 +35,7 @@ class DeepSets(tf.keras.layers.Layer):
             tf.keras.layers.Dense(self._latent_dim, activation="relu", dtype=self.dtype)
         ]
 
-    def call(self, x):
+    def call(self, x) -> tf.Tensor:
         outputs = list()
         for i in range(x.shape[1]):
             latent_tensor = x[:, i : i + 1, :]  # (batch_size, 1, x_depth)

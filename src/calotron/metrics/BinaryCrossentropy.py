@@ -5,7 +5,9 @@ from calotron.metrics.BaseMetric import BaseMetric
 
 
 class BinaryCrossentropy(BaseMetric):
-    def __init__(self, name="bce", dtype=None, from_logits=False, label_smoothing=0.0):
+    def __init__(
+        self, name="bce", dtype=None, from_logits=False, label_smoothing=0.0
+    ) -> None:
         super().__init__(name, dtype)
         self._bce = TF_BCE(
             name=name,
@@ -14,6 +16,6 @@ class BinaryCrossentropy(BaseMetric):
             label_smoothing=label_smoothing,
         )
 
-    def update_state(self, y_true, y_pred, sample_weight=None):
+    def update_state(self, y_true, y_pred, sample_weight=None) -> None:
         state = self._bce(tf.ones_like(y_pred), y_pred, sample_weight=sample_weight)
         self._metric_values.assign(state)

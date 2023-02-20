@@ -53,7 +53,7 @@ class Simulator(tf.Module):
         for i in tf.range(max_length):
             out_target = tf.transpose(ta_target.stack(), perm=[1, 0, 2])
             predictions = self.transformer((source, out_target), training=False)
-            ta_target = ta_target.write(index=i+1, value=predictions[:, -1, :])
+            ta_target = ta_target.write(index=i + 1, value=predictions[:, -1, :])
 
         out_target = tf.transpose(ta_target.stack(), perm=[1, 0, 2])
         return out_target[:, 1:, :]

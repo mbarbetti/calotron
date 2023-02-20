@@ -1,5 +1,8 @@
+import tensorflow as tf
+
+
 class BaseLoss:
-    def __init__(self, name="loss"):
+    def __init__(self, name="loss") -> None:
         if not isinstance(name, str):
             raise TypeError(
                 f"`name` should be a string " f"instead {type(name)} passed"
@@ -9,7 +12,7 @@ class BaseLoss:
 
     def discriminator_loss(
         self, discriminator, target_true, target_pred, sample_weight=None
-    ):
+    ) -> tf.Tensor:
         raise NotImplementedError(
             "Only `BaseLoss` subclasses have the "
             "`discriminator_loss()` method implemented."
@@ -17,7 +20,7 @@ class BaseLoss:
 
     def transformer_loss(
         self, discriminator, target_true, target_pred, sample_weight=None
-    ):
+    ) -> tf.Tensor:
         raise NotImplementedError(
             "Only `BaseLoss` subclasses have the "
             "`transformer_loss()` method implemented."

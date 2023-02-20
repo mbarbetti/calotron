@@ -16,7 +16,7 @@ class DecoderLayer(tf.keras.layers.Layer):
         residual_smoothing=True,
         name=None,
         dtype=None,
-    ):
+    ) -> None:
         super().__init__(name=name, dtype=dtype)
         assert decoder_depth >= 1
         self._decoder_depth = int(decoder_depth)
@@ -53,7 +53,7 @@ class DecoderLayer(tf.keras.layers.Layer):
             dtype=self.dtype,
         )
 
-    def call(self, x, context):
+    def call(self, x, context) -> tf.Tensor:
         x = self._csa_layer(x=x)  # (batch_size, x_elements, x_depth)
         x = self._ca_layer(x=x, context=context)  # (batch_size, x_elements, x_depth)
         x = self._ff_layer(x)  # (batch_size, x_elements, decoder_depth)
@@ -100,7 +100,7 @@ class Decoder(tf.keras.layers.Layer):
         residual_smoothing=True,
         name=None,
         dtype=None,
-    ):
+    ) -> None:
         super().__init__(name=name, dtype=dtype)
         assert decoder_depth >= 1
         self._decoder_depth = int(decoder_depth)
@@ -151,7 +151,7 @@ class Decoder(tf.keras.layers.Layer):
             for _ in range(self._num_layers)
         ]
 
-    def call(self, x, context):
+    def call(self, x, context) -> tf.Tensor:
         if self._pos_embedding is not None:
             x = self._pos_embedding(x)  # (batch_size, x_elements, pos_dim)
         for i in range(self._num_layers):

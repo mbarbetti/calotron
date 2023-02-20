@@ -12,7 +12,7 @@ class BinaryCrossentropy(BaseLoss):
         axis=-1,
         reduction="auto",
         name="bce_loss",
-    ):
+    ) -> None:
         super().__init__(name)
         self._loss = TF_BCE(
             from_logits=from_logits,
@@ -23,7 +23,7 @@ class BinaryCrossentropy(BaseLoss):
 
     def discriminator_loss(
         self, discriminator, target_true, target_pred, sample_weight=None
-    ):
+    ) -> tf.Tensor:
         rnd_true = tf.random.normal(
             tf.shape(target_true), stddev=0.05, dtype=target_true.dtype
         )
@@ -44,7 +44,7 @@ class BinaryCrossentropy(BaseLoss):
 
     def transformer_loss(
         self, discriminator, target_true, target_pred, sample_weight=None
-    ):
+    ) -> tf.Tensor:
         rnd_pred = tf.random.normal(
             tf.shape(target_pred), stddev=0.05, dtype=target_pred.dtype
         )

@@ -6,7 +6,7 @@ from calotron.utils import checkLoss, checkMetrics, checkOptimizer
 
 
 class Calotron(tf.keras.Model):
-    def __init__(self, transformer, discriminator, name=None, dtype=None):
+    def __init__(self, transformer, discriminator, name=None, dtype=None) -> None:
         super().__init__(name=name, dtype=dtype)
         if not isinstance(transformer, Transformer):
             raise TypeError(
@@ -21,14 +21,14 @@ class Calotron(tf.keras.Model):
             )
         self._discriminator = discriminator
 
-    def call(self, inputs):
+    def call(self, inputs) -> tuple:
         source, target = inputs
         output = self._transformer((source, target))
         d_output_true = self._discriminator(target)
         d_output_pred = self._discriminator(output)
         return output, d_output_true, d_output_pred
 
-    def summary(self, **kwargs):
+    def summary(self, **kwargs) -> None:
         print("_" * 65)
         self._transformer.summary(**kwargs)
         self._discriminator.summary(**kwargs)
@@ -41,7 +41,7 @@ class Calotron(tf.keras.Model):
         discriminator_optimizer="rmsprop",
         transformer_upds_per_batch=1,
         discriminator_upds_per_batch=1,
-    ):
+    ) -> None:
         super().compile()
         self._loss = checkLoss(loss)
         self._t_loss = tf.keras.metrics.Mean(name=f"t_{self._loss.name}")
@@ -54,7 +54,7 @@ class Calotron(tf.keras.Model):
         assert discriminator_upds_per_batch >= 1
         self._d_upds_per_batch = int(discriminator_upds_per_batch)
 
-    def train_step(self, data):
+    def train_step(self, data) -> dict:
         if len(data) == 3:
             source, target, sample_weight = data
         else:
@@ -80,7 +80,7 @@ class Calotron(tf.keras.Model):
         )
         return train_dict
 
-    def _d_train_step(self, source, target, sample_weight):
+    def _d_train_step(self, source, target, sample_weight) -> None:
         with tf.GradientTape() as tape:
             output = self._transformer((source, target), training=False)
             loss = self._loss.discriminator_loss(
@@ -94,7 +94,7 @@ class Calotron(tf.keras.Model):
         self._d_opt.apply_gradients(zip(gradients, trainable_vars))
         self._d_loss.update_state(loss)
 
-    def _t_train_step(self, source, target, sample_weight):
+    def _t_train_step(self, source, target, sample_weight) -> None:
         with tf.GradientTape() as tape:
             output = self._transformer((source, target), training=True)
             loss = self._loss.transformer_loss(

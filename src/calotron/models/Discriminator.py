@@ -14,7 +14,7 @@ class Discriminator(tf.keras.Model):
         dropout_rate=0.1,
         name=None,
         dtype=None,
-    ):
+    ) -> None:
         super().__init__(name=name, dtype=dtype)
         assert latent_dim >= 1
         self._latent_dim = int(latent_dim)
@@ -52,7 +52,7 @@ class Discriminator(tf.keras.Model):
             )
         ]
 
-    def call(self, x):
+    def call(self, x) -> tf.Tensor:
         x = self._deepsets(x)
         for layer in self._seq:
             x = layer(x)

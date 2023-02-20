@@ -4,13 +4,13 @@ from calotron.utils import checkActivations
 
 
 class MultiActivations(tf.keras.layers.Layer):
-    def __init__(self, activations, output_depth, name=None, dtype=None):
+    def __init__(self, activations, output_depth, name=None, dtype=None) -> None:
         super().__init__(name=name, dtype=dtype)
         assert output_depth >= 1
         self._output_depth = int(output_depth)
         self._output_activations = checkActivations(activations, output_depth, dtype)
 
-    def call(self, x):
+    def call(self, x) -> tf.Tensor:
         if x.shape[2] != self._output_depth:
             raise ValueError(
                 f"`output_depth` passed {self._output_depth} doesn't "

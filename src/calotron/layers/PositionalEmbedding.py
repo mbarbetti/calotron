@@ -11,7 +11,7 @@ class PositionalEmbedding(tf.keras.layers.Layer):
         dropout_rate=0.1,
         name=None,
         dtype=None,
-    ):
+    ) -> None:
         super().__init__(name=name, dtype=dtype)
         assert output_depth >= 1
         self._output_depth = int(output_depth)
@@ -35,7 +35,7 @@ class PositionalEmbedding(tf.keras.layers.Layer):
 
         self._dropout = tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype)
 
-    def call(self, x):
+    def call(self, x) -> tf.Tensor:
         length = tf.shape(x)[1]
         x = self._embedding(x)
         x *= tf.math.sqrt(tf.cast(self._output_depth, self.dtype))  # scale factor
@@ -44,7 +44,9 @@ class PositionalEmbedding(tf.keras.layers.Layer):
         return x
 
     @staticmethod
-    def _positional_encoding(length, depth, normalization=512, dtype=tf.float32):
+    def _positional_encoding(
+        length, depth, normalization=512, dtype=tf.float32
+    ) -> tf.Tensor:
         pos_encoding = np.zeros(shape=(length, depth))  # buffer to fill
         for k in range(length):
             for i in range(int(depth / 2)):

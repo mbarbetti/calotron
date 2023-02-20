@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import Activation, Layer
 
 
-def checkActivations(activations, output_length, dtype=None):
+def checkActivations(activations, output_length, dtype=None):  # TODO: add Union[list, None]
     if activations is None:
         return None
     elif isinstance(activations, str):

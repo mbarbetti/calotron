@@ -5,11 +5,11 @@ from calotron.metrics.BaseMetric import BaseMetric
 
 
 class JSDivergence(BaseMetric):
-    def __init__(self, name="js_div", dtype=None):
+    def __init__(self, name="js_div", dtype=None) -> None:
         super().__init__(name, dtype)
         self._kl_div = TF_KLDivergence(name=name, dtype=dtype)
 
-    def update_state(self, y_true, y_pred, sample_weight=None):
+    def update_state(self, y_true, y_pred, sample_weight=None) -> None:
         dtype = self._kl_div(y_true, y_pred).dtype
         y_true = tf.cast(y_true, dtype)
         y_pred = tf.cast(y_pred, dtype)

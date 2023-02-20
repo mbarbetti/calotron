@@ -26,7 +26,7 @@ class ExportSimulator(tf.Module):
     @property
     def simulator(self) -> Simulator:
         return self._simulator
-    
+
     @property
     def max_length(self) -> int:
         return self._max_length

@@ -16,7 +16,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         residual_smoothing=True,
         name=None,
         dtype=None,
-    ):
+    ) -> None:
         super().__init__(name=name, dtype=dtype)
         assert encoder_depth >= 1
         self._encoder_depth = int(encoder_depth)
@@ -46,7 +46,7 @@ class EncoderLayer(tf.keras.layers.Layer):
             dtype=self.dtype,
         )
 
-    def call(self, x):
+    def call(self, x) -> tf.Tensor:
         x = self._gsa_layer(x)  # (batch_size, x_elements, x_depth)
         x = self._ff_layer(x)  # (batch_size, x_elements, encoder_depth)
         return x
@@ -92,7 +92,7 @@ class Encoder(tf.keras.layers.Layer):
         residual_smoothing=True,
         name=None,
         dtype=None,
-    ):
+    ) -> None:
         super().__init__(name=name, dtype=dtype)
         assert encoder_depth >= 1
         self._encoder_depth = int(encoder_depth)
@@ -143,7 +143,7 @@ class Encoder(tf.keras.layers.Layer):
             for _ in range(self._num_layers)
         ]
 
-    def call(self, x):
+    def call(self, x) -> tf.Tensor:
         if self._pos_embedding is not None:
             x = self._pos_embedding(x)  # (batch_size, x_elements, pos_dim)
         for i in range(self._num_layers):

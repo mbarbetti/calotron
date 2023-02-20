@@ -4,11 +4,11 @@ import yaml
 
 
 class HPSingleton:
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         self._hparams = dict(**kwargs)
         self._used_keys = set()
 
-    def update(self, **kwargs):
+    def update(self, **kwargs) -> None:
         for key in kwargs.keys():
             if key in self._used_keys:
                 raise KeyError(
@@ -22,23 +22,23 @@ class HPSingleton:
         self._used_keys.add(key)
         return self._hparams[key]
 
-    def clean(self):
+    def clean(self) -> None:
         self._hparams = dict()
         self._used_keys = set()
 
-    def __del__(self):
+    def __del__(self) -> None:
         for key in self._hparams.keys():
             if key not in self._used_keys:
                 print(f"[WARNING] The hyperparameter {key} was defined but never used")
                 print(self._used_keys)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return pprint.pformat(self._hparams)
 
-    def get_dict(self):
+    def get_dict(self) -> dict:
         return dict(**self._hparams)
 
-    def dump(self, filename):
+    def dump(self, filename) -> None:
         with open(filename, "w") as file:
             yaml.dump(self.get_dict(), file)
 
