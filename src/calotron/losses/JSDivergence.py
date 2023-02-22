@@ -10,19 +10,29 @@ class JSDivergence(BaseLoss):
         self._kl_div = TF_KLDivergence(reduction=reduction)
 
     def discriminator_loss(
-        self, discriminator, target_true, target_pred, sample_weight=None
+        self,
+        discriminator,
+        target_true,
+        target_pred,
+        sample_weight=None,
+        discriminator_training=True,
     ) -> tf.Tensor:
-        y_true = discriminator(target_true, training=True)
-        y_pred = discriminator(target_pred, training=True)
+        y_true = discriminator(target_true, training=discriminator_training)
+        y_pred = discriminator(target_pred, training=discriminator_training)
         loss = self._js_div(y_true, y_pred, sample_weight=sample_weight)
         loss = tf.cast(loss, dtype=target_true.dtype)
         return -loss  # divergence maximization
 
     def transformer_loss(
-        self, discriminator, target_true, target_pred, sample_weight=None
+        self,
+        discriminator,
+        target_true,
+        target_pred,
+        sample_weight=None,
+        discriminator_training=False,
     ) -> tf.Tensor:
-        y_true = discriminator(target_true, training=False)
-        y_pred = discriminator(target_pred, training=False)
+        y_true = discriminator(target_true, training=discriminator_training)
+        y_pred = discriminator(target_pred, training=discriminator_training)
         loss = self._js_div(y_true, y_pred, sample_weight=sample_weight)
         loss = tf.cast(loss, dtype=target_true.dtype)
         return loss  # divergence minimization

@@ -11,7 +11,12 @@ class BaseLoss:
         self._loss = None
 
     def discriminator_loss(
-        self, discriminator, target_true, target_pred, sample_weight=None
+        self,
+        discriminator,
+        target_true,
+        target_pred,
+        sample_weight=None,
+        discriminator_training=True,
     ) -> tf.Tensor:
         raise NotImplementedError(
             "Only `BaseLoss` subclasses have the "
@@ -19,7 +24,12 @@ class BaseLoss:
         )
 
     def transformer_loss(
-        self, discriminator, target_true, target_pred, sample_weight=None
+        self,
+        discriminator,
+        target_true,
+        target_pred,
+        sample_weight=None,
+        discriminator_training=False,
     ) -> tf.Tensor:
         raise NotImplementedError(
             "Only `BaseLoss` subclasses have the "

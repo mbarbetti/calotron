@@ -115,6 +115,52 @@ class Calotron(tf.keras.Model):
                     y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
                 )
 
+    def test_step(self, data) -> dict:
+        if len(data) == 3:
+            source, target, sample_weight = data
+        else:
+            source, target = data
+            sample_weight = None
+
+        train_dict = dict()
+        output = self._transformer((source, target), training=False)
+
+        d_loss = self._loss.discriminator_loss(
+            discriminator=self._discriminator,
+            target_true=target,
+            target_pred=output,
+            sample_weight=sample_weight,
+            discriminator_training=False,
+        )
+        self._d_loss.update_state(d_loss)
+
+        t_loss = self._loss.transformer_loss(
+            discriminator=self._discriminator,
+            target_true=target,
+            target_pred=output,
+            sample_weight=sample_weight,
+            discriminator_training=False,
+        )
+        self._t_loss.update_state(t_loss)
+        if self._metrics is not None:
+            y_pred = self._discriminator(output, training=False)
+            y_true = self._discriminator(target, training=False)
+            for metric in self._metrics:
+                metric.update_state(
+                    y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
+                )
+                train_dict.update({metric.name: metric.result()})
+
+        train_dict.update(
+            {
+                f"t_{self._loss.name}": self._t_loss.result(),
+                f"d_{self._loss.name}": self._d_loss.result(),
+                "t_lr": self._t_opt.learning_rate,
+                "d_lr": self._d_opt.learning_rate,
+            }
+        )
+        return train_dict
+
     def get_start_token(self, target) -> tf.Tensor:
         return self._transformer.get_start_token(target)
 

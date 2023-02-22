@@ -115,3 +115,20 @@ def test_model_train(model):
         discriminator_upds_per_batch=1,
     )
     model.fit(dataset, epochs=3)
+
+
+def test_model_eval(model):
+    from calotron.losses import CaloLoss
+
+    loss = CaloLoss(alpha=0.1)
+    t_opt = RMSprop(learning_rate=0.001)
+    d_opt = RMSprop(learning_rate=0.001)
+    model.compile(
+        loss=loss,
+        metrics=None,
+        transformer_optimizer=t_opt,
+        discriminator_optimizer=d_opt,
+        transformer_upds_per_batch=1,
+        discriminator_upds_per_batch=1,
+    )
+    model.evaluate(source, target)
