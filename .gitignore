@@ -5,6 +5,7 @@
 *.svg
 *.pdf
 *.html
+scripts/models/
 tests/*/tmp/
 
 # VS Code
