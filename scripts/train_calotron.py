@@ -18,7 +18,7 @@ from calotron.utils import initHPSingleton, getSummaryHTML
 
 
 DTYPE = tf.float32
-TRAIN_RATIO = 0.75
+TRAIN_RATIO = 1.0
 BATCHSIZE = 128
 ALPHA = 0.02
 EPOCHS = 500
@@ -54,7 +54,7 @@ report_dir = config_dir["report_dir"]
 # |   Data loading   |
 # +------------------+
 
-npzfile = np.load(f"{data_dir}/train-data-demo-medium-0.npz")
+npzfile = np.load(f"{data_dir}/train-data-demo-medium-1.npz")
 photon = npzfile["photon"][:,::-1]
 cluster = npzfile["cluster"][:,::-1]
 
@@ -264,12 +264,12 @@ plt.title("Learning curves", fontsize=14)
 plt.xlabel("Training epochs", fontsize=12)
 plt.ylabel("Loss", fontsize=12)
 plt.plot(
-  np.array(train.history["t_calo_loss"]), 
-  lw=1.5, color="dodgerblue", label="transformer"
+  np.array(train.history["t_loss"]), 
+  lw=1.5, color="#3288bd", label="transformer"
 )
 plt.plot(
-  np.array(train.history["d_calo_loss"]),
-  lw=1.5, color="coral", label="discriminator"
+  np.array(train.history["d_loss"]),
+  lw=1.5, color="#fc8d59", label="discriminator"
 )
 plt.yscale("log")
 plt.legend(loc="upper left", fontsize=10)
@@ -285,11 +285,11 @@ plt.xlabel("Training epochs", fontsize=12)
 plt.ylabel("Learning rate", fontsize=12)
 plt.plot(
   np.array(train.history["t_lr"]),
-  lw=1.5, color="dodgerblue", label="transformer"
+  lw=1.5, color="#3288bd", label="transformer"
 )
 plt.plot(
   np.array(train.history["d_lr"]),
-  lw=1.5, color="coral", label="discriminator"
+  lw=1.5, color="#fc8d59", label="discriminator"
 )
 plt.yscale("log")
 plt.legend(loc="upper right", fontsize=10)
@@ -305,12 +305,12 @@ plt.xlabel("Training epochs", fontsize=12)
 plt.ylabel("Accuracy", fontsize=12)
 plt.plot(
   np.array(train.history["accuracy"]),
-  lw=1.5, color="forestgreen", label="training set"
+  lw=1.5, color="#4dac26", label="training set"
 )
 if TRAIN_RATIO != 1.0:
   plt.plot(
     np.array(train.history["val_accuracy"]),
-    lw=1.5, color="orangered", label="validation set"
+    lw=1.5, color="#d01c8b", label="validation set"
   )
 plt.legend(loc="upper right", fontsize=10)
 if args.saving:
@@ -325,12 +325,12 @@ plt.xlabel("Training epochs", fontsize=12)
 plt.ylabel("Binary cross-entropy", fontsize=12)
 plt.plot(
   np.array(train.history["bce"]),
-  lw=1.5, color="forestgreen", label="training set"
+  lw=1.5, color="#4dac26", label="training set"
 )
 if TRAIN_RATIO != 1.0:
   plt.plot(
     np.array(train.history["val_bce"]),
-    lw=1.5, color="orangered", label="validation set"
+    lw=1.5, color="#d01c8b", label="validation set"
   )
 plt.legend(loc="upper right", fontsize=10)
 if args.saving:
@@ -347,13 +347,17 @@ report.add_markdown('<h2 align="center">Validation plots</h2>')
 plt.figure(figsize=(8,5), dpi=100)
 plt.xlabel("$x$ coordinate", fontsize=12)
 plt.ylabel("Candidates", fontsize=12)
+x_min = Y[:,:,0].numpy().flatten().min()
+x_max = Y[:,:,0].numpy().flatten().max()
+bins = np.linspace(x_min, x_max, 101)
 plt.hist(
   Y[:,:,0].numpy().flatten(),
-  bins=100, label="Training data"
+  bins=bins, color="#3288bd",
+  label="Training data"
 )
 plt.hist(
   out[:,:,0].numpy().flatten(),
-  bins=100, histtype="step",
+  bins=bins, histtype="step", color="#fc8d59",
   lw=2, label="Calotron output"
 )
 plt.yscale("log")
@@ -367,13 +371,17 @@ plt.close()
 plt.figure(figsize=(8,5), dpi=100)
 plt.xlabel("$y$ coordinate", fontsize=12)
 plt.ylabel("Candidates", fontsize=12)
+y_min = Y[:,:,1].numpy().flatten().min()
+y_max = Y[:,:,1].numpy().flatten().max()
+bins = np.linspace(y_min, y_max, 101)
 plt.hist(
   Y[:,:,1].numpy().flatten(), 
-  bins=100, label="Training data"
+  bins=bins, color="#3288bd",
+  label="Training data"
 )
 plt.hist(
   out[:,:,1].numpy().flatten(),
-  bins=100, histtype="step",
+  bins=bins, histtype="step", color="#fc8d59",
   lw=2, label="Calotron output"
 )
 plt.yscale("log")
@@ -390,12 +398,14 @@ plt.ylabel("$y$ coordinate", fontsize=12)
 plt.scatter(
   Y[:,:,0].numpy().flatten(),
   Y[:,:,1].numpy().flatten(), 
-  s=1, alpha=0.3, label="Training data"
+  s=0.75, alpha=0.2, color="#3288bd",
+  label="Training data"
 )
 plt.scatter(
   out[:,:,0].numpy().flatten(),
   out[:,:,1].numpy().flatten(),
-  s=1, alpha=0.3, label="Calotron output"
+  s=0.75, alpha=0.2, color="#fc8d59",
+  label="Calotron output"
 )
 # plt.legend(loc="upper left", fontsize=10)
 if args.saving:
@@ -407,13 +417,17 @@ plt.close()
 plt.figure(figsize=(8,5), dpi=100)
 plt.xlabel("Preprocessed energy [a.u]", fontsize=12)
 plt.ylabel("Candidates", fontsize=12)
+e_min = Y[:,:,2].numpy().flatten().min()
+e_max = Y[:,:,2].numpy().flatten().max()
+bins = np.linspace(e_min, e_max, 101)
 plt.hist(
   Y[:,:,2].numpy().flatten(),
-  bins=100, label="Training data"
+  bins=bins, color="#3288bd",
+  label="Training data"
 )
 plt.hist(
   out[:,:,2].numpy().flatten(),
-  bins=100, histtype="step", 
+  bins=bins, histtype="step", color="#fc8d59",
   lw=2, label="Calotron output"
 )
 plt.yscale("log")
@@ -430,12 +444,14 @@ plt.ylabel("Preprocessed energy [a.u]", fontsize=12)
 plt.scatter(
   Y[:,:,0].numpy().flatten(),
   Y[:,:,2].numpy().flatten(), 
-  s=1, alpha=0.3, label="Training data"
+  s=0.75, alpha=0.2, color="#3288bd",
+  label="Training data"
 )
 plt.scatter(
   out[:,:,0].numpy().flatten(),
   out[:,:,2].numpy().flatten(),
-  s=1, alpha=0.3, label="Calotron output"
+  s=0.75, alpha=0.2, color="#fc8d59",
+  label="Calotron output"
 )
 # plt.legend(loc="upper left", fontsize=10)
 if args.saving:
@@ -450,12 +466,14 @@ plt.ylabel("Preprocessed energy [a.u]", fontsize=12)
 plt.scatter(
   Y[:,:,1].numpy().flatten(),
   Y[:,:,2].numpy().flatten(), 
-  s=1, alpha=0.3, label="Training data"
+  s=0.75, alpha=0.2, color="#3288bd",
+  label="Training data"
 )
 plt.scatter(
   out[:,:,1].numpy().flatten(),
   out[:,:,2].numpy().flatten(),
-  s=1, alpha=0.3, label="Calotron output"
+  s=0.75, alpha=0.2, color="#fc8d59",
+  label="Calotron output"
 )
 # plt.legend(loc="upper left", fontsize=10)
 if args.saving:
@@ -473,22 +491,22 @@ for i in range(4):
     X[evt,:,0].numpy().flatten(),
     X[evt,:,1].numpy().flatten(),
     s=50 * X[evt,:,2].numpy().flatten() / Y[evt,:,2].numpy().flatten().max(),
-    marker="o", facecolors="none", edgecolors="r", linewidth=0.5,
-    label="True photon"
+    marker="o", facecolors="none", edgecolors="#d7191c",
+    lw=0.75, label="True photon"
   )
   plt.scatter(
     Y[evt,:,0].numpy().flatten(),
     Y[evt,:,1].numpy().flatten(),
     s=50 * Y[evt,:,2].numpy().flatten() / Y[evt,:,2].numpy().flatten().max(),
-    marker="s", facecolors="none", edgecolors="b", linewidth=0.5,
-    label="Calo neutral cluster"
+    marker="s", facecolors="none", edgecolors="#2b83ba", 
+    lw=0.75, label="Calo neutral cluster"
   )
   plt.scatter(
     out[evt,:,0].numpy().flatten(),
     out[evt,:,1].numpy().flatten(),
     s=50 * out[evt,:,2].numpy().flatten() / Y[evt,:,2].numpy().flatten().max(),
-    marker="^", facecolors="none", edgecolors="g", linewidth=0.5,
-    label="Calotron output"
+    marker="^", facecolors="none", edgecolors="#1a9641",
+    lw=0.75, label="Calotron output"
   )
   plt.legend()
   if args.saving:
