@@ -28,7 +28,7 @@ EPOCHS = 500
 # |   Parser setup   |
 # +------------------+
 
-parser = ArgumentParser(description="scripts configuration")
+parser = ArgumentParser(description="training setup")
 
 parser.add_argument("--saving", action="store_true")
 parser.add_argument("--no-saving", dest="saving", action="store_false")
@@ -54,7 +54,7 @@ report_dir = config_dir["report_dir"]
 # |   Data loading   |
 # +------------------+
 
-npzfile = np.load(f"{data_dir}/train-data-demo-medium-1.npz")
+npzfile = np.load(f"{data_dir}/train-data-demo.npz")
 photon = npzfile["photon"][:,::-1]
 cluster = npzfile["cluster"][:,::-1]
 
@@ -343,148 +343,83 @@ report.add_markdown("---")
 ## Validation plots
 report.add_markdown('<h2 align="center">Validation plots</h2>')
 
-#### X coordinate
+#### X histogram
 plt.figure(figsize=(8,5), dpi=100)
 plt.xlabel("$x$ coordinate", fontsize=12)
 plt.ylabel("Candidates", fontsize=12)
 x_min = Y[:,:,0].numpy().flatten().min()
 x_max = Y[:,:,0].numpy().flatten().max()
-bins = np.linspace(x_min, x_max, 101)
+x_bins = np.linspace(x_min, x_max, 101)
 plt.hist(
   Y[:,:,0].numpy().flatten(),
-  bins=bins, color="#3288bd",
+  bins=x_bins, color="#3288bd",
   label="Training data"
 )
 plt.hist(
   out[:,:,0].numpy().flatten(),
-  bins=bins, histtype="step", color="#fc8d59",
+  bins=x_bins, histtype="step", color="#fc8d59",
   lw=2, label="Calotron output"
 )
 plt.yscale("log")
 plt.legend(loc="upper left", fontsize=10)
 if args.saving:
-  plt.savefig(f"{export_img_fname}/x-coord.png")
+  plt.savefig(f"{export_img_fname}/x-hist.png")
 report.add_figure(options="width=45%")
 plt.close()
 
-#### Y coordinate
+#### Y histogram
 plt.figure(figsize=(8,5), dpi=100)
 plt.xlabel("$y$ coordinate", fontsize=12)
 plt.ylabel("Candidates", fontsize=12)
 y_min = Y[:,:,1].numpy().flatten().min()
 y_max = Y[:,:,1].numpy().flatten().max()
-bins = np.linspace(y_min, y_max, 101)
+y_bins = np.linspace(y_min, y_max, 101)
 plt.hist(
   Y[:,:,1].numpy().flatten(), 
-  bins=bins, color="#3288bd",
+  bins=y_bins, color="#3288bd",
   label="Training data"
 )
 plt.hist(
   out[:,:,1].numpy().flatten(),
-  bins=bins, histtype="step", color="#fc8d59",
+  bins=y_bins, histtype="step", color="#fc8d59",
   lw=2, label="Calotron output"
 )
 plt.yscale("log")
 plt.legend(loc="upper left", fontsize=10)
 if args.saving:
-  plt.savefig(f"{export_img_fname}/y-coord.png")
+  plt.savefig(f"{export_img_fname}/y-hist.png")
 report.add_figure(options="width=45%")
 plt.close()
 
-#### X-Y correlations
-plt.figure(figsize=(8,5), dpi=100)
+#### X-Y histogram
+plt.figure(figsize=(16,5), dpi=100)
+plt.subplot(1,2,1)
+plt.title("Training data", fontsize=14)
 plt.xlabel("$x$ coordinate", fontsize=12)
 plt.ylabel("$y$ coordinate", fontsize=12)
-plt.scatter(
+plt.hist2d(
   Y[:,:,0].numpy().flatten(),
   Y[:,:,1].numpy().flatten(), 
-  s=0.75, alpha=0.2, color="#3288bd",
-  label="Training data"
+  bins=(x_bins, y_bins), cmin=0, cmap="gist_heat"
 )
-plt.scatter(
-  out[:,:,0].numpy().flatten(),
-  out[:,:,1].numpy().flatten(),
-  s=0.75, alpha=0.2, color="#fc8d59",
-  label="Calotron output"
-)
-# plt.legend(loc="upper left", fontsize=10)
-if args.saving:
-  plt.savefig(f"{export_img_fname}/x-y-corr.png")
-report.add_figure(options="width=45%")
-plt.close()
-
-#### Energy
-plt.figure(figsize=(8,5), dpi=100)
-plt.xlabel("Preprocessed energy [a.u]", fontsize=12)
-plt.ylabel("Candidates", fontsize=12)
-e_min = Y[:,:,2].numpy().flatten().min()
-e_max = Y[:,:,2].numpy().flatten().max()
-bins = np.linspace(e_min, e_max, 101)
-plt.hist(
-  Y[:,:,2].numpy().flatten(),
-  bins=bins, color="#3288bd",
-  label="Training data"
-)
-plt.hist(
-  out[:,:,2].numpy().flatten(),
-  bins=bins, histtype="step", color="#fc8d59",
-  lw=2, label="Calotron output"
-)
-plt.yscale("log")
-plt.legend(loc="upper left", fontsize=10)
-if args.saving:
-  plt.savefig(f"{export_img_fname}/energy.png")
-report.add_figure(options="width=45%")
-plt.close()
-
-#### X-energy correlations
-plt.figure(figsize=(8,5), dpi=100)
+plt.subplot(1,2,2)
+plt.title("Calotron output", fontsize=14)
 plt.xlabel("$x$ coordinate", fontsize=12)
-plt.ylabel("Preprocessed energy [a.u]", fontsize=12)
-plt.scatter(
-  Y[:,:,0].numpy().flatten(),
-  Y[:,:,2].numpy().flatten(), 
-  s=0.75, alpha=0.2, color="#3288bd",
-  label="Training data"
-)
-plt.scatter(
+plt.ylabel("$y$ coordinate", fontsize=12)
+plt.hist2d(
   out[:,:,0].numpy().flatten(),
-  out[:,:,2].numpy().flatten(),
-  s=0.75, alpha=0.2, color="#fc8d59",
-  label="Calotron output"
+  out[:,:,1].numpy().flatten(), 
+  bins=(x_bins, y_bins), cmin=0, cmap="gist_heat"
 )
-# plt.legend(loc="upper left", fontsize=10)
 if args.saving:
-  plt.savefig(f"{export_img_fname}/x-energy-corr.png")
-report.add_figure(options="width=45%")
+  plt.savefig(f"{export_img_fname}/x-y-hist2d.png")
+report.add_figure(options="width=95%")
 plt.close()
 
-#### Y-energy correlations
-plt.figure(figsize=(8,5), dpi=100)
-plt.xlabel("$y$ coordinate", fontsize=12)
-plt.ylabel("Preprocessed energy [a.u]", fontsize=12)
-plt.scatter(
-  Y[:,:,1].numpy().flatten(),
-  Y[:,:,2].numpy().flatten(), 
-  s=0.75, alpha=0.2, color="#3288bd",
-  label="Training data"
-)
-plt.scatter(
-  out[:,:,1].numpy().flatten(),
-  out[:,:,2].numpy().flatten(),
-  s=0.75, alpha=0.2, color="#fc8d59",
-  label="Calotron output"
-)
-# plt.legend(loc="upper left", fontsize=10)
-if args.saving:
-  plt.savefig(f"{export_img_fname}/y-energy-corr.png")
-report.add_figure(options="width=45%")
-plt.close()
-
-#### Photon/cluster coordinates
+#### Event examples
 for i in range(4):
   evt = int(np.random.uniform(0, chunk_size))
-  plt.figure(figsize=(8,5), dpi=100)
+  plt.figure(figsize=(8,6), dpi=100)
   plt.xlabel("$x$ coordinate", fontsize=12)
   plt.ylabel("$y$ coordinate", fontsize=12)
   plt.scatter(
@@ -510,11 +445,85 @@ for i in range(4):
   )
   plt.legend()
   if args.saving:
-    plt.savefig(f"{export_img_fname}/photon-cluster-coord-{i}.png")
+    plt.savefig(f"{export_img_fname}/evt-example-{i}.png")
   report.add_figure(options="width=45%")
 plt.close()
 
-#### Energy matrix
+#### Energy histogram
+plt.figure(figsize=(8,5), dpi=100)
+plt.xlabel("Preprocessed energy [a.u]", fontsize=12)
+plt.ylabel("Candidates", fontsize=12)
+e_min = Y[:,:,2].numpy().flatten().min()
+e_max = Y[:,:,2].numpy().flatten().max()
+e_bins = np.linspace(e_min, e_max, 101)
+plt.hist(
+  Y[:,:,2].numpy().flatten(),
+  bins=e_bins, color="#3288bd",
+  label="Training data"
+)
+plt.hist(
+  out[:,:,2].numpy().flatten(),
+  bins=e_bins, histtype="step", color="#fc8d59",
+  lw=2, label="Calotron output"
+)
+plt.yscale("log")
+plt.legend(loc="upper left", fontsize=10)
+if args.saving:
+  plt.savefig(f"{export_img_fname}/energy-hist.png")
+report.add_figure(options="width=45%")
+plt.close()
+
+#### X-energy histogram
+plt.figure(figsize=(16,5), dpi=100)
+plt.subplot(1,2,1)
+plt.title("Training data", fontsize=14)
+plt.xlabel("$x$ coordinate", fontsize=12)
+plt.ylabel("Preprocessed energy [a.u]", fontsize=12)
+plt.hist2d(
+  Y[:,:,0].numpy().flatten(),
+  Y[:,:,2].numpy().flatten(), 
+  bins=(x_bins, e_bins), cmin=0, cmap="gist_heat"
+)
+plt.subplot(1,2,2)
+plt.title("Calotron output", fontsize=14)
+plt.xlabel("$x$ coordinate", fontsize=12)
+plt.ylabel("Preprocessed energy [a.u]", fontsize=12)
+plt.hist2d(
+  out[:,:,0].numpy().flatten(),
+  out[:,:,2].numpy().flatten(), 
+  bins=(x_bins, y_bins), cmin=0, cmap="gist_heat"
+)
+if args.saving:
+  plt.savefig(f"{export_img_fname}/x-energy-hist2d.png")
+report.add_figure(options="width=95%")
+plt.close()
+
+#### Y-energy histogram
+plt.figure(figsize=(16,5), dpi=100)
+plt.subplot(1,2,1)
+plt.title("Training data", fontsize=14)
+plt.xlabel("$y$ coordinate", fontsize=12)
+plt.ylabel("Preprocessed energy [a.u]", fontsize=12)
+plt.hist2d(
+  Y[:,:,1].numpy().flatten(),
+  Y[:,:,2].numpy().flatten(), 
+  bins=(x_bins, e_bins), cmin=0, cmap="gist_heat"
+)
+plt.subplot(1,2,2)
+plt.title("Calotron output", fontsize=14)
+plt.xlabel("$y$ coordinate", fontsize=12)
+plt.ylabel("Preprocessed energy [a.u]", fontsize=12)
+plt.hist2d(
+  out[:,:,1].numpy().flatten(),
+  out[:,:,2].numpy().flatten(), 
+  bins=(x_bins, y_bins), cmin=0, cmap="gist_heat"
+)
+if args.saving:
+  plt.savefig(f"{export_img_fname}/y-energy-hist2d.png")
+report.add_figure(options="width=95%")
+plt.close()
+
+#### Energy batches plot
 plt.figure(figsize=(16,10), dpi=100)
 plt.subplot(1,2,1)
 plt.title("Training data", fontsize=14)
@@ -533,7 +542,7 @@ plt.imshow(
   aspect="auto", interpolation="none"
 )
 if args.saving:
-  plt.savefig(f"{export_img_fname}/energy-matrix.png")
+  plt.savefig(f"{export_img_fname}/energy-batches.png")
 report.add_figure(options="width=95%")
 plt.close()
 

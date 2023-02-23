@@ -5,13 +5,31 @@ import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from time import time
+from argparse import ArgumentParser
 from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
 
-VERBOSE = False
-MAX_INPUT_PHOTONS = 64
-MAX_OUTPUT_CLUSTERS = 32
+MAX_INPUT_PHOTONS = 128
+MAX_OUTPUT_CLUSTERS = 64
+MAX_INPUT_PHOTONS_DEMO = 32
+MAX_OUTPUT_CLUSTERS_DEMO = 16
 
+
+# +------------------+
+# |   Parser setup   |
+# +------------------+
+
+parser = ArgumentParser(description="data preparation setup")
+
+parser.add_argument("--demo", action="store_true")
+parser.add_argument("--no-demo", dest="saving", action="store_false")
+parser.set_defaults(demo=False)
+
+parser.add_argument("--verbose", action="store_true")
+parser.add_argument("--no-verbose", dest="saving", action="store_false")
+parser.set_defaults(verbose=False)
+
+args = parser.parse_args()
 
 # +-------------------+
 # |   Initial setup   |
@@ -42,7 +60,7 @@ calo_true["tx"] = calo_true.px/calo_true.pz
 calo_true["ty"] = calo_true.py/calo_true.pz
 
 true_vars = ["ecal_x", "ecal_y", "p", "tx", "ty"]
-if VERBOSE:
+if args.verbose:
   print(calo_true[true_vars].describe())
 
 # +--------------------------------+
@@ -61,7 +79,7 @@ p_calo_true["ecal_y"] = p_calo_true.ecal_y / ECAL_H * 2
 p_calo_true["p"] = p_scaler.fit_transform(np.c_[np.log(p_calo_true.p)])
 print(f"[INFO] Generated photons preprocessing completed in {time()-start:.2f} s")
 
-if VERBOSE:
+if args.verbose:
   print(p_calo_true[true_vars].describe())
 
 # +-----------------------------------+
@@ -79,9 +97,12 @@ print(f"[INFO] Reconstructed calo-clusters DataFrame ({len(neutral_protos)} "
 
 neutral_protos["NotPadding"] = 1.0
 
-reco_vars = ["x", "y", "E", "PhotonFromMergedPi0", "Pi0Merged",
-             "Photon", "NotPadding", "PhotonID", "IsNotE", "IsNotH"]
-if VERBOSE:
+if args.demo:
+  reco_vars = ["x", "y", "E"]
+else:
+  reco_vars = ["x", "y", "E", "PhotonFromMergedPi0", "Pi0Merged",
+               "Photon", "NotPadding", "PhotonID", "IsNotE", "IsNotH"]
+if args.verbose:
   print(neutral_protos[reco_vars].describe())
 
 # +---------------------------------+
@@ -97,10 +118,11 @@ start = time()
 p_neutral_protos["x"] = p_neutral_protos.x / ECAL_W * 2
 p_neutral_protos["y"] = p_neutral_protos.y / ECAL_H * 2
 p_neutral_protos["E"] = e_scaler.fit_transform(np.c_[np.log(p_neutral_protos.E)])
-p_neutral_protos[reco_vars[7:]] = rec_scaler.fit_transform(neutral_protos[reco_vars[7:]].values)
+if not args.demo:
+  p_neutral_protos[reco_vars[7:]] = rec_scaler.fit_transform(neutral_protos[reco_vars[7:]].values)
 print(f"[INFO] Reconstructed calo-clusters preprocessing completed in {time()-start:.2f} s")
 
-if VERBOSE:
+if args.verbose:
   print(p_neutral_protos[reco_vars].describe())
 
 # +--------------------------------+
@@ -138,7 +160,7 @@ event_number = 42
 photon = np.array(X[event_number])
 cluster = np.array(Y[event_number])
 
-plt.figure(figsize=(8,8), dpi=100)
+plt.figure(figsize=(8,6), dpi=100)
 plt.xlabel("$x$ coordinate", fontsize=12)
 plt.ylabel("$y$ coordinate", fontsize=12)
 plt.scatter(
@@ -155,8 +177,8 @@ plt.scatter(
               marker="s", facecolors="none", edgecolors="#2b83ba", 
               lw=0.75, label="Reconstructed calo-cluster"
            )
-plt.legend()
-plt.savefig(f"{images_dir}/event-example.png")
+plt.legend(loc="upper left", fontsize=10)
+plt.savefig(fname=f"{images_dir}/evt-example.png")
 plt.close()
 
 # +-----------------------------+
@@ -166,7 +188,7 @@ plt.close()
 plt.figure(figsize=(8,5), dpi=100)
 plt.xlabel("Event multipilcity", fontsize=12)
 plt.ylabel("Number of events", fontsize=12)
-bins = np.linspace(0, 512, 65)
+bins = np.linspace(0, 400, 51)
 plt.hist(
            np.array([len(x) for x in X]),
            bins=bins, color="#3288bd",
@@ -178,7 +200,7 @@ plt.hist(
            lw=2, label="Reconstructed clusters"
         )
 plt.legend(loc="upper right", fontsize=10)
-plt.savefig(fname=f"{images_dir}/events-multiplicity.png")
+plt.savefig(fname=f"{images_dir}/evt-multiplicity.png")
 plt.close()
 
 # +------------------------------+
@@ -198,9 +220,9 @@ for iRow, y in tqdm(enumerate(Y), total=len(Y), desc="Padding Y"):
   y_trunkated = y[:MAX_OUTPUT_CLUSTERS]
   pad_Y[iRow, :len(y_trunkated)] = y_trunkated
 
-# +------------------------+
-# |   Energy matrix plot   |
-# +------------------------+
+# +-------------------------+
+# |   Energy batches plot   |
+# +-------------------------+
 
 plt.figure(figsize=(16,10), dpi=100)
 plt.subplot(1,2,1)
@@ -213,13 +235,14 @@ plt.title("Reconstructed calo-clusters", fontsize=14)
 plt.xlabel("Cluster energy deposits", fontsize=12)
 plt.ylabel("Events", fontsize=12)
 plt.imshow(pad_Y[:64,:,2], aspect="auto", interpolation="none")
-plt.savefig(fname=f"{images_dir}/energy-matrix.png")
+img_name = "energy-batches-demo" if args.demo else "energy-batches"
+plt.savefig(fname=f"{images_dir}/{img_name}.png")
 plt.close()
 
 # +--------------------------+
 # |   Training data export   |
 # +--------------------------+
 
-data_fname = f"{data_dir}/train-data.npz"
-np.savez(data_fname, photon=pad_X, cluster=pad_Y)
+data_fname = "train-data-demo" if args.demo else "train-data"
+np.savez(f"{data_dir}/{data_fname}.npz", photon=pad_X, cluster=pad_Y)
 print(f"[INFO] Training data correctly saved to {data_fname}")
