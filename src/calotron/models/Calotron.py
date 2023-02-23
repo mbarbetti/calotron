@@ -44,8 +44,8 @@ class Calotron(tf.keras.Model):
     ) -> None:
         super().compile()
         self._loss = checkLoss(loss)
-        self._t_loss = tf.keras.metrics.Mean(name=f"t_{self._loss.name}")
-        self._d_loss = tf.keras.metrics.Mean(name=f"d_{self._loss.name}")
+        self._t_loss = tf.keras.metrics.Mean(name="t_loss")
+        self._d_loss = tf.keras.metrics.Mean(name="d_loss")
         self._metrics = checkMetrics(metrics)
         self._t_opt = checkOptimizer(transformer_optimizer)
         self._d_opt = checkOptimizer(discriminator_optimizer)
@@ -72,8 +72,8 @@ class Calotron(tf.keras.Model):
                 train_dict.update({metric.name: metric.result()})
         train_dict.update(
             {
-                f"t_{self._loss.name}": self._t_loss.result(),
-                f"d_{self._loss.name}": self._d_loss.result(),
+                "t_loss": self._t_loss.result(),
+                "d_loss": self._d_loss.result(),
                 "t_lr": self._t_opt.learning_rate,
                 "d_lr": self._d_opt.learning_rate,
             }
@@ -153,8 +153,8 @@ class Calotron(tf.keras.Model):
 
         train_dict.update(
             {
-                f"t_{self._loss.name}": self._t_loss.result(),
-                f"d_{self._loss.name}": self._d_loss.result(),
+                "t_loss": self._t_loss.result(),
+                "d_loss": self._d_loss.result(),
                 "t_lr": self._t_opt.learning_rate,
                 "d_lr": self._d_opt.learning_rate,
             }
