@@ -1,7 +1,7 @@
 import os
-import yaml
 from argparse import ArgumentParser
 
+import yaml
 
 here = os.path.dirname(__file__)
 parser = ArgumentParser(description="scripts configuration")
@@ -26,13 +26,19 @@ if args.interactive:
     data_dir = input(f"Path for the data directory (default: '{args.data_dir}'): ")
     config_dir["data_dir"] = data_dir if not (data_dir == "") else args.data_dir
 
-    export_dir = input(f"Path for the export directory (default: '{args.export_dir}'): ")
+    export_dir = input(
+        f"Path for the export directory (default: '{args.export_dir}'): "
+    )
     config_dir["export_dir"] = export_dir if not (export_dir == "") else args.export_dir
 
-    images_dir = input(f"Path for the images directory (default: '{args.images_dir}'): ")
+    images_dir = input(
+        f"Path for the images directory (default: '{args.images_dir}'): "
+    )
     config_dir["images_dir"] = images_dir if not (images_dir == "") else args.images_dir
 
-    report_dir = input(f"Path for the report directory (default: '{args.report_dir}'): ")
+    report_dir = input(
+        f"Path for the report directory (default: '{args.report_dir}'): "
+    )
     config_dir["report_dir"] = report_dir if not (report_dir == "") else args.report_dir
 
     server = input(f"Address of the Hopaas service (default: '{args.server}'): ")

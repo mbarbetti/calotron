@@ -28,7 +28,7 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements/style.txt
     - name: Run black checks
-      run: black src/ tests/ --check --diff
+      run: black src/ tests/ scripts/ --check --diff
 
   flake8:
     name: flake8
@@ -45,7 +45,7 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements/style.txt
     - name: Run flake8 checks
-      run: flake8 src/ tests/
+      run: flake8 src/ tests/ scripts/
 
   isort:
     name: isort
@@ -62,4 +62,4 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements/style.txt
     - name: Run isort checks
-      run: isort src/ tests/ --check --diff
+      run: isort src/ tests/ scripts/ --check --diff
