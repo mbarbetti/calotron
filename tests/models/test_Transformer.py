@@ -21,15 +21,12 @@ def model():
         decoder_depth=8,
         num_layers=2,
         num_heads=4,
-        key_dim=None,
-        encoder_pos_dim=None,
-        decoder_pos_dim=None,
-        encoder_pos_normalization=64,
-        decoder_pos_normalization=64,
-        encoder_max_length=source.shape[1],
-        decoder_max_length=target.shape[1],
+        key_dims=None,
+        pos_dims=None,
+        pos_norms=64,
+        max_lengths=[source.shape[1], target.shape[1]],
         ff_units=16,
-        dropout_rate=0.1,
+        dropout_rates=0.1,
         pos_sensitive=False,
         residual_smoothing=True,
         output_activations="relu",
@@ -41,13 +38,10 @@ def model():
 ###########################################################################
 
 
-@pytest.mark.parametrize("key_dim", [None, 64])
-@pytest.mark.parametrize("encoder_pos_dim", [None, 3])
-@pytest.mark.parametrize("decoder_pos_dim", [None, 9])
+@pytest.mark.parametrize("key_dims", [None, 64, [None, 64], [64, 64]])
+@pytest.mark.parametrize("pos_dims", [None, 6, [None, 6], [6, 6]])
 @pytest.mark.parametrize("output_activations", [None, "relu"])
-def test_model_configuration(
-    key_dim, encoder_pos_dim, decoder_pos_dim, output_activations
-):
+def test_model_configuration(key_dims, pos_dims, output_activations):
     from calotron.models import Transformer
 
     model = Transformer(
@@ -56,15 +50,12 @@ def test_model_configuration(
         decoder_depth=8,
         num_layers=2,
         num_heads=4,
-        key_dim=key_dim,
-        encoder_pos_dim=encoder_pos_dim,
-        decoder_pos_dim=decoder_pos_dim,
-        encoder_pos_normalization=64,
-        decoder_pos_normalization=64,
-        encoder_max_length=source.shape[1],
-        decoder_max_length=target.shape[1],
+        key_dims=key_dims,
+        pos_dims=pos_dims,
+        pos_norms=64,
+        max_lengths=[source.shape[1], target.shape[1]],
         ff_units=16,
-        dropout_rate=0.1,
+        dropout_rates=0.1,
         pos_sensitive=False,
         residual_smoothing=True,
         output_activations=output_activations,
@@ -74,26 +65,24 @@ def test_model_configuration(
     assert isinstance(model.output_depth, int)
     assert isinstance(model.encoder_depth, int)
     assert isinstance(model.decoder_depth, int)
-    assert isinstance(model.num_layers, int)
-    assert isinstance(model.num_heads, int)
-    if model.key_dim is not None:
-        assert isinstance(model.key_dim, int)
-    if model.pos_dim is not None:
-        assert isinstance(model.pos_dim, tuple)
-    assert isinstance(model.pos_normalization, tuple)
-    assert isinstance(model.max_length, tuple)
-    assert isinstance(model.ff_units, int)
-    assert isinstance(model.dropout_rate, float)
-    assert isinstance(model.pos_sensitive, bool)
-    assert isinstance(model.residual_smoothing, bool)
+    assert isinstance(model.num_layers, list)
+    assert isinstance(model.num_heads, list)
+    assert isinstance(model.key_dims, list)
+    assert isinstance(model.pos_dims, list)
+    assert isinstance(model.pos_norms, list)
+    assert isinstance(model.max_lengths, list)
+    assert isinstance(model.ff_units, list)
+    assert isinstance(model.dropout_rates, list)
+    assert isinstance(model.pos_sensitive, list)
+    assert isinstance(model.residual_smoothing, list)
     if model.output_activations is not None:
         assert isinstance(model.output_activations, list)
     assert isinstance(model.start_token_initializer, str)
 
 
-@pytest.mark.parametrize("key_dim", [None, 64])
+@pytest.mark.parametrize("key_dims", [None, 64, [None, 64], [64, 64]])
 @pytest.mark.parametrize("residual_smoothing", [True, False])
-def test_model_use_no_position(key_dim, residual_smoothing):
+def test_model_use_no_position(key_dims, residual_smoothing):
     if residual_smoothing:
         encoder_depth, decoder_depth = (8, 16)
     else:
@@ -106,15 +95,12 @@ def test_model_use_no_position(key_dim, residual_smoothing):
         decoder_depth=decoder_depth,
         num_layers=2,
         num_heads=4,
-        key_dim=key_dim,
-        encoder_pos_dim=None,
-        decoder_pos_dim=None,
-        encoder_pos_normalization=64,
-        decoder_pos_normalization=64,
-        encoder_max_length=source.shape[1],
-        decoder_max_length=target.shape[1],
+        key_dims=key_dims,
+        pos_dims=None,
+        pos_norms=64,
+        max_lengths=[source.shape[1], target.shape[1]],
         ff_units=16,
-        dropout_rate=0.1,
+        dropout_rates=0.1,
         pos_sensitive=False,
         residual_smoothing=residual_smoothing,
         output_activations=None,
@@ -126,10 +112,9 @@ def test_model_use_no_position(key_dim, residual_smoothing):
     assert output.shape == tuple(test_shape)
 
 
-@pytest.mark.parametrize("encoder_pos_dim", [None, 3])
-@pytest.mark.parametrize("decoder_pos_dim", [None, 9])
+@pytest.mark.parametrize("pos_dims", [None, [source.shape[2], target.shape[2]]])
 @pytest.mark.parametrize("residual_smoothing", [True, False])
-def test_model_use_with_position(encoder_pos_dim, decoder_pos_dim, residual_smoothing):
+def test_model_use_with_position(pos_dims, residual_smoothing):
     if residual_smoothing:
         encoder_depth, decoder_depth = (8, 16)
     else:
@@ -142,15 +127,12 @@ def test_model_use_with_position(encoder_pos_dim, decoder_pos_dim, residual_smoo
         decoder_depth=decoder_depth,
         num_layers=2,
         num_heads=4,
-        key_dim=None,
-        encoder_pos_dim=encoder_pos_dim,
-        decoder_pos_dim=decoder_pos_dim,
-        encoder_pos_normalization=64,
-        decoder_pos_normalization=64,
-        encoder_max_length=source.shape[1],
-        decoder_max_length=target.shape[1],
+        key_dims=None,
+        pos_dims=pos_dims,
+        pos_norms=64,
+        max_lengths=[source.shape[1], target.shape[1]],
         ff_units=16,
-        dropout_rate=0.1,
+        dropout_rates=0.1,
         pos_sensitive=True,
         residual_smoothing=residual_smoothing,
         output_activations=None,
@@ -180,15 +162,12 @@ def test_model_use_start_token_initializer(start_token_initializer):
         decoder_depth=8,
         num_layers=2,
         num_heads=4,
-        key_dim=None,
-        encoder_pos_dim=None,
-        decoder_pos_dim=None,
-        encoder_pos_normalization=64,
-        decoder_pos_normalization=64,
-        encoder_max_length=source.shape[1],
-        decoder_max_length=target.shape[1],
+        key_dims=None,
+        pos_dims=None,
+        pos_norms=64,
+        max_lengths=[source.shape[1], target.shape[1]],
         ff_units=16,
-        dropout_rate=0.1,
+        dropout_rates=0.1,
         pos_sensitive=False,
         residual_smoothing=True,
         output_activations="relu",

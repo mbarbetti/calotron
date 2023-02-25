@@ -13,19 +13,33 @@ class PositionalEmbedding(tf.keras.layers.Layer):
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
+
+        # Output depth
+        assert isinstance(output_depth, (int, float))
         assert output_depth >= 1
         self._output_depth = int(output_depth)
+
+        # Max length
+        assert isinstance(max_length, (int, float))
         assert max_length >= 1
         self._max_length = int(max_length)
+
+        # Encoding normalization
+        assert isinstance(encoding_normalization, (int, float))
         assert encoding_normalization > 0.0
         self._encoding_normalization = float(encoding_normalization)
-        assert dropout_rate >= 0.0
+
+        # Dropout rate
+        assert isinstance(dropout_rate, (int, float))
+        assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
+        # Embedding layer
         self._embedding = tf.keras.layers.Dense(
             self._output_depth, activation="linear", dtype=self.dtype
         )
 
+        # Positional encoding
         self._pos_encoding = self._positional_encoding(
             length=self._max_length,
             depth=self._output_depth,
@@ -33,13 +47,14 @@ class PositionalEmbedding(tf.keras.layers.Layer):
             dtype=self.dtype,
         )
 
+        # Dropout layer
         self._dropout = tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype)
 
     def call(self, x) -> tf.Tensor:
         length = tf.shape(x)[1]
         x = self._embedding(x)
         x *= tf.math.sqrt(tf.cast(self._output_depth, self.dtype))  # scale factor
-        x = x + self._pos_encoding[None, :length, :]
+        x += self._pos_encoding[None, :length, :]
         x = self._dropout(x)
         return x
 

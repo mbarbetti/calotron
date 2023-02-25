@@ -12,15 +12,27 @@ class FeedForward(tf.keras.layers.Layer):
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
+
+        # Output units
+        assert isinstance(output_units, (int, float))
         assert output_units >= 1
         self._output_units = int(output_units)
+
+        # Hidden units
+        assert isinstance(hidden_units, (int, float))
         assert hidden_units >= 1
         self._hidden_units = int(hidden_units)
-        assert dropout_rate >= 0.0
+
+        # Dropout rate
+        assert isinstance(dropout_rate, (int, float))
+        assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
+
+        # Residual smoothing
         assert isinstance(residual_smoothing, bool)
         self._residual_smoothing = residual_smoothing
 
+        # Smoothing layer
         if self._residual_smoothing:
             self._emb_layer = tf.keras.layers.Dense(
                 self._output_units, dtype=self.dtype
@@ -28,6 +40,7 @@ class FeedForward(tf.keras.layers.Layer):
         else:
             self._emb_layer = None
 
+        # Final layers
         self._seq = tf.keras.Sequential(
             [
                 tf.keras.layers.Dense(
@@ -38,6 +51,7 @@ class FeedForward(tf.keras.layers.Layer):
             ]
         )
 
+        # Normalization layer
         self._add = tf.keras.layers.Add()
         self._layer_norm = tf.keras.layers.LayerNormalization(dtype=self.dtype)
 

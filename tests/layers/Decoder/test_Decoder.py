@@ -15,7 +15,7 @@ def test_layer_configuration(key_dim, pos_dim):
         num_heads=8,
         key_dim=key_dim,
         pos_dim=pos_dim,
-        pos_normalization=64,
+        pos_norm=64,
         max_length=32,
         ff_units=128,
         dropout_rate=0.1,
@@ -30,7 +30,7 @@ def test_layer_configuration(key_dim, pos_dim):
         assert isinstance(layer.key_dim, int)
     if layer.pos_dim is not None:
         assert isinstance(layer.pos_dim, int)
-    assert isinstance(layer.pos_normalization, float)
+    assert isinstance(layer.pos_norm, float)
     assert isinstance(layer.max_length, int)
     assert isinstance(layer.ff_units, int)
     assert isinstance(layer.dropout_rate, float)
@@ -53,7 +53,7 @@ def test_layer_use_no_position(key_dim, residual_smoothing):
         num_heads=8,
         key_dim=key_dim,
         pos_dim=None,
-        pos_normalization=64,
+        pos_norm=64,
         max_length=32,
         ff_units=128,
         dropout_rate=0.1,
@@ -83,7 +83,7 @@ def test_layer_use_with_position(pos_dim, residual_smoothing):
         num_heads=8,
         key_dim=None,
         pos_dim=pos_dim,
-        pos_normalization=64,
+        pos_norm=64,
         max_length=32,
         ff_units=128,
         dropout_rate=0.1,

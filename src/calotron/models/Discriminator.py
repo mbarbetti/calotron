@@ -16,18 +16,36 @@ class Discriminator(tf.keras.Model):
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
+
+        # Latent dimension
+        assert isinstance(latent_dim, (int, float))
         assert latent_dim >= 1
         self._latent_dim = int(latent_dim)
+
+        # Output units
+        assert isinstance(output_units, (int, float))
         assert output_units >= 1
         self._output_units = int(output_units)
+
+        # Output activation
         self._output_activation = output_activation
+
+        # Hidden layers
+        assert isinstance(hidden_layers, (int, float))
         assert hidden_layers >= 1
         self._hidden_layers = int(hidden_layers)
+
+        # Hidden units
+        assert isinstance(hidden_units, (int, float))
         assert hidden_units >= 1
         self._hidden_units = int(hidden_units)
-        assert dropout_rate >= 0.0
+
+        # Dropout rate
+        assert isinstance(dropout_rate, (int, float))
+        assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
+        # Deep Sets
         self._deepsets = DeepSets(
             latent_dim=self._latent_dim,
             num_layers=self._hidden_layers,
@@ -36,6 +54,7 @@ class Discriminator(tf.keras.Model):
             dtype=self.dtype,
         )
 
+        # Final layers
         self._seq = [
             tf.keras.layers.Dense(
                 self._latent_dim, activation="relu", dtype=self.dtype

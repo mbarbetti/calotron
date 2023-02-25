@@ -12,15 +12,28 @@ class DeepSets(tf.keras.layers.Layer):
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
+
+        # Latent dimension
+        assert isinstance(latent_dim, (int, float))
         assert latent_dim >= 1
         self._latent_dim = int(latent_dim)
+
+        # Number of layers
+        assert isinstance(num_layers, (int, float))
         assert num_layers >= 1
         self._num_layers = int(num_layers)
+
+        # Hidden units
+        assert isinstance(hidden_units, (int, float))
         assert hidden_units >= 1
         self._hidden_units = int(hidden_units)
-        assert dropout_rate >= 0.0
+
+        # Dropout rate
+        assert isinstance(dropout_rate, (int, float))
+        assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
+        # Layers
         self._seq = list()
         for _ in range(self._num_layers - 1):
             self._seq.append(

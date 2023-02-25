@@ -6,8 +6,13 @@ from calotron.utils.checks import checkActivations
 class MultiActivations(tf.keras.layers.Layer):
     def __init__(self, activations, output_depth, name=None, dtype=None) -> None:
         super().__init__(name=name, dtype=dtype)
+
+        # Output depth
+        assert isinstance(output_depth, (int, float))
         assert output_depth >= 1
         self._output_depth = int(output_depth)
+
+        # Output activations
         self._output_activations = checkActivations(activations, output_depth, dtype)
 
     def call(self, x) -> tf.Tensor:

@@ -18,20 +18,38 @@ class EncoderLayer(tf.keras.layers.Layer):
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
+
+        # Encoder depth
+        assert isinstance(encoder_depth, (int, float))
         assert encoder_depth >= 1
         self._encoder_depth = int(encoder_depth)
+
+        # Number of heads
+        assert isinstance(num_heads, (int, float))
         assert num_heads >= 1
         self._num_heads = int(num_heads)
+
+        # Key dimension
         if key_dim:
+            assert isinstance(key_dim, (int, float))
             assert key_dim >= 1
         self._key_dim = int(key_dim) if key_dim else None
+
+        # Feed-forward net units
+        assert isinstance(ff_units, (int, float))
         assert ff_units >= 1
         self._ff_units = int(ff_units)
-        assert dropout_rate >= 0.0
+
+        # Dropout rate
+        assert isinstance(dropout_rate, (int, float))
+        assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
+
+        # Residual smoothing
         assert isinstance(residual_smoothing, bool)
         self._residual_smoothing = residual_smoothing
 
+        # Global self-attention layer
         self._gsa_layer = GlobalSelfAttention(
             num_heads=self._num_heads,
             key_dim=self._key_dim if self._key_dim else self._encoder_depth,
@@ -39,6 +57,7 @@ class EncoderLayer(tf.keras.layers.Layer):
             dtype=self.dtype,
         )
 
+        # Final layer
         self._ff_layer = FeedForward(
             output_units=self._encoder_depth,
             hidden_units=self._ff_units,
@@ -84,7 +103,7 @@ class Encoder(tf.keras.layers.Layer):
         num_heads,
         key_dim=None,
         pos_dim=None,
-        pos_normalization=128,
+        pos_norm=128,
         max_length=32,
         ff_units=256,
         dropout_rate=0.1,
@@ -94,42 +113,75 @@ class Encoder(tf.keras.layers.Layer):
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
+
+        # Encoder depth
+        assert isinstance(encoder_depth, (int, float))
         assert encoder_depth >= 1
         self._encoder_depth = int(encoder_depth)
+
+        # Number of layers
+        assert isinstance(num_layers, (int, float))
         assert num_layers >= 1
         self._num_layers = int(num_layers)
+
+        # Number of heads
+        assert isinstance(num_heads, (int, float))
         assert num_heads >= 1
         self._num_heads = int(num_heads)
+
+        # Key dimension
         if key_dim:
+            assert isinstance(key_dim, (int, float))
             assert key_dim >= 1
         self._key_dim = int(key_dim) if key_dim else None
+
+        # Position dimension
         if pos_dim:
+            assert isinstance(pos_dim, (int, float))
             assert pos_dim >= 1
         self._pos_dim = int(pos_dim) if pos_dim else None
-        assert pos_normalization > 0.0
-        self._pos_normalization = float(pos_normalization)
+
+        # Position normalization
+        assert isinstance(pos_norm, (int, float))
+        assert pos_norm > 0.0
+        self._pos_norm = float(pos_norm)
+
+        # Max length
+        assert isinstance(max_length, (int, float))
         assert max_length >= 1
         self._max_length = int(max_length)
+
+        # Feed-forward net units
+        assert isinstance(ff_units, (int, float))
         assert ff_units >= 1
         self._ff_units = int(ff_units)
-        assert dropout_rate >= 0.0
+
+        # Dropout rate
+        assert isinstance(dropout_rate, (int, float))
+        assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
+
+        # Position sensitive
         assert isinstance(pos_sensitive, bool)
         self._pos_sensitive = pos_sensitive
+
+        # Residual smoothing
         assert isinstance(residual_smoothing, bool)
         self._residual_smoothing = residual_smoothing
 
+        # Positional embedding layer
         if self._pos_sensitive:
             self._pos_embedding = PositionalEmbedding(
                 self._pos_dim if self._pos_dim else self._encoder_depth,
                 max_length=self._max_length,
-                encoding_normalization=self._pos_normalization,
+                encoding_normalization=self._pos_norm,
                 dropout_rate=self._dropout_rate,
                 dtype=self.dtype,
             )
         else:
             self._pos_embedding = None
 
+        # Encoder layers
         self._enc_layers = [
             EncoderLayer(
                 encoder_depth=self._encoder_depth,
@@ -171,8 +223,8 @@ class Encoder(tf.keras.layers.Layer):
         return self._pos_dim
 
     @property
-    def pos_normalization(self) -> float:
-        return self._pos_normalization
+    def pos_norm(self) -> float:
+        return self._pos_norm
 
     @property
     def max_length(self) -> int:
