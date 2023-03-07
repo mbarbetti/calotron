@@ -19,14 +19,14 @@ from calotron.utils import getSummaryHTML, initHPSingleton
 DTYPE = tf.float32
 TRAIN_RATIO = 1.0
 BATCHSIZE = 128
-ALPHA = 0.02
+ALPHA = 0.05
 EPOCHS = 500
 
 # +------------------+
 # |   Parser setup   |
 # +------------------+
 
-parser = ArgumentParser(description="training setup")
+parser = ArgumentParser(description="calotron training setup")
 
 parser.add_argument("--saving", action="store_true")
 parser.add_argument("--no-saving", dest="saving", action="store_false")
@@ -56,8 +56,8 @@ npzfile = np.load(f"{data_dir}/train-data-demo.npz")
 photon = npzfile["photon"][:, ::-1]
 cluster = npzfile["cluster"][:, ::-1]
 
-# print(f"photon {photon.shape}\n", photon)
-# print(f"cluster {cluster.shape}\n", cluster)
+print(f"[INFO] Generated photons - shape: {photon.shape}")
+print(f"[INFO] Reconstructed clusters - shape: {cluster.shape}")
 
 photon, cluster = shuffle(photon, cluster)
 
@@ -93,25 +93,22 @@ else:
 
 transformer = Transformer(
     output_depth=hp.get("t_output_depth", Y.shape[2]),
-    encoder_depth=hp.get("t_encoder_depth", 32),
-    decoder_depth=hp.get("t_decoder_depth", 32),
+    encoder_depth=hp.get("t_encoder_depth", X.shape[2] + 16),  # 32
+    decoder_depth=hp.get("t_decoder_depth", Y.shape[2] + 16),  # 32
     num_layers=hp.get("t_num_layers", 5),
     num_heads=hp.get("t_num_heads", 4),
-    key_dim=hp.get("t_key_dim", 64),
-    encoder_pos_dim=hp.get("t_encoder_pos_dim", 32),
-    decoder_pos_dim=hp.get("t_decoder_pos_dim", 32),
-    encoder_pos_normalization=hp.get("t_encoder_pos_normalization", 128),
-    decoder_pos_normalization=hp.get("t_decoder_pos_normalization", 128),
-    encoder_max_length=hp.get("t_encoder_max_length", X.shape[1]),
-    decoder_max_length=hp.get("t_decoder_max_length", Y.shape[1]),
-    ff_units=hp.get("t_ff_units", 256),
-    dropout_rate=hp.get("t_dropout_rate", 0.1),
-    pos_sensitive=hp.get("t_pos_sensitive", True),
-    residual_smoothing=hp.get("t_residual_smoothing", True),
+    key_dims=hp.get("t_key_dims", 32),  # 64
+    fnn_units=hp.get("t_fnn_units", 128),  # 256
+    dropout_rates=hp.get("t_dropout_rates", 0.1),
+    seq_ord_latent_dims=hp.get("t_seq_ord_latent_dims", 16),  # 32
+    seq_ord_max_lengths=hp.get("t_seq_ord_max_lengths", [X.shape[1], Y.shape[1]]),
+    seq_ord_normalizations=hp.get("t_seq_ord_normalizations", 10_000),  # 128
+    residual_smoothing=hp.get("t_residual_smoothing", False),  # True
     output_activations=hp.get("t_output_activations", ["linear", "linear", "sigmoid"]),
     start_token_initializer=hp.get("t_start_toke_initializer", "zeros"),
     dtype=DTYPE,
 )
+
 discriminator = Discriminator(
     latent_dim=hp.get("d_latent_dim", 64),
     output_units=hp.get("d_output_units", 1),
@@ -281,7 +278,7 @@ plt.plot(
     np.array(train.history["d_loss"]), lw=1.5, color="#fc8d59", label="discriminator"
 )
 plt.yscale("log")
-plt.legend(loc="upper left", fontsize=10)
+plt.legend(loc="center right", fontsize=10)
 if args.saving:
     plt.savefig(fname=f"{export_img_fname}/learn-curves.png")
 report.add_figure(options="width=45%")

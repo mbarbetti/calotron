@@ -4,4 +4,4 @@ from .DeepSets import DeepSets
 from .Encoder import Encoder
 from .FeedForward import FeedForward
 from .MultiActivations import MultiActivations
-from .PositionalEmbedding import PositionalEmbedding
+from .SeqOrderEmbedding import SeqOrderEmbedding

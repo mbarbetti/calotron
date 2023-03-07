@@ -2,65 +2,64 @@ import numpy as np
 import tensorflow as tf
 
 
-class PositionalEmbedding(tf.keras.layers.Layer):
+class SeqOrderEmbedding(tf.keras.layers.Layer):
     def __init__(
         self,
-        output_depth,
-        max_length=32,
-        encoding_normalization=128,
+        latent_dim=16,
+        max_length=512,
+        normalization=10_000,
         dropout_rate=0.1,
         name=None,
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
 
-        # Output depth
-        assert isinstance(output_depth, (int, float))
-        assert output_depth >= 1
-        self._output_depth = int(output_depth)
+        # Sequence order latent space dimension
+        assert isinstance(latent_dim, (int, float))
+        assert latent_dim >= 1
+        self._latent_dim = int(latent_dim)
 
-        # Max length
+        # Sequence max length
         assert isinstance(max_length, (int, float))
         assert max_length >= 1
         self._max_length = int(max_length)
 
-        # Encoding normalization
-        assert isinstance(encoding_normalization, (int, float))
-        assert encoding_normalization > 0.0
-        self._encoding_normalization = float(encoding_normalization)
+        # Sequence order encoding normalization
+        assert isinstance(normalization, (int, float))
+        assert normalization > 0.0
+        self._normalization = float(normalization)
 
         # Dropout rate
         assert isinstance(dropout_rate, (int, float))
         assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
-        # Embedding layer
-        self._embedding = tf.keras.layers.Dense(
-            self._output_depth, activation="linear", dtype=self.dtype
-        )
-
-        # Positional encoding
-        self._pos_encoding = self._positional_encoding(
+        # Sequence order encoding
+        self._seq_ord_encoding = self._seq_order_encoding(
             length=self._max_length,
-            depth=self._output_depth,
-            normalization=self._encoding_normalization,
+            depth=self._latent_dim,
+            normalization=self._normalization,
             dtype=self.dtype,
         )
 
-        # Dropout layer
+        # Additional layers
+        self._dense = tf.keras.layers.Dense(self._latent_dim, dtype=self.dtype)
         self._dropout = tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype)
 
     def call(self, x) -> tf.Tensor:
+        batch_size = tf.shape(x)[0]
         length = tf.shape(x)[1]
-        x = self._embedding(x)
-        x *= tf.math.sqrt(tf.cast(self._output_depth, self.dtype))  # scale factor
-        x += self._pos_encoding[None, :length, :]
-        x = self._dropout(x)
-        return x
+        seq_order = tf.tile(
+            self._seq_ord_encoding[None, :length, :], multiples=[batch_size, 1, 1]
+        )
+        output = tf.concat([x, seq_order], axis=2)
+        output = self._dense(output)
+        output = self._dropout(output)
+        return output
 
     @staticmethod
-    def _positional_encoding(
-        length, depth, normalization=512, dtype=tf.float32
+    def _seq_order_encoding(
+        length, depth, normalization=10_000, dtype=tf.float32
     ) -> tf.Tensor:
         pos_encoding = np.zeros(shape=(length, depth))  # buffer to fill
         for k in range(length):
@@ -71,16 +70,16 @@ class PositionalEmbedding(tf.keras.layers.Layer):
         return tf.cast(pos_encoding, dtype=dtype)
 
     @property
-    def output_depth(self) -> int:
-        return self._output_depth
+    def latent_dim(self) -> int:
+        return self._latent_dim
 
     @property
     def max_length(self) -> int:
         return self._max_length
 
     @property
-    def encoding_normalization(self) -> float:
-        return self._encoding_normalization
+    def normalization(self) -> float:
+        return self._normalization
 
     @property
     def dropout_rate(self) -> float:

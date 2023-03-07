@@ -14,13 +14,12 @@ class Transformer(tf.keras.Model):
         decoder_depth,
         num_layers,
         num_heads,
-        key_dims=None,
-        pos_dims=None,
-        pos_norms=128,
-        max_lengths=32,
-        ff_units=256,
+        key_dims,
+        fnn_units=128,
         dropout_rates=0.1,
-        pos_sensitive=False,
+        seq_ord_latent_dims=16,
+        seq_ord_max_lengths=512,
+        seq_ord_normalizations=10_000,
         residual_smoothing=True,
         output_activations=None,
         start_token_initializer="zeros",
@@ -68,79 +67,30 @@ class Transformer(tf.keras.Model):
                 self._num_heads.append(int(num))
 
         # Key dimension (encoder/decoder)
-        if key_dims:
-            if isinstance(key_dims, (int, float)):
-                assert key_dims >= 1
-                self._key_dims = [int(key_dims)] * 2
-            else:
-                assert isinstance(key_dims, (list, tuple, np.ndarray))
-                assert len(key_dims) == 2
-                self._key_dims = list()
-                for dim in key_dims:
-                    if dim:
-                        assert isinstance(dim, (int, float))
-                        assert dim >= 1
-                        dim = int(dim)
-                    self._key_dims.append(dim)
+        if isinstance(key_dims, (int, float)):
+            assert key_dims >= 1
+            self._key_dims = [int(key_dims)] * 2
         else:
-            self._key_dims = [None, None]
-
-        # Position dimension (encoder/decoder)
-        if pos_dims:
-            if isinstance(pos_dims, (int, float)):
-                assert pos_dims >= 1
-                self._pos_dims = [int(pos_dims)] * 2
-            else:
-                assert isinstance(pos_dims, (list, tuple, np.ndarray))
-                assert len(pos_dims) == 2
-                self._pos_dims = list()
-                for dim in pos_dims:
-                    if dim:
-                        assert isinstance(dim, (int, float))
-                        assert dim >= 1
-                        dim = int(dim)
-                    self._pos_dims.append(dim)
-        else:
-            self._pos_dims = [None, None]
-
-        # Position normalization (encoder/decoder)
-        if isinstance(pos_norms, (int, float)):
-            assert pos_norms > 0.0
-            self._pos_norms = [float(pos_norms)] * 2
-        else:
-            assert isinstance(pos_norms, (list, tuple, np.ndarray))
-            assert len(pos_norms) == 2
-            self._pos_norms = list()
-            for norm in pos_norms:
-                assert isinstance(norm, (int, float))
-                assert norm > 0.0
-                self._pos_norms.append(float(norm))
-
-        # Max length (encoder/decoder)
-        if isinstance(max_lengths, (int, float)):
-            assert max_lengths >= 1
-            self._max_lengths = [int(max_lengths)] * 2
-        else:
-            assert isinstance(max_lengths, (list, tuple, np.ndarray))
-            assert len(max_lengths) == 2
-            self._max_lengths = list()
-            for length in max_lengths:
-                assert isinstance(length, (int, float))
-                assert length >= 1
-                self._max_lengths.append(int(length))
+            assert isinstance(key_dims, (list, tuple, np.ndarray))
+            assert len(key_dims) == 2
+            self._key_dims = list()
+            for dim in key_dims:
+                assert isinstance(dim, (int, float))
+                assert dim >= 1
+                self._key_dims.append(int(dim))
 
         # Feed-forward net units (encoder/decoder)
-        if isinstance(ff_units, (int, float)):
-            assert ff_units >= 1
-            self._ff_units = [int(ff_units)] * 2
+        if isinstance(fnn_units, (int, float)):
+            assert fnn_units >= 1
+            self._fnn_units = [int(fnn_units)] * 2
         else:
-            assert isinstance(ff_units, (list, tuple, np.ndarray))
-            assert len(ff_units) == 2
-            self._ff_units = list()
-            for units in ff_units:
+            assert isinstance(fnn_units, (list, tuple, np.ndarray))
+            assert len(fnn_units) == 2
+            self._fnn_units = list()
+            for units in fnn_units:
                 assert isinstance(units, (int, float))
                 assert units >= 1
-                self._ff_units.append(int(units))
+                self._fnn_units.append(int(units))
 
         # Dropout rate (encoder/decoder)
         if isinstance(dropout_rates, (int, float)):
@@ -155,18 +105,46 @@ class Transformer(tf.keras.Model):
                 assert rate >= 0.0 and rate < 1.0
                 self._dropout_rates.append(float(rate))
 
-        # Position sensitive (encoder/decoder)
-        if isinstance(pos_sensitive, bool):
-            self._pos_sensitive = [pos_sensitive] * 2
+        # Sequence order latent space dimension (encoder/decoder)
+        if isinstance(seq_ord_latent_dims, (int, float)):
+            assert seq_ord_latent_dims >= 1
+            self._seq_ord_latent_dims = [int(seq_ord_latent_dims)] * 2
         else:
-            assert isinstance(pos_sensitive, (list, tuple, np.ndarray))
-            assert len(pos_sensitive) == 2
-            self._pos_sensitive = list()
-            for flag in pos_sensitive:
-                assert isinstance(flag, bool)
-                self._pos_sensitive.append(flag)
+            assert isinstance(seq_ord_latent_dims, (list, tuple, np.ndarray))
+            assert len(seq_ord_latent_dims) == 2
+            self._seq_ord_latent_dims = list()
+            for dim in seq_ord_latent_dims:
+                assert isinstance(dim, (int, float))
+                assert dim >= 1
+                self._seq_ord_latent_dims.append(int(dim))
 
-        # Residual blocks smoothing (encoder/decoder)
+        # Sequence max length (encoder/decoder)
+        if isinstance(seq_ord_max_lengths, (int, float)):
+            assert seq_ord_max_lengths >= 1
+            self._seq_ord_max_lengths = [int(seq_ord_max_lengths)] * 2
+        else:
+            assert isinstance(seq_ord_max_lengths, (list, tuple, np.ndarray))
+            assert len(seq_ord_max_lengths) == 2
+            self._seq_ord_max_lengths = list()
+            for length in seq_ord_max_lengths:
+                assert isinstance(length, (int, float))
+                assert length >= 1
+                self._seq_ord_max_lengths.append(int(length))
+
+        # Sequence order encoding normalization (encoder/decoder)
+        if isinstance(seq_ord_normalizations, (int, float)):
+            assert seq_ord_normalizations > 0.0
+            self._seq_ord_normalizations = [float(seq_ord_normalizations)] * 2
+        else:
+            assert isinstance(seq_ord_normalizations, (list, tuple, np.ndarray))
+            assert len(seq_ord_normalizations) == 2
+            self._seq_ord_normalizations = list()
+            for norm in seq_ord_normalizations:
+                assert isinstance(norm, (int, float))
+                assert norm > 0.0
+                self._seq_ord_normalizations.append(float(norm))
+
+        # Residual smoothing (encoder/decoder)
         if isinstance(residual_smoothing, bool):
             assert isinstance(residual_smoothing, bool)
             self._residual_smoothing = [residual_smoothing] * 2
@@ -189,67 +167,54 @@ class Transformer(tf.keras.Model):
 
         # Encoder
         self._encoder = Encoder(
-            encoder_depth=self._encoder_depth,
+            output_depth=self._encoder_depth,
             num_layers=self._num_layers[0],
             num_heads=self._num_heads[0],
             key_dim=self._key_dims[0],
-            pos_dim=self._pos_dims[0],
-            pos_norm=self._pos_norms[0],
-            max_length=self._max_lengths[0],
-            ff_units=self._ff_units[0],
+            fnn_units=self._fnn_units[0],
             dropout_rate=self._dropout_rates[0],
-            pos_sensitive=self._pos_sensitive[0],
+            seq_ord_latent_dim=self._seq_ord_latent_dims[0],
+            seq_ord_max_length=self._seq_ord_max_lengths[0],
+            seq_ord_normalization=self._seq_ord_normalizations[0],
             residual_smoothing=self._residual_smoothing[0],
             dtype=self.dtype,
         )
 
         # Decoder
         self._decoder = Decoder(
-            decoder_depth=self._decoder_depth,
+            output_depth=self._decoder_depth,
             num_layers=self._num_layers[1],
             num_heads=self._num_heads[1],
             key_dim=self._key_dims[1],
-            pos_dim=self._pos_dims[1],
-            pos_norm=self._pos_norms[1],
-            max_length=self._max_lengths[1],
-            ff_units=self._ff_units[1],
+            fnn_units=self._fnn_units[1],
             dropout_rate=self._dropout_rates[1],
-            pos_sensitive=self._pos_sensitive[1],
+            seq_ord_latent_dim=self._seq_ord_latent_dims[1],
+            seq_ord_max_length=self._seq_ord_max_lengths[1],
+            seq_ord_normalization=self._seq_ord_normalizations[1],
             residual_smoothing=self._residual_smoothing[1],
             dtype=self.dtype,
         )
 
-        # Final layers
-        self._final_layer = tf.keras.layers.Dense(
+        # Output layers
+        self._output_layer = tf.keras.layers.Dense(
             self._output_depth, name="output_layer", dtype=self.dtype
         )
         if output_activations is not None:
-            self._multi_act_layer = MultiActivations(
-                output_activations,
-                self._output_depth,
-                name="ma_layer",
-                dtype=self.dtype,
+            self._multi_activations = MultiActivations(
+                output_activations, self._output_depth, name="filter", dtype=self.dtype
             )
-            self._output_activations = self._multi_act_layer.output_activations
+            self._output_activations = self._multi_activations.output_activations
         else:
             self._output_activations = None
 
     def call(self, inputs) -> tf.Tensor:
         source, target = inputs
         target = self._prepare_input_target(target)
-        context = self._encoder(
-            x=source
-        )  # (batch_size, source_elements, encoder_depth)
-        output = self._decoder(
-            x=target, context=context
-        )  # (batch_size, target_elements, decoder_depth)
-        output = self._final_layer(
-            output
-        )  # (batch_size, target_elements, output_depth)
+        condition = self._encoder(source)
+        output = self._decoder(target, condition)
+        output = self._output_layer(output)
         if self._output_activations is not None:
-            output = self._multi_act_layer(
-                output
-            )  # (batch_size, target_elements, output_depth)
+            output = self._multi_activations(output)
         return output
 
     def _prepare_input_target(self, target) -> tf.Tensor:
@@ -297,37 +262,33 @@ class Transformer(tf.keras.Model):
         return self._key_dims
 
     @property
-    def pos_dims(self) -> list:
-        return self._pos_dims
-
-    @property
-    def pos_norms(self) -> list:
-        return self._pos_norms
-
-    @property
-    def max_lengths(self) -> list:
-        return self._max_lengths
-
-    @property
-    def ff_units(self) -> list:
-        return self._ff_units
+    def fnn_units(self) -> list:
+        return self._fnn_units
 
     @property
     def dropout_rates(self) -> list:
         return self._dropout_rates
 
     @property
-    def pos_sensitive(self) -> list:
-        return self._pos_sensitive
+    def seq_ord_latent_dims(self) -> list:
+        return self._seq_ord_latent_dims
+
+    @property
+    def seq_ord_max_lengths(self) -> list:
+        return self._seq_ord_max_lengths
+
+    @property
+    def seq_ord_normalizations(self) -> list:
+        return self._seq_ord_normalizations
 
     @property
     def residual_smoothing(self) -> list:
         return self._residual_smoothing
 
     @property
-    def start_token_initializer(self) -> str:
-        return self._start_token_initializer
-
-    @property
     def output_activations(self):  # TODO: add Union[list, None]
         return self._output_activations
+
+    @property
+    def start_token_initializer(self) -> str:
+        return self._start_token_initializer

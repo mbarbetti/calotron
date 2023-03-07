@@ -40,7 +40,7 @@ class FeedForward(tf.keras.layers.Layer):
         else:
             self._emb_layer = None
 
-        # Final layers
+        # Feed-forward net layers
         self._seq = tf.keras.Sequential(
             [
                 tf.keras.layers.Dense(
@@ -58,9 +58,10 @@ class FeedForward(tf.keras.layers.Layer):
     def call(self, x) -> tf.Tensor:
         if self._emb_layer is not None:
             x = self._emb_layer(x)
-        x = self._add([x, self._seq(x)])
-        x = self._layer_norm(x)
-        return x  # (batch_size, x_elements, output_units)
+        fnn_output = self._seq(x)
+        output = self._add([x, fnn_output])
+        output = self._layer_norm(output)
+        return output
 
     @property
     def output_units(self) -> int:

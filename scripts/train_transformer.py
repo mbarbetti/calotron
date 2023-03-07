@@ -10,13 +10,13 @@ import yaml
 from html_reports import Report
 from sklearn.utils import shuffle
 
-from calotron.callbacks.schedulers import AttentionDecay
+from calotron.callbacks.schedulers import ExponentialDecay
 from calotron.models import Transformer
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
 DTYPE = tf.float32
-TRAIN_RATIO = 0.75
+TRAIN_RATIO = 1.0
 BATCHSIZE = 128
 EPOCHS = 500
 
@@ -24,7 +24,7 @@ EPOCHS = 500
 # |   Parser setup   |
 # +------------------+
 
-parser = ArgumentParser(description="scripts configuration")
+parser = ArgumentParser(description="transformer training setup")
 
 parser.add_argument("--saving", action="store_true")
 parser.add_argument("--no-saving", dest="saving", action="store_false")
@@ -54,8 +54,8 @@ npzfile = np.load(f"{data_dir}/train-data-demo.npz")
 photon = npzfile["photon"][:, ::-1]
 cluster = npzfile["cluster"][:, ::-1]
 
-# print(f"photon {photon.shape}\n", photon)
-# print(f"cluster {cluster.shape}\n", cluster)
+print(f"[INFO] Generated photons - shape: {photon.shape}")
+print(f"[INFO] Reconstructed clusters - shape: {cluster.shape}")
 
 photon, cluster = shuffle(photon, cluster)
 
@@ -70,7 +70,9 @@ X = tf.cast(photon, dtype=DTYPE)
 Y = tf.cast(cluster, dtype=DTYPE)
 
 train_ds = (
-    tf.data.Dataset.from_tensor_slices((X[:train_size], Y[:train_size]))
+    tf.data.Dataset.from_tensor_slices(
+        ((X[:train_size], Y[:train_size]), Y[:train_size])
+    )
     .batch(hp.get("batch_size", BATCHSIZE), drop_remainder=True)
     .cache()
     .prefetch(tf.data.AUTOTUNE)
@@ -78,7 +80,9 @@ train_ds = (
 
 if TRAIN_RATIO != 1.0:
     val_ds = (
-        tf.data.Dataset.from_tensor_slices((X[train_size:], Y[train_size:]))
+        tf.data.Dataset.from_tensor_slices(
+            ((X[train_size:], Y[train_size:]), Y[train_size:])
+        )
         .batch(BATCHSIZE, drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
@@ -91,24 +95,20 @@ else:
 # +------------------------+
 
 model = Transformer(
-    output_depth=hp.get("t_output_depth", Y.shape[2]),
-    encoder_depth=hp.get("t_encoder_depth", 32),
-    decoder_depth=hp.get("t_decoder_depth", 32),
-    num_layers=hp.get("t_num_layers", 5),
-    num_heads=hp.get("t_num_heads", 4),
-    key_dim=hp.get("t_key_dim", 64),
-    encoder_pos_dim=hp.get("t_encoder_pos_dim", 32),
-    decoder_pos_dim=hp.get("t_decoder_pos_dim", 32),
-    encoder_pos_normalization=hp.get("t_encoder_pos_normalization", 128),
-    decoder_pos_normalization=hp.get("t_decoder_pos_normalization", 128),
-    encoder_max_length=hp.get("t_encoder_max_length", X.shape[1]),
-    decoder_max_length=hp.get("t_decoder_max_length", Y.shape[1]),
-    ff_units=hp.get("t_ff_units", 256),
-    dropout_rate=hp.get("t_dropout_rate", 0.1),
-    pos_sensitive=hp.get("t_pos_sensitive", True),
-    residual_smoothing=hp.get("t_residual_smoothing", True),
-    output_activations=hp.get("t_output_activations", ["linear", "linear", "sigmoid"]),
-    start_token_initializer=hp.get("t_start_toke_initializer", "zeros"),
+    output_depth=hp.get("output_depth", Y.shape[2]),
+    encoder_depth=hp.get("encoder_depth", X.shape[2] + 16),  # 32
+    decoder_depth=hp.get("decoder_depth", Y.shape[2] + 16),  # 32
+    num_layers=hp.get("num_layers", 5),
+    num_heads=hp.get("num_heads", 4),
+    key_dims=hp.get("key_dims", 32),  # 64
+    fnn_units=hp.get("fnn_units", 128),  # 256
+    dropout_rates=hp.get("dropout_rates", 0.1),
+    seq_ord_latent_dims=hp.get("seq_ord_latent_dims", 16),  # 32
+    seq_ord_max_lengths=hp.get("seq_ord_max_lengths", [X.shape[1], Y.shape[1]]),
+    seq_ord_normalizations=hp.get("seq_ord_normalizations", 10_000),  # 128
+    residual_smoothing=hp.get("residual_smoothing", False),  # True
+    output_activations=hp.get("output_activations", ["linear", "linear", "sigmoid"]),
+    start_token_initializer=hp.get("start_toke_initializer", "zeros"),
     dtype=DTYPE,
 )
 
@@ -122,7 +122,7 @@ model.summary()
 lr0 = 1e-3
 rms = tf.keras.optimizers.RMSprop(lr0)
 hp.get("optimizer", "RMSprop")
-hp.get("tlr0", lr0)
+hp.get("lr0", lr0)
 
 # +----------------------------+
 # |   Training configuration   |
@@ -137,14 +137,14 @@ model.compile(loss=mse, optimizer=rms, metrics=hp.get("metrics", ["mae"]))
 # |   Learning rate scheduling   |
 # +------------------------------+
 
-d_model = 64
-warmup_steps = 2_000
-sched = AttentionDecay(
-    model.optimizer, d_model=d_model, warmup_steps=warmup_steps, verbose=True
+decay_rate = 0.10
+decay_steps = 50_000
+sched = ExponentialDecay(
+    model.optimizer, decay_rate=decay_rate, decay_steps=decay_steps, verbose=True
 )
-hp.get("sched", "AttentionDecay")
-hp.get("d_model", d_model)
-hp.get("warmup_steps", warmup_steps)
+hp.get("sched", "ExponentialDecay")
+hp.get("decay_rate", decay_rate)
+hp.get("decay_steps", decay_steps)
 
 # +------------------------+
 # |   Training procedure   |
@@ -230,7 +230,7 @@ plt.xlabel("Training epochs", fontsize=12)
 plt.ylabel("Loss", fontsize=12)
 plt.plot(np.array(train.history["loss"]), lw=1.5, color="#3288bd", label="MSE")
 plt.yscale("log")
-plt.legend(loc="upper left", fontsize=10)
+plt.legend(loc="upper right", fontsize=10)
 if args.saving:
     plt.savefig(fname=f"{export_img_fname}/learn-curves.png")
 report.add_figure(options="width=45%")

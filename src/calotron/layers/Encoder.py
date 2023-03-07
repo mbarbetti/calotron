@@ -2,16 +2,16 @@ import tensorflow as tf
 
 from calotron.layers.Attention import GlobalSelfAttention
 from calotron.layers.FeedForward import FeedForward
-from calotron.layers.PositionalEmbedding import PositionalEmbedding
+from calotron.layers.SeqOrderEmbedding import SeqOrderEmbedding
 
 
 class EncoderLayer(tf.keras.layers.Layer):
     def __init__(
         self,
-        encoder_depth,
+        output_depth,
         num_heads,
-        key_dim=None,
-        ff_units=256,
+        key_dim,
+        fnn_units=128,
         dropout_rate=0.1,
         residual_smoothing=True,
         name=None,
@@ -19,10 +19,10 @@ class EncoderLayer(tf.keras.layers.Layer):
     ) -> None:
         super().__init__(name=name, dtype=dtype)
 
-        # Encoder depth
-        assert isinstance(encoder_depth, (int, float))
-        assert encoder_depth >= 1
-        self._encoder_depth = int(encoder_depth)
+        # Output depth
+        assert isinstance(output_depth, (int, float))
+        assert output_depth >= 1
+        self._output_depth = int(output_depth)
 
         # Number of heads
         assert isinstance(num_heads, (int, float))
@@ -30,15 +30,14 @@ class EncoderLayer(tf.keras.layers.Layer):
         self._num_heads = int(num_heads)
 
         # Key dimension
-        if key_dim:
-            assert isinstance(key_dim, (int, float))
-            assert key_dim >= 1
-        self._key_dim = int(key_dim) if key_dim else None
+        assert isinstance(key_dim, (int, float))
+        assert key_dim >= 1
+        self._key_dim = int(key_dim)
 
         # Feed-forward net units
-        assert isinstance(ff_units, (int, float))
-        assert ff_units >= 1
-        self._ff_units = int(ff_units)
+        assert isinstance(fnn_units, (int, float))
+        assert fnn_units >= 1
+        self._fnn_units = int(fnn_units)
 
         # Dropout rate
         assert isinstance(dropout_rate, (int, float))
@@ -49,30 +48,30 @@ class EncoderLayer(tf.keras.layers.Layer):
         assert isinstance(residual_smoothing, bool)
         self._residual_smoothing = residual_smoothing
 
-        # Global self-attention layer
-        self._gsa_layer = GlobalSelfAttention(
+        # Multi-head attention
+        self._self_attn = GlobalSelfAttention(
             num_heads=self._num_heads,
-            key_dim=self._key_dim if self._key_dim else self._encoder_depth,
+            key_dim=self._key_dim,
             dropout=self._dropout_rate,
             dtype=self.dtype,
         )
 
-        # Final layer
-        self._ff_layer = FeedForward(
-            output_units=self._encoder_depth,
-            hidden_units=self._ff_units,
+        # Feed-forward net
+        self._ff_net = FeedForward(
+            output_units=self._output_depth,
+            hidden_units=self._fnn_units,
             residual_smoothing=self._residual_smoothing,
             dtype=self.dtype,
         )
 
     def call(self, x) -> tf.Tensor:
-        x = self._gsa_layer(x)  # (batch_size, x_elements, x_depth)
-        x = self._ff_layer(x)  # (batch_size, x_elements, encoder_depth)
-        return x
+        output = self._self_attn(x)
+        output = self._ff_net(output)
+        return output
 
     @property
-    def encoder_depth(self) -> int:
-        return self._encoder_depth
+    def output_depth(self) -> int:
+        return self._output_depth
 
     @property
     def num_heads(self) -> int:
@@ -83,8 +82,8 @@ class EncoderLayer(tf.keras.layers.Layer):
         return self._key_dim
 
     @property
-    def ff_units(self) -> int:
-        return self._ff_units
+    def fnn_units(self) -> int:
+        return self._fnn_units
 
     @property
     def dropout_rate(self) -> float:
@@ -98,26 +97,25 @@ class EncoderLayer(tf.keras.layers.Layer):
 class Encoder(tf.keras.layers.Layer):
     def __init__(
         self,
-        encoder_depth,
+        output_depth,
         num_layers,
         num_heads,
-        key_dim=None,
-        pos_dim=None,
-        pos_norm=128,
-        max_length=32,
-        ff_units=256,
+        key_dim,
+        fnn_units=128,
         dropout_rate=0.1,
-        pos_sensitive=False,
+        seq_ord_latent_dim=16,
+        seq_ord_max_length=512,
+        seq_ord_normalization=10_000,
         residual_smoothing=True,
         name=None,
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
 
-        # Encoder depth
-        assert isinstance(encoder_depth, (int, float))
-        assert encoder_depth >= 1
-        self._encoder_depth = int(encoder_depth)
+        # Output depth
+        assert isinstance(output_depth, (int, float))
+        assert output_depth >= 1
+        self._output_depth = int(output_depth)
 
         # Number of layers
         assert isinstance(num_layers, (int, float))
@@ -130,64 +128,55 @@ class Encoder(tf.keras.layers.Layer):
         self._num_heads = int(num_heads)
 
         # Key dimension
-        if key_dim:
-            assert isinstance(key_dim, (int, float))
-            assert key_dim >= 1
-        self._key_dim = int(key_dim) if key_dim else None
-
-        # Position dimension
-        if pos_dim:
-            assert isinstance(pos_dim, (int, float))
-            assert pos_dim >= 1
-        self._pos_dim = int(pos_dim) if pos_dim else None
-
-        # Position normalization
-        assert isinstance(pos_norm, (int, float))
-        assert pos_norm > 0.0
-        self._pos_norm = float(pos_norm)
-
-        # Max length
-        assert isinstance(max_length, (int, float))
-        assert max_length >= 1
-        self._max_length = int(max_length)
+        assert isinstance(key_dim, (int, float))
+        assert key_dim >= 1
+        self._key_dim = int(key_dim)
 
         # Feed-forward net units
-        assert isinstance(ff_units, (int, float))
-        assert ff_units >= 1
-        self._ff_units = int(ff_units)
+        assert isinstance(fnn_units, (int, float))
+        assert fnn_units >= 1
+        self._fnn_units = int(fnn_units)
 
         # Dropout rate
         assert isinstance(dropout_rate, (int, float))
         assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
-        # Position sensitive
-        assert isinstance(pos_sensitive, bool)
-        self._pos_sensitive = pos_sensitive
+        # Sequence order latent space dimension
+        assert isinstance(seq_ord_latent_dim, (int, float))
+        assert seq_ord_latent_dim >= 1
+        self._seq_ord_latent_dim = int(seq_ord_latent_dim)
+
+        # Sequence max length
+        assert isinstance(seq_ord_max_length, (int, float))
+        assert seq_ord_max_length >= 1
+        self._seq_ord_max_length = int(seq_ord_max_length)
+
+        # Sequence order encoding normalization
+        assert isinstance(seq_ord_normalization, (int, float))
+        assert seq_ord_normalization > 0.0
+        self._seq_ord_normalization = float(seq_ord_normalization)
 
         # Residual smoothing
         assert isinstance(residual_smoothing, bool)
         self._residual_smoothing = residual_smoothing
 
-        # Positional embedding layer
-        if self._pos_sensitive:
-            self._pos_embedding = PositionalEmbedding(
-                self._pos_dim if self._pos_dim else self._encoder_depth,
-                max_length=self._max_length,
-                encoding_normalization=self._pos_norm,
-                dropout_rate=self._dropout_rate,
-                dtype=self.dtype,
-            )
-        else:
-            self._pos_embedding = None
+        # Sequence order embedding
+        self._seq_ord_embedding = SeqOrderEmbedding(
+            latent_dim=self._seq_ord_latent_dim,
+            max_length=self._seq_ord_max_length,
+            normalization=self._seq_ord_normalization,
+            dropout_rate=self._dropout_rate,
+            dtype=self.dtype,
+        )
 
         # Encoder layers
-        self._enc_layers = [
+        self._encoder_layers = [
             EncoderLayer(
-                encoder_depth=self._encoder_depth,
+                output_depth=self._output_depth,
                 num_heads=self._num_heads,
                 key_dim=self._key_dim,
-                ff_units=self._ff_units,
+                fnn_units=self._fnn_units,
                 dropout_rate=self._dropout_rate,
                 residual_smoothing=self._residual_smoothing,
                 dtype=self.dtype,
@@ -196,15 +185,15 @@ class Encoder(tf.keras.layers.Layer):
         ]
 
     def call(self, x) -> tf.Tensor:
-        if self._pos_embedding is not None:
-            x = self._pos_embedding(x)  # (batch_size, x_elements, pos_dim)
+        seq_order = self._seq_ord_embedding(x)
+        output = tf.concat([x, seq_order], axis=2)
         for i in range(self._num_layers):
-            x = self._enc_layers[i](x)
-        return x  # (batch_size, x_elements, encoder_depth)
+            output = self._encoder_layers[i](output)
+        return output
 
     @property
-    def encoder_depth(self) -> int:
-        return self._encoder_depth
+    def output_depth(self) -> int:
+        return self._output_depth
 
     @property
     def num_layers(self) -> int:
@@ -215,32 +204,28 @@ class Encoder(tf.keras.layers.Layer):
         return self._num_heads
 
     @property
-    def key_dim(self):  # TODO: add Union[int, None]
+    def key_dim(self) -> int:
         return self._key_dim
 
     @property
-    def pos_dim(self):  # TODO: add Union[int, None]
-        return self._pos_dim
-
-    @property
-    def pos_norm(self) -> float:
-        return self._pos_norm
-
-    @property
-    def max_length(self) -> int:
-        return self._max_length
-
-    @property
-    def ff_units(self) -> int:
-        return self._ff_units
+    def fnn_units(self) -> int:
+        return self._fnn_units
 
     @property
     def dropout_rate(self) -> float:
         return self._dropout_rate
 
     @property
-    def pos_sensitive(self) -> bool:
-        return self._pos_sensitive
+    def seq_ord_latent_dim(self) -> int:
+        return self._seq_ord_latent_dim
+
+    @property
+    def seq_ord_max_length(self) -> int:
+        return self._seq_ord_max_length
+
+    @property
+    def seq_ord_normalization(self) -> float:
+        return self._seq_ord_normalization
 
     @property
     def residual_smoothing(self) -> bool:
