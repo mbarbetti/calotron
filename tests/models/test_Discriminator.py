@@ -17,9 +17,9 @@ def model():
     from calotron.models import Discriminator
 
     disc = Discriminator(
-        latent_dim=8,
         output_units=1,
         output_activation="sigmoid",
+        latent_dim=8,
         hidden_layers=2,
         hidden_units=32,
         dropout_rate=0.1,
@@ -34,8 +34,8 @@ def test_model_configuration(model):
     from calotron.models import Discriminator
 
     assert isinstance(model, Discriminator)
-    assert isinstance(model.latent_dim, int)
     assert isinstance(model.output_units, int)
+    assert isinstance(model.latent_dim, int)
     assert isinstance(model.hidden_layers, int)
     assert isinstance(model.hidden_units, int)
     assert isinstance(model.dropout_rate, float)
@@ -50,9 +50,9 @@ def test_model_use(activation):
     from calotron.models import Discriminator
 
     model = Discriminator(
-        latent_dim=8,
         output_units=1,
         output_activation=activation,
+        latent_dim=8,
         hidden_layers=2,
         hidden_units=32,
         dropout_rate=0.1,
