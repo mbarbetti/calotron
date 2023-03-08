@@ -33,43 +33,30 @@ class DeepSets(tf.keras.layers.Layer):
         assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
-        # Latent space layers
-        self._latent_layers = list()
+        # Layers
+        self._seq = list()
         for _ in range(self._num_layers - 1):
-            self._latent_layers.append(
+            self._seq.append(
                 tf.keras.layers.Dense(
                     self._hidden_units, activation="relu", dtype=self.dtype
                 )
             )
-            self._latent_layers.append(
+            self._seq.append(
                 tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype)
             )
-        self._latent_layers += [
+        self._seq += [
             tf.keras.layers.Dense(self._latent_dim, activation="relu", dtype=self.dtype)
         ]
-
-        # Output layers
-        self._output_layers = tf.keras.Sequential(
-            [
-                tf.keras.layers.Dense(
-                    self._latent_dim, activation="relu", dtype=self.dtype
-                ),
-                tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype),
-                tf.keras.layers.Dense(self._latent_dim, dtype=self.dtype),
-            ]
-        )
 
     def call(self, x) -> tf.Tensor:
         outputs = list()
         for i in range(x.shape[1]):
             latent_tensor = x[:, i : i + 1, :]
-            for layer in self._latent_layers:
+            for layer in self._seq:
                 latent_tensor = layer(latent_tensor)
             outputs.append(latent_tensor)
-
         concat = tf.keras.layers.Concatenate(axis=1)(outputs)
         output = tf.reduce_sum(concat, axis=1)
-        output = self._output_layers(output)
         return output
 
     @property

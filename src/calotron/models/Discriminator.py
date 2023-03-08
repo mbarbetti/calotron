@@ -46,7 +46,7 @@ class Discriminator(tf.keras.Model):
         self._dropout_rate = float(dropout_rate)
 
         # Deep Sets
-        self._deepsets = DeepSets(
+        self._deep_sets = DeepSets(
             latent_dim=self._latent_dim,
             num_layers=self._hidden_layers,
             hidden_units=self._hidden_units,
@@ -54,17 +54,30 @@ class Discriminator(tf.keras.Model):
             dtype=self.dtype,
         )
 
-        # Output layers
-        self._dropout = tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype)
-        self._output_layer = tf.keras.layers.Dense(
-            self._output_units, name="output_layer", dtype=self.dtype
-        )
+        # Layers
+        self._seq = [
+            tf.keras.layers.Dense(
+                self._latent_dim, activation="relu", dtype=self.dtype
+            ),
+            tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype),
+            tf.keras.layers.Dense(
+                self._latent_dim, activation="relu", dtype=self.dtype
+            ),
+            tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype),
+        ]
+
+        # Output layer
+        self._seq += [
+            tf.keras.layers.Dense(
+                self._output_units, activation=self._output_activation, name="output_layer", dtype=self.dtype
+            )
+        ]
 
     def call(self, x) -> tf.Tensor:
-        x = self._deepsets(x)
-        output = self._dropout(x)
-        output = self._output_layer(output)
-        return output
+        x = self._deep_sets(x)
+        for layer in self._seq:
+            x = layer(x)
+        return x
 
     @property
     def output_units(self) -> int:
