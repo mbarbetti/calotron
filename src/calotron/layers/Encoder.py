@@ -49,7 +49,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         self._residual_smoothing = residual_smoothing
 
         # Multi-head attention
-        self._self_attn = GlobalSelfAttention(
+        self._global_attn = GlobalSelfAttention(
             num_heads=self._num_heads,
             key_dim=self._key_dim,
             dropout=self._dropout_rate,
@@ -65,7 +65,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         )
 
     def call(self, x) -> tf.Tensor:
-        output = self._self_attn(x)
+        output = self._global_attn(x)
         output = self._ff_net(output)
         return output
 

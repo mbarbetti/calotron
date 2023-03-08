@@ -98,6 +98,7 @@ class Calotron(tf.keras.Model):
                 target_true=target,
                 target_pred=output,
                 sample_weight=sample_weight,
+                discriminator_training=True,
             )
         trainable_vars = self._discriminator.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)
@@ -112,6 +113,7 @@ class Calotron(tf.keras.Model):
                 target_true=target,
                 target_pred=output,
                 sample_weight=sample_weight,
+                discriminator_training=False,
             )
         trainable_vars = self._transformer.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)

@@ -55,12 +55,14 @@ class Discriminator(tf.keras.Model):
         )
 
         # Output layers
+        self._dropout = tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype)
         self._output_layer = tf.keras.layers.Dense(
             self._output_units, name="output_layer", dtype=self.dtype
         )
 
     def call(self, x) -> tf.Tensor:
-        output = self._deepsets(x)
+        x = self._deepsets(x)
+        output = self._dropout(x)
         output = self._output_layer(output)
         return output
 

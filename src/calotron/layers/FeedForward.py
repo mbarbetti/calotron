@@ -51,7 +51,7 @@ class FeedForward(tf.keras.layers.Layer):
             ]
         )
 
-        # Normalization layer
+        # Additional layers
         self._add = tf.keras.layers.Add()
         self._layer_norm = tf.keras.layers.LayerNormalization(dtype=self.dtype)
 

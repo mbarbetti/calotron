@@ -49,7 +49,7 @@ class DecoderLayer(tf.keras.layers.Layer):
         self._residual_smoothing = residual_smoothing
 
         # Masked multi-head attention
-        self._mask_self_attn = CausalSelfAttention(
+        self._causal_attn = CausalSelfAttention(
             num_heads=self._num_heads,
             key_dim=self._key_dim,
             dropout=self._dropout_rate,
@@ -57,7 +57,7 @@ class DecoderLayer(tf.keras.layers.Layer):
         )
 
         # Multi-head attention
-        self._self_attn = CrossAttention(
+        self._cross_attn = CrossAttention(
             num_heads=self._num_heads,
             key_dim=self._key_dim,
             dropout=self._dropout_rate,
@@ -73,8 +73,8 @@ class DecoderLayer(tf.keras.layers.Layer):
         )
 
     def call(self, x, condition) -> tf.Tensor:
-        x = self._mask_self_attn(x)
-        output = self._self_attn(x, condition=condition)
+        x = self._causal_attn(x)
+        output = self._cross_attn(x, condition)
         output = self._ff_net(output)
         return output
 
