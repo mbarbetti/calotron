@@ -179,6 +179,9 @@ class Decoder(tf.keras.layers.Layer):
             dtype=self.dtype,
         )
 
+        # Dropout layer
+        self._dropout = tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype)
+
         # Decoder layers
         self._decoder_layers = [
             DecoderLayer(
@@ -196,6 +199,7 @@ class Decoder(tf.keras.layers.Layer):
     def call(self, x, condition) -> tf.Tensor:
         seq_order = self._seq_ord_embedding(x)
         output = tf.concat([x, seq_order], axis=2)
+        output = self._dropout(output)
         for i in range(self._num_layers):
             output = self._decoder_layers[i](output, condition)
         return output

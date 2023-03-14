@@ -46,8 +46,8 @@ class FeedForward(tf.keras.layers.Layer):
                 tf.keras.layers.Dense(
                     self._hidden_units, activation="relu", dtype=self.dtype
                 ),
-                tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype),
                 tf.keras.layers.Dense(self._output_units, dtype=self.dtype),
+                tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype),
             ]
         )
 
