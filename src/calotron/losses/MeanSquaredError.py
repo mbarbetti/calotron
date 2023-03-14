@@ -5,13 +5,14 @@ from calotron.losses.BaseLoss import BaseLoss
 
 
 class MeanSquaredError(BaseLoss):
-    def __init__(self, reduction="auto", name="mse_loss") -> None:
+    def __init__(self, name="mse_loss") -> None:
         super().__init__(name)
-        self._loss = TF_MSE(reduction=reduction)
+        self._loss = TF_MSE(reduction="auto")
 
     def discriminator_loss(
         self,
         discriminator,
+        source_true,
         target_true,
         target_pred,
         sample_weight=None,
@@ -26,6 +27,7 @@ class MeanSquaredError(BaseLoss):
     def transformer_loss(
         self,
         discriminator,
+        source_true,
         target_true,
         target_pred,
         sample_weight=None,

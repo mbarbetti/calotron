@@ -13,6 +13,7 @@ class BaseLoss:
     def discriminator_loss(
         self,
         discriminator,
+        source_true,
         target_true,
         target_pred,
         sample_weight=None,
@@ -26,6 +27,7 @@ class BaseLoss:
     def transformer_loss(
         self,
         discriminator,
+        source_true,
         target_true,
         target_pred,
         sample_weight=None,

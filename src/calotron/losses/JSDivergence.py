@@ -5,13 +5,14 @@ from calotron.losses.BaseLoss import BaseLoss
 
 
 class JSDivergence(BaseLoss):
-    def __init__(self, reduction="auto", name="js_loss") -> None:
+    def __init__(self, name="js_loss") -> None:
         super().__init__(name)
-        self._kl_div = TF_KLDivergence(reduction=reduction)
+        self._kl_div = TF_KLDivergence(reduction="auto")
 
     def discriminator_loss(
         self,
         discriminator,
+        source_true,
         target_true,
         target_pred,
         sample_weight=None,
@@ -26,6 +27,7 @@ class JSDivergence(BaseLoss):
     def transformer_loss(
         self,
         discriminator,
+        source_true,
         target_true,
         target_pred,
         sample_weight=None,
