@@ -23,9 +23,7 @@ def loss():
     from calotron.losses import RefinedMeanSquaredError
 
     loss_ = RefinedMeanSquaredError(
-        alpha=0.1,
-        discriminator_from_logits=False,
-        discriminator_label_smoothing=0.0,
+        alpha=0.1, discriminator_from_logits=False, discriminator_label_smoothing=0.0
     )
     return loss_
 

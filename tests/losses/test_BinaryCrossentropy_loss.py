@@ -22,8 +22,7 @@ def loss():
     from calotron.losses import BinaryCrossentropy
 
     loss_ = BinaryCrossentropy(
-        discriminator_from_logits=False,
-        discriminator_label_smoothing=0.0,
+        discriminator_from_logits=False, discriminator_label_smoothing=0.0
     )
     return loss_
 

@@ -52,7 +52,7 @@ class DeepSets(tf.keras.layers.Layer):
         batch_size = tf.shape(x)[0]
         length = tf.shape(x)[1]
         depth = tf.shape(x)[2]
-        output = tf.reshape(x, (batch_size*length, depth))
+        output = tf.reshape(x, (batch_size * length, depth))
         for layer in self._seq:
             output = layer(output)
         output = tf.reshape(output, (batch_size, length, self._latent_dim))
