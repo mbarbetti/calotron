@@ -69,7 +69,10 @@ class Discriminator(tf.keras.Model):
         # Output layer
         self._seq += [
             tf.keras.layers.Dense(
-                self._output_units, activation=self._output_activation, name="output_layer", dtype=self.dtype
+                self._output_units,
+                activation=self._output_activation,
+                name="output_layer",
+                dtype=self.dtype,
             )
         ]
 
@@ -82,7 +85,7 @@ class Discriminator(tf.keras.Model):
         x_1 = tf.tile(x[:, :, None, :], (1, 1, tf.shape(x)[1], 1))
         x_2 = tf.tile(x[:, None, :, :], (1, tf.shape(x)[1], 1, 1))
         output = tf.concat([x_1, x_2], axis=-1)
-        output = tf.reshape(output, (batch_size, length**2, 2*depth))
+        output = tf.reshape(output, (batch_size, length**2, 2 * depth))
 
         # DeepSets evaluation
         output = self._deep_sets(output)
