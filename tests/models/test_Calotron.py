@@ -70,9 +70,9 @@ def test_model_use(model):
 
 @pytest.mark.parametrize("metrics", [["bce"], None])
 def test_model_compilation(model, metrics):
-    from calotron.losses import CaloLoss
+    from calotron.losses import RefinedMeanSquaredError
 
-    loss = CaloLoss(alpha=0.1)
+    loss = RefinedMeanSquaredError(alpha=0.1)
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     model.compile(
@@ -97,9 +97,9 @@ def test_model_train(model):
         .cache()
         .prefetch(tf.data.AUTOTUNE)
     )
-    from calotron.losses import CaloLoss
+    from calotron.losses import RefinedMeanSquaredError
 
-    loss = CaloLoss(alpha=0.1)
+    loss = RefinedMeanSquaredError(alpha=0.1)
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     model.compile(
@@ -114,9 +114,9 @@ def test_model_train(model):
 
 
 def test_model_eval(model):
-    from calotron.losses import CaloLoss
+    from calotron.losses import RefinedMeanSquaredError
 
-    loss = CaloLoss(alpha=0.1)
+    loss = RefinedMeanSquaredError(alpha=0.1)
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     model.compile(

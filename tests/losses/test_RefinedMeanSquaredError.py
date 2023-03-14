@@ -6,8 +6,9 @@ FROM_MEAN_TO_SUM = 2
 ALPHA_TO_INF = 1e4
 CHUNK_SIZE = int(1e4)
 
-target_true = np.random.uniform(0.5, 1.0, size=(CHUNK_SIZE, 5))
-target_pred = np.random.uniform(0.2, 0.8, size=(CHUNK_SIZE, 5))
+source_true = np.random.uniform(1.0, 0.5, size=(CHUNK_SIZE, 4))
+target_true = np.random.uniform(0.4, 0.5, size=(CHUNK_SIZE, 8))
+target_pred = np.random.uniform(0.2, 0.5, size=(CHUNK_SIZE, 8))
 
 model = tf.keras.Sequential(
     [
@@ -19,15 +20,12 @@ model = tf.keras.Sequential(
 
 @pytest.fixture
 def loss():
-    from calotron.losses import CaloLoss
+    from calotron.losses import RefinedMeanSquaredError
 
-    loss_ = CaloLoss(
+    loss_ = RefinedMeanSquaredError(
         alpha=0.1,
-        from_logits=False,
-        label_smoothing=0.0,
-        axis=-1,
-        reduction="auto",
-        name="calo_loss",
+        discriminator_from_logits=False,
+        discriminator_label_smoothing=0.0,
     )
     return loss_
 
@@ -36,36 +34,35 @@ def loss():
 
 
 def test_loss_configuration(loss):
-    from calotron.losses import CaloLoss
+    from calotron.losses import RefinedMeanSquaredError
 
-    assert isinstance(loss, CaloLoss)
+    assert isinstance(loss, RefinedMeanSquaredError)
     assert isinstance(loss.name, str)
 
 
-@pytest.mark.parametrize("from_logits", [False, True])
-def test_loss_use_no_weights(from_logits):
-    from calotron.losses import CaloLoss
+@pytest.mark.parametrize("discriminator_from_logits", [False, True])
+def test_loss_use_no_weights(discriminator_from_logits):
+    from calotron.losses import RefinedMeanSquaredError
 
-    loss = CaloLoss(
+    loss = RefinedMeanSquaredError(
         alpha=ALPHA_TO_INF,
-        from_logits=from_logits,
-        label_smoothing=0.0,
-        axis=-1,
-        reduction="auto",
-        name="calo_loss",
+        discriminator_from_logits=discriminator_from_logits,
+        discriminator_label_smoothing=0.0,
     )
-    if from_logits:
+    if discriminator_from_logits:
         model.add(tf.keras.layers.Dense(1, activation="tanh"))
     else:
         model.add(tf.keras.layers.Dense(1, activation="sigmoid"))
     out1 = loss.discriminator_loss(
         discriminator=model,
+        source_true=source_true,
         target_true=target_true,
         target_pred=target_pred,
         sample_weight=None,
     )
     out2 = loss.transformer_loss(
         discriminator=model,
+        source_true=source_true,
         target_true=target_true,
         target_pred=target_pred,
         sample_weight=None,
@@ -73,31 +70,30 @@ def test_loss_use_no_weights(from_logits):
     assert out1.numpy() * FROM_MEAN_TO_SUM > out2.numpy() / ALPHA_TO_INF
 
 
-@pytest.mark.parametrize("from_logits", [False, True])
-def test_loss_use_with_weights(from_logits):
+@pytest.mark.parametrize("discriminator_from_logits", [False, True])
+def test_loss_use_with_weights(discriminator_from_logits):
     w = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE, 1)) > 0.5
-    from calotron.losses import CaloLoss
+    from calotron.losses import RefinedMeanSquaredError
 
-    loss = CaloLoss(
+    loss = RefinedMeanSquaredError(
         alpha=ALPHA_TO_INF,
-        from_logits=from_logits,
-        label_smoothing=0.0,
-        axis=-1,
-        reduction="auto",
-        name="calo_loss",
+        discriminator_from_logits=discriminator_from_logits,
+        discriminator_label_smoothing=0.0,
     )
-    if from_logits:
+    if discriminator_from_logits:
         model.add(tf.keras.layers.Dense(1, activation="tanh"))
     else:
         model.add(tf.keras.layers.Dense(1, activation="sigmoid"))
     out1 = loss.discriminator_loss(
         discriminator=model,
+        source_true=source_true,
         target_true=target_true,
         target_pred=target_pred,
         sample_weight=w,
     )
     out2 = loss.transformer_loss(
         discriminator=model,
+        source_true=source_true,
         target_true=target_true,
         target_pred=target_pred,
         sample_weight=w,
