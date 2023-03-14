@@ -40,10 +40,6 @@ def test_model_configuration(model):
     assert isinstance(model.hidden_units, int)
     assert isinstance(model.dropout_rate, float)
 
-    from calotron.layers import DeepSets
-
-    assert isinstance(model.deepsets, DeepSets)
-
 
 @pytest.mark.parametrize("activation", ["sigmoid", None])
 def test_model_use(activation):

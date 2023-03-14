@@ -95,6 +95,7 @@ class Calotron(tf.keras.Model):
             output = self._transformer((source, target), training=False)
             loss = self._loss.discriminator_loss(
                 discriminator=self._discriminator,
+                source_true=source,
                 target_true=target,
                 target_pred=output,
                 sample_weight=sample_weight,
@@ -110,6 +111,7 @@ class Calotron(tf.keras.Model):
             output = self._transformer((source, target), training=True)
             loss = self._loss.transformer_loss(
                 discriminator=self._discriminator,
+                source_true=source,
                 target_true=target,
                 target_pred=output,
                 sample_weight=sample_weight,
@@ -139,6 +141,7 @@ class Calotron(tf.keras.Model):
 
         d_loss = self._loss.discriminator_loss(
             discriminator=self._discriminator,
+            source_true=source,
             target_true=target,
             target_pred=output,
             sample_weight=sample_weight,
@@ -148,6 +151,7 @@ class Calotron(tf.keras.Model):
 
         t_loss = self._loss.transformer_loss(
             discriminator=self._discriminator,
+            source_true=source,
             target_true=target,
             target_pred=output,
             sample_weight=sample_weight,

@@ -74,10 +74,21 @@ class Discriminator(tf.keras.Model):
         ]
 
     def call(self, x) -> tf.Tensor:
-        x = self._deep_sets(x)
+        batch_size = tf.shape(x)[0]
+        length = tf.shape(x)[1]
+        depth = tf.shape(x)[2]
+
+        # Pairwise arrangement
+        x_1 = tf.tile(x[:, :, None, :], (1, 1, tf.shape(x)[1], 1))
+        x_2 = tf.tile(x[:, None, :, :], (1, tf.shape(x)[1], 1, 1))
+        output = tf.concat([x_1, x_2], axis=-1)
+        output = tf.reshape(output, (batch_size, length**2, 2*depth))
+
+        # DeepSets evaluation
+        output = self._deep_sets(output)
         for layer in self._seq:
-            x = layer(x)
-        return x
+            output = layer(output)
+        return output
 
     @property
     def output_units(self) -> int:
@@ -102,7 +113,3 @@ class Discriminator(tf.keras.Model):
     @property
     def dropout_rate(self) -> float:
         return self._dropout_rate
-
-    @property
-    def deepsets(self) -> DeepSets:
-        return self._deepsets
