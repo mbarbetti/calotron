@@ -49,14 +49,14 @@ class DeepSets(tf.keras.layers.Layer):
         ]
 
     def call(self, x) -> tf.Tensor:
-        outputs = list()
-        for i in range(x.shape[1]):
-            latent_tensor = x[:, i : i + 1, :]
-            for layer in self._seq:
-                latent_tensor = layer(latent_tensor)
-            outputs.append(latent_tensor)
-        concat = tf.keras.layers.Concatenate(axis=1)(outputs)
-        output = tf.reduce_sum(concat, axis=1)
+        batch_size = tf.shape(x)[0]
+        length = tf.shape(x)[1]
+        depth = tf.shape(x)[2]
+        output = tf.reshape(x, (batch_size*length, depth))
+        for layer in self._seq:
+            output = layer(output)
+        output = tf.reshape(output, (batch_size, length, self._latent_dim))
+        output = tf.reduce_sum(output, axis=1)
         return output
 
     @property
