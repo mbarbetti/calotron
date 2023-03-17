@@ -13,6 +13,8 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
+        if name is not None:
+            prefix = name.split("_")[0]
 
         # Sequence order latent space dimension
         assert isinstance(latent_dim, (int, float))
@@ -43,13 +45,19 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
         )
 
         # Embedding layer
-        self._embedding = tf.keras.layers.Dense(self._latent_dim, dtype=self.dtype)
+        self._embedding = tf.keras.layers.Dense(
+            units=self._latent_dim,
+            activation="linear",
+            kernel_initializer="glorot_uniform",
+            name=f"{prefix}_seq_ord_dense" if name else None,
+            dtype=self.dtype
+        )
 
     def call(self, x) -> tf.Tensor:
         batch_size = tf.shape(x)[0]
         length = tf.shape(x)[1]
         seq_order = tf.tile(
-            self._seq_ord_encoding[None, :length, :], multiples=[batch_size, 1, 1]
+            self._seq_ord_encoding[None, :length, :], (batch_size, 1, 1)
         )
         output = tf.concat([x, seq_order], axis=2)
         output = self._embedding(output)

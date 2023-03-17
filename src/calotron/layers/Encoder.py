@@ -18,6 +18,9 @@ class EncoderLayer(tf.keras.layers.Layer):
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
+        if name is not None:
+            prefix = name.split("_")[0]
+            suffix = name.split("_")[-1]
 
         # Output depth
         assert isinstance(output_depth, (int, float))
@@ -52,7 +55,9 @@ class EncoderLayer(tf.keras.layers.Layer):
         self._global_attn = GlobalSelfAttention(
             num_heads=self._num_heads,
             key_dim=self._key_dim,
+            kernel_initializer="glorot_uniform",
             dropout=self._dropout_rate,
+            name=f"{prefix}_global_attn_{suffix}" if name else None,
             dtype=self.dtype,
         )
 
@@ -61,6 +66,7 @@ class EncoderLayer(tf.keras.layers.Layer):
             output_units=self._output_depth,
             hidden_units=self._fnn_units,
             residual_smoothing=self._residual_smoothing,
+            name=f"{prefix}_fnn_{suffix}" if name else None,
             dtype=self.dtype,
         )
 
@@ -167,11 +173,16 @@ class Encoder(tf.keras.layers.Layer):
             max_length=self._seq_ord_max_length,
             normalization=self._seq_ord_normalization,
             dropout_rate=self._dropout_rate,
+            name="enc_seq_ord_embedding",
             dtype=self.dtype,
         )
 
         # Dropout layer
-        self._dropout = tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype)
+        self._dropout = tf.keras.layers.Dropout(
+            self._dropout_rate, 
+            name="enc_dropout", 
+            dtype=self.dtype,
+        )
 
         # Encoder layers
         self._encoder_layers = [
@@ -182,9 +193,10 @@ class Encoder(tf.keras.layers.Layer):
                 fnn_units=self._fnn_units,
                 dropout_rate=self._dropout_rate,
                 residual_smoothing=self._residual_smoothing,
+                name=f"enc_layer_{i}",
                 dtype=self.dtype,
             )
-            for _ in range(self._num_layers)
+            for i in range(self._num_layers)
         ]
 
     def call(self, x) -> tf.Tensor:

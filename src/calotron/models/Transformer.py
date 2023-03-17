@@ -177,6 +177,7 @@ class Transformer(tf.keras.Model):
             seq_ord_max_length=self._seq_ord_max_lengths[0],
             seq_ord_normalization=self._seq_ord_normalizations[0],
             residual_smoothing=self._residual_smoothing[0],
+            name="t_encoder",
             dtype=self.dtype,
         )
 
@@ -192,16 +193,24 @@ class Transformer(tf.keras.Model):
             seq_ord_max_length=self._seq_ord_max_lengths[1],
             seq_ord_normalization=self._seq_ord_normalizations[1],
             residual_smoothing=self._residual_smoothing[1],
+            name="t_decoder",
             dtype=self.dtype,
         )
 
         # Output layers
         self._output_layer = tf.keras.layers.Dense(
-            self._output_depth, name="output_layer", dtype=self.dtype
+            units=self._output_depth,
+            activation="linear",
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.1),
+            name="t_dense_out",
+            dtype=self.dtype,
         )
         if output_activations is not None:
             self._multi_activations = MultiActivations(
-                output_activations, self._output_depth, name="filter", dtype=self.dtype
+                activations=output_activations,
+                output_depth=self._output_depth,
+                name="t_filter",
+                dtype=self.dtype,
             )
             self._output_activations = self._multi_activations.output_activations
         else:

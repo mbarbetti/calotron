@@ -12,6 +12,9 @@ class FeedForward(tf.keras.layers.Layer):
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
+        if name is not None:
+            prefix = name.split("_")[0]
+            suffix = name.split("_")[-1]
 
         # Output units
         assert isinstance(output_units, (int, float))
@@ -35,7 +38,9 @@ class FeedForward(tf.keras.layers.Layer):
         # Smoothing layer
         if self._residual_smoothing:
             self._emb_layer = tf.keras.layers.Dense(
-                self._output_units, dtype=self.dtype
+                units=self._output_units,
+                name=f"{prefix}_fnn_res_smoothing_{suffix}" if name else None,
+                dtype=self.dtype,
             )
         else:
             self._emb_layer = None
@@ -44,23 +49,35 @@ class FeedForward(tf.keras.layers.Layer):
         self._seq = tf.keras.Sequential(
             [
                 tf.keras.layers.Dense(
-                    self._hidden_units, activation="relu", dtype=self.dtype
+                    units=self._hidden_units,
+                    activation="relu",
+                    kernel_initializer="glorot_uniform",
+                    name=f"{prefix}_fnn_dense_in_{suffix}" if name else None,
+                    dtype=self.dtype,
                 ),
-                tf.keras.layers.Dense(self._output_units, dtype=self.dtype),
-                tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype),
+                tf.keras.layers.Dense(
+                    units=self._output_units,
+                    activation="linear",
+                    kernel_initializer="he_normal",
+                    name=f"{prefix}_fnn_dense_out_{suffix}" if name else None,
+                    dtype=self.dtype,
+                ),
+                tf.keras.layers.Dropout(
+                    rate=self._dropout_rate,
+                    name=f"{prefix}_fnn_dropout_{suffix}" if name else None,
+                    dtype=self.dtype,
+                ),
             ]
         )
-
-        # Additional layers
         self._add = tf.keras.layers.Add()
-        self._layer_norm = tf.keras.layers.LayerNormalization(dtype=self.dtype)
+        # self._layer_norm = tf.keras.layers.LayerNormalization()
 
     def call(self, x) -> tf.Tensor:
         if self._emb_layer is not None:
             x = self._emb_layer(x)
         fnn_output = self._seq(x)
         output = self._add([x, fnn_output])
-        output = self._layer_norm(output)
+        # output = self._layer_norm(output)
         return output
 
     @property
