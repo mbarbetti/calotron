@@ -39,7 +39,9 @@ if args.interactive:
     reports_dir = input(
         f"Path for the reports directory (default: '{args.reports_dir}'): "
     )
-    config_dir["reports_dir"] = reports_dir if not (reports_dir == "") else args.reports_dir
+    config_dir["reports_dir"] = (
+        reports_dir if not (reports_dir == "") else args.reports_dir
+    )
 
     server = input(f"Address of the Hopaas service (default: '{args.server}'): ")
     config_hopaas["server"] = server if not (server == "") else args.server

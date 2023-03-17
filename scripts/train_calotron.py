@@ -11,7 +11,7 @@ from html_reports import Report
 from sklearn.utils import shuffle
 
 from calotron.callbacks.schedulers import ExponentialDecay
-from calotron.losses import CaloLoss
+from calotron.losses import GlobalEventReco
 from calotron.models import Calotron, Discriminator, Transformer
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
@@ -44,9 +44,9 @@ with open("config/directories.yml") as file:
     config_dir = yaml.full_load(file)
 
 data_dir = config_dir["data_dir"]
-export_dir = config_dir["export_dir"]
+models_dir = config_dir["models_dir"]
 images_dir = config_dir["images_dir"]
-report_dir = config_dir["report_dir"]
+reports_dir = config_dir["reports_dir"]
 
 # +------------------+
 # |   Data loading   |
@@ -93,17 +93,17 @@ else:
 
 transformer = Transformer(
     output_depth=hp.get("t_output_depth", Y.shape[2]),
-    encoder_depth=hp.get("t_encoder_depth", X.shape[2] + 16),  # 32
-    decoder_depth=hp.get("t_decoder_depth", Y.shape[2] + 16),  # 32
+    encoder_depth=hp.get("t_encoder_depth", 32),
+    decoder_depth=hp.get("t_decoder_depth", 32),
     num_layers=hp.get("t_num_layers", 5),
     num_heads=hp.get("t_num_heads", 4),
-    key_dims=hp.get("t_key_dims", 32),  # 64
-    fnn_units=hp.get("t_fnn_units", 128),  # 256
+    key_dims=hp.get("t_key_dims", 64),
+    fnn_units=hp.get("t_fnn_units", 128),
     dropout_rates=hp.get("t_dropout_rates", 0.1),
-    seq_ord_latent_dims=hp.get("t_seq_ord_latent_dims", 16),  # 32
+    seq_ord_latent_dims=hp.get("t_seq_ord_latent_dims", 16),
     seq_ord_max_lengths=hp.get("t_seq_ord_max_lengths", [X.shape[1], Y.shape[1]]),
-    seq_ord_normalizations=hp.get("t_seq_ord_normalizations", 10_000),  # 128
-    residual_smoothing=hp.get("t_residual_smoothing", False),  # True
+    seq_ord_normalizations=hp.get("t_seq_ord_normalizations", 10_000),
+    residual_smoothing=hp.get("t_residual_smoothing", True),
     output_activations=hp.get("t_output_activations", ["linear", "linear", "sigmoid"]),
     start_token_initializer=hp.get("t_start_toke_initializer", "zeros"),
     dtype=DTYPE,
@@ -113,8 +113,8 @@ discriminator = Discriminator(
     latent_dim=hp.get("d_latent_dim", 64),
     output_units=hp.get("d_output_units", 1),
     output_activation=hp.get("d_output_activation", "sigmoid"),
-    hidden_layers=hp.get("d_hidden_layers", 5),
-    hidden_units=hp.get("d_hidden_units", 256),
+    deepsets_num_layers=hp.get("d_deepsets_num_layers", 5),
+    deepsets_hidden_units=hp.get("d_deepsets_hidden_units", 256),
     dropout_rate=hp.get("d_dropout_rate", 0.1),
     dtype=DTYPE,
 )
@@ -142,7 +142,7 @@ hp.get("d_lr0", d_lr0)
 # |   Training configuration   |
 # +----------------------------+
 
-loss = CaloLoss(alpha=ALPHA)
+loss = GlobalEventReco(alpha=ALPHA)
 hp.get("loss", loss.name)
 hp.get("loss_alpha", loss._alpha)
 
@@ -151,7 +151,7 @@ model.compile(
     metrics=hp.get("metrics", ["accuracy", "bce"]),
     transformer_optimizer=t_opt,
     discriminator_optimizer=d_opt,
-    transformer_upds_per_batch=hp.get("transformer_upds_per_batch", 4),
+    transformer_upds_per_batch=hp.get("transformer_upds_per_batch", 3),
     discriminator_upds_per_batch=hp.get("discriminator_upds_per_batch", 1),
 )
 
@@ -215,8 +215,8 @@ for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
 prefix += "_calotron"
 
 if args.saving:
-    export_model_fname = f"{export_dir}/{prefix}_model"
-    tf.saved_model.save(exp_sim, export_dir=export_model_fname)
+    export_model_fname = f"{models_dir}/{prefix}_model"
+    tf.saved_model.save(exp_sim, models_dir=export_model_fname)
     hp.dump(f"{export_model_fname}/hyperparams.yml")  # export also list of hyperparams
     print(f"[INFO] Trained model correctly exported to {export_model_fname}")
     export_img_fname = f"{images_dir}/{prefix}_img"
@@ -266,19 +266,34 @@ report.add_markdown("---")
 ## Training plots
 report.add_markdown('<h2 align="center">Training plots</h2>')
 
+start_epoch = int(EPOCHS / 20)
+
 #### Learning curves
 plt.figure(figsize=(8, 5), dpi=100)
 plt.title("Learning curves", fontsize=14)
 plt.xlabel("Training epochs", fontsize=12)
 plt.ylabel("Loss", fontsize=12)
+ratio = (
+    np.array(train.history["d_loss"])[start_epoch:]
+    / np.array(train.history["t_loss"])[start_epoch:]
+)
+ratio = int(np.mean(ratio)) + 1
 plt.plot(
-    np.array(train.history["t_loss"]), lw=1.5, color="#3288bd", label="transformer"
+    np.arange(EPOCHS)[start_epoch:],
+    np.array(train.history["t_loss"])[start_epoch:],
+    lw=1.5,
+    color="#3288bd",
+    label=f"transformer [x {1:.1f}]",
 )
 plt.plot(
-    np.array(train.history["d_loss"]), lw=1.5, color="#fc8d59", label="discriminator"
+    np.arange(EPOCHS)[start_epoch:],
+    np.array(train.history["d_loss"])[start_epoch:] / ratio,
+    lw=1.5,
+    color="#fc8d59",
+    label=f"discriminator [x {1/ratio:.1f}]",
 )
-plt.yscale("log")
-plt.legend(loc="center right", fontsize=10)
+# plt.yscale("log")
+plt.legend(loc="upper right", fontsize=10)
 if args.saving:
     plt.savefig(fname=f"{export_img_fname}/learn-curves.png")
 report.add_figure(options="width=45%")
@@ -289,9 +304,19 @@ plt.figure(figsize=(8, 5), dpi=100)
 plt.title("Learning rate scheduling", fontsize=14)
 plt.xlabel("Training epochs", fontsize=12)
 plt.ylabel("Learning rate", fontsize=12)
-plt.plot(np.array(train.history["t_lr"]), lw=1.5, color="#3288bd", label="transformer")
 plt.plot(
-    np.array(train.history["d_lr"]), lw=1.5, color="#fc8d59", label="discriminator"
+    np.arange(EPOCHS),
+    np.array(train.history["t_lr"]),
+    lw=1.5,
+    color="#3288bd",
+    label="transformer",
+)
+plt.plot(
+    np.arange(EPOCHS),
+    np.array(train.history["d_lr"]),
+    lw=1.5,
+    color="#fc8d59",
+    label="discriminator",
 )
 plt.yscale("log")
 plt.legend(loc="upper right", fontsize=10)
@@ -306,16 +331,21 @@ plt.title("Metric curves", fontsize=14)
 plt.xlabel("Training epochs", fontsize=12)
 plt.ylabel("Accuracy", fontsize=12)
 plt.plot(
-    np.array(train.history["accuracy"]), lw=1.5, color="#4dac26", label="training set"
+    np.arange(EPOCHS)[start_epoch:],
+    np.array(train.history["accuracy"])[start_epoch:],
+    lw=1.5,
+    color="#4dac26",
+    label="training set",
 )
 if TRAIN_RATIO != 1.0:
     plt.plot(
-        np.array(train.history["val_accuracy"]),
+        np.arange(EPOCHS)[start_epoch:],
+        np.array(train.history["val_accuracy"])[start_epoch:],
         lw=1.5,
         color="#d01c8b",
         label="validation set",
     )
-plt.legend(loc="upper right", fontsize=10)
+plt.legend(loc="upper left", fontsize=10)
 if args.saving:
     plt.savefig(fname=f"{export_img_fname}/metric-curves-0.png")
 report.add_figure(options="width=45%")
@@ -326,10 +356,17 @@ plt.figure(figsize=(8, 5), dpi=100)
 plt.title("Metric curves", fontsize=14)
 plt.xlabel("Training epochs", fontsize=12)
 plt.ylabel("Binary cross-entropy", fontsize=12)
-plt.plot(np.array(train.history["bce"]), lw=1.5, color="#4dac26", label="training set")
+plt.plot(
+    np.arange(EPOCHS)[start_epoch:],
+    np.array(train.history["bce"])[start_epoch:],
+    lw=1.5,
+    color="#4dac26",
+    label="training set",
+)
 if TRAIN_RATIO != 1.0:
     plt.plot(
-        np.array(train.history["val_bce"]),
+        np.arange(EPOCHS)[start_epoch:],
+        np.array(train.history["val_bce"])[start_epoch:],
         lw=1.5,
         color="#d01c8b",
         label="validation set",
@@ -512,6 +549,6 @@ plt.close()
 
 report.add_markdown("---")
 
-report_fname = f"{report_dir}/{prefix}_train-report.html"
+report_fname = f"{reports_dir}/{prefix}_train-report.html"
 report.write_report(filename=report_fname)
 print(f"[INFO] Training report correctly exported to {report_fname}")

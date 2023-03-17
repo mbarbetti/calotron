@@ -42,9 +42,9 @@ with open("config/directories.yml") as file:
     config_dir = yaml.full_load(file)
 
 data_dir = config_dir["data_dir"]
-export_dir = config_dir["export_dir"]
+models_dir = config_dir["models_dir"]
 images_dir = config_dir["images_dir"]
-report_dir = config_dir["report_dir"]
+reports_dir = config_dir["reports_dir"]
 
 # +------------------+
 # |   Data loading   |
@@ -181,8 +181,8 @@ for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
 prefix += "_transformer"
 
 if args.saving:
-    export_model_fname = f"{export_dir}/{prefix}_model"
-    tf.saved_model.save(exp_sim, export_dir=export_model_fname)
+    export_model_fname = f"{models_dir}/{prefix}_model"
+    tf.saved_model.save(exp_sim, models_dir=export_model_fname)
     hp.dump(f"{export_model_fname}/hyperparams.yml")  # export also list of hyperparams
     print(f"[INFO] Trained model correctly exported to {export_model_fname}")
     export_img_fname = f"{images_dir}/{prefix}_img"
@@ -440,6 +440,6 @@ plt.close()
 
 report.add_markdown("---")
 
-report_fname = f"{report_dir}/{prefix}_train-report.html"
+report_fname = f"{reports_dir}/{prefix}_train-report.html"
 report.write_report(filename=report_fname)
 print(f"[INFO] Training report correctly exported to {report_fname}")
