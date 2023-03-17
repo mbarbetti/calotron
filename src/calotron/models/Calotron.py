@@ -78,8 +78,15 @@ class Calotron(tf.keras.Model):
 
         train_dict = dict()
         if self._metrics is not None:
+            output = self._transformer((source, target), training=False)
+            y_pred = self._discriminator(output, training=False)
+            y_true = self._discriminator(target, training=False)
             for metric in self._metrics:
+                metric.update_state(
+                    y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
+                )
                 train_dict.update({metric.name: metric.result()})
+
         train_dict.update(
             {
                 "t_loss": self._t_loss.result(),
@@ -121,13 +128,6 @@ class Calotron(tf.keras.Model):
         gradients = tape.gradient(loss, trainable_vars)
         self._t_opt.apply_gradients(zip(gradients, trainable_vars))
         self._t_loss.update_state(loss)
-        if self._metrics is not None:
-            y_pred = self._discriminator(output, training=False)
-            y_true = self._discriminator(target, training=False)
-            for metric in self._metrics:
-                metric.update_state(
-                    y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
-                )
 
     def test_step(self, data) -> dict:
         if len(data) == 3:
@@ -136,8 +136,17 @@ class Calotron(tf.keras.Model):
             source, target = data
             sample_weight = None
 
-        train_dict = dict()
         output = self._transformer((source, target), training=False)
+
+        t_loss = self._loss.transformer_loss(
+            discriminator=self._discriminator,
+            source_true=source,
+            target_true=target,
+            target_pred=output,
+            sample_weight=sample_weight,
+            discriminator_training=False,
+        )
+        self._t_loss.update_state(t_loss)
 
         d_loss = self._loss.discriminator_loss(
             discriminator=self._discriminator,
@@ -149,15 +158,7 @@ class Calotron(tf.keras.Model):
         )
         self._d_loss.update_state(d_loss)
 
-        t_loss = self._loss.transformer_loss(
-            discriminator=self._discriminator,
-            source_true=source,
-            target_true=target,
-            target_pred=output,
-            sample_weight=sample_weight,
-            discriminator_training=False,
-        )
-        self._t_loss.update_state(t_loss)
+        train_dict = dict()
         if self._metrics is not None:
             y_pred = self._discriminator(output, training=False)
             y_true = self._discriminator(target, training=False)

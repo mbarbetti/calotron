@@ -9,8 +9,8 @@ class Discriminator(tf.keras.Model):
         output_units,
         output_activation=None,
         latent_dim=64,
-        hidden_layers=5,
-        hidden_units=128,
+        deepsets_num_layers=5,
+        deepsets_hidden_units=128,
         dropout_rate=0.1,
         name=None,
         dtype=None,
@@ -30,15 +30,15 @@ class Discriminator(tf.keras.Model):
         assert latent_dim >= 1
         self._latent_dim = int(latent_dim)
 
-        # Number of hidden layers
-        assert isinstance(hidden_layers, (int, float))
-        assert hidden_layers >= 1
-        self._hidden_layers = int(hidden_layers)
+        # Number of layers for DeepSets
+        assert isinstance(deepsets_num_layers, (int, float))
+        assert deepsets_num_layers >= 1
+        self._deepsets_num_layers = int(deepsets_num_layers)
 
-        # Number of hidden units
-        assert isinstance(hidden_units, (int, float))
-        assert hidden_units >= 1
-        self._hidden_units = int(hidden_units)
+        # Number of hidden units for DeepSets
+        assert isinstance(deepsets_hidden_units, (int, float))
+        assert deepsets_hidden_units >= 1
+        self._deepsets_hidden_units = int(deepsets_hidden_units)
 
         # Dropout rate
         assert isinstance(dropout_rate, (int, float))
@@ -48,47 +48,37 @@ class Discriminator(tf.keras.Model):
         # Deep Sets
         self._deep_sets = DeepSets(
             latent_dim=self._latent_dim,
-            num_layers=self._hidden_layers,
-            hidden_units=self._hidden_units,
+            num_layers=self._deepsets_num_layers,
+            hidden_units=self._deepsets_hidden_units,
             dropout_rate=self._dropout_rate,
+            name="d_deepsets",
             dtype=self.dtype,
         )
 
-        # Layers
-        self._seq = [
-            tf.keras.layers.Dense(
-                self._latent_dim, activation="relu", dtype=self.dtype
-            ),
-            tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype),
-            tf.keras.layers.Dense(
-                self._latent_dim, activation="relu", dtype=self.dtype
-            ),
-            tf.keras.layers.Dropout(self._dropout_rate, dtype=self.dtype),
-        ]
+        # Latent layers
+        self._seq = list()
+        for _ in range(2):
+            self._seq.append(
+                tf.keras.layers.Dense(
+                    self._latent_dim, activation="relu", name="d_dense", dtype=self.dtype
+                )
+            )
+            self._seq.append(
+                tf.keras.layers.Dropout(self._dropout_rate, name="d_dropout", dtype=self.dtype)
+            )
 
         # Output layer
         self._seq += [
             tf.keras.layers.Dense(
                 self._output_units,
                 activation=self._output_activation,
-                name="output_layer",
+                name="d_output_layer",
                 dtype=self.dtype,
             )
         ]
 
     def call(self, x) -> tf.Tensor:
-        batch_size = tf.shape(x)[0]
-        length = tf.shape(x)[1]
-        depth = tf.shape(x)[2]
-
-        # Pairwise arrangement
-        x_1 = tf.tile(x[:, :, None, :], (1, 1, tf.shape(x)[1], 1))
-        x_2 = tf.tile(x[:, None, :, :], (1, tf.shape(x)[1], 1, 1))
-        output = tf.concat([x_1, x_2], axis=-1)
-        output = tf.reshape(output, (batch_size, length**2, 2 * depth))
-
-        # DeepSets evaluation
-        output = self._deep_sets(output)
+        output = self._deep_sets(x)
         for layer in self._seq:
             output = layer(output)
         return output
@@ -106,12 +96,12 @@ class Discriminator(tf.keras.Model):
         return self._latent_dim
 
     @property
-    def hidden_layers(self) -> int:
-        return self._hidden_layers
+    def deepsets_num_layers(self) -> int:
+        return self._deepsets_num_layers
 
     @property
-    def hidden_units(self) -> int:
-        return self._hidden_units
+    def deepsets_hidden_units(self) -> int:
+        return self._deepsets_hidden_units
 
     @property
     def dropout_rate(self) -> float:

@@ -7,8 +7,8 @@ from calotron.models import Transformer
 CHUNK_SIZE = int(1e4)
 BATCH_SIZE = 100
 
-source = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
-target = tf.random.normal(shape=(CHUNK_SIZE, 32, 9))
+source = tf.random.normal(shape=(CHUNK_SIZE, 32, 5))
+target = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
 
 model = Transformer(
     output_depth=target.shape[2],

@@ -8,8 +8,8 @@ BATCH_SIZE = 500
 ADDITIONAL_DIM = 2
 
 
-source = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
-target = tf.random.normal(shape=(CHUNK_SIZE, 32, 9))
+source = tf.random.normal(shape=(CHUNK_SIZE, 32, 5))
+target = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
 
 
 @pytest.fixture

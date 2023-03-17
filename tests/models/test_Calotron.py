@@ -4,8 +4,8 @@ from tensorflow.keras.optimizers import Optimizer, RMSprop
 
 CHUNK_SIZE = int(1e4)
 
-source = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
-target = tf.random.normal(shape=(CHUNK_SIZE, 32, 9))
+source = tf.random.normal(shape=(CHUNK_SIZE, 32, 5))
+target = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
 
 
 @pytest.fixture
@@ -33,8 +33,8 @@ def model():
         latent_dim=8,
         output_units=1,
         output_activation="sigmoid",
-        hidden_layers=2,
-        hidden_units=32,
+        deepsets_num_layers=2,
+        deepsets_hidden_units=32,
         dropout_rate=0.1,
     )
 
@@ -70,9 +70,9 @@ def test_model_use(model):
 
 @pytest.mark.parametrize("metrics", [["bce"], None])
 def test_model_compilation(model, metrics):
-    from calotron.losses import RefinedMeanSquaredError
+    from calotron.losses import GlobalEventReco
 
-    loss = RefinedMeanSquaredError(alpha=0.1)
+    loss = GlobalEventReco(alpha=0.1)
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     model.compile(
@@ -97,9 +97,9 @@ def test_model_train(model):
         .cache()
         .prefetch(tf.data.AUTOTUNE)
     )
-    from calotron.losses import RefinedMeanSquaredError
+    from calotron.losses import GlobalEventReco
 
-    loss = RefinedMeanSquaredError(alpha=0.1)
+    loss = GlobalEventReco(alpha=0.1)
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     model.compile(
@@ -114,9 +114,9 @@ def test_model_train(model):
 
 
 def test_model_eval(model):
-    from calotron.losses import RefinedMeanSquaredError
+    from calotron.losses import GlobalEventReco
 
-    loss = RefinedMeanSquaredError(alpha=0.1)
+    loss = GlobalEventReco(alpha=0.1)
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     model.compile(

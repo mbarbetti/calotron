@@ -3,8 +3,8 @@ import tensorflow as tf
 
 CHUNK_SIZE = int(5e4)
 
-input1 = tf.random.normal(shape=(CHUNK_SIZE, 4, 10), mean=1.0)
-input2 = tf.random.normal(shape=(CHUNK_SIZE, 4, 10), mean=2.0)
+input1 = tf.random.normal(shape=(CHUNK_SIZE, 4, 3), mean=1.0)
+input2 = tf.random.normal(shape=(CHUNK_SIZE, 4, 3), mean=2.0)
 inputs = tf.concat([input1, input2], axis=0)
 
 label1 = tf.zeros(shape=(CHUNK_SIZE,))
@@ -20,8 +20,8 @@ def model():
         output_units=1,
         output_activation="sigmoid",
         latent_dim=8,
-        hidden_layers=2,
-        hidden_units=32,
+        deepsets_num_layers=2,
+        deepsets_hidden_units=32,
         dropout_rate=0.1,
     )
     return disc
@@ -36,8 +36,8 @@ def test_model_configuration(model):
     assert isinstance(model, Discriminator)
     assert isinstance(model.output_units, int)
     assert isinstance(model.latent_dim, int)
-    assert isinstance(model.hidden_layers, int)
-    assert isinstance(model.hidden_units, int)
+    assert isinstance(model.deepsets_num_layers, int)
+    assert isinstance(model.deepsets_hidden_units, int)
     assert isinstance(model.dropout_rate, float)
 
 
@@ -49,8 +49,8 @@ def test_model_use(activation):
         output_units=1,
         output_activation=activation,
         latent_dim=8,
-        hidden_layers=2,
-        hidden_units=32,
+        deepsets_num_layers=2,
+        deepsets_hidden_units=32,
         dropout_rate=0.1,
     )
     output = model(inputs)
