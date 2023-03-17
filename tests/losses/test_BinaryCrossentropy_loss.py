@@ -5,9 +5,9 @@ import tensorflow as tf
 FROM_MEAN_TO_SUM = 2
 CHUNK_SIZE = int(1e4)
 
-source_true = np.random.uniform(1.0, 0.5, size=(CHUNK_SIZE, 4))
-target_true = np.random.uniform(0.4, 0.5, size=(CHUNK_SIZE, 8))
-target_pred = np.random.uniform(0.2, 0.5, size=(CHUNK_SIZE, 8))
+source_true = np.random.uniform(1.0, 0.5, size=(CHUNK_SIZE, 8, 2))
+target_true = np.random.uniform(0.4, 0.5, size=(CHUNK_SIZE, 4, 2))
+target_pred = np.random.uniform(0.2, 0.5, size=(CHUNK_SIZE, 4, 2))
 
 model = tf.keras.Sequential(
     [
@@ -22,7 +22,9 @@ def loss():
     from calotron.losses import BinaryCrossentropy
 
     loss_ = BinaryCrossentropy(
-        discriminator_from_logits=False, discriminator_label_smoothing=0.0
+        noise_stddev=0.05,
+        from_logits=False,
+        label_smoothing=0.0
     )
     return loss_
 
@@ -34,18 +36,22 @@ def test_loss_configuration(loss):
     from calotron.losses import BinaryCrossentropy
 
     assert isinstance(loss, BinaryCrossentropy)
+    assert isinstance(loss.noise_stddev, float)
+    assert isinstance(loss.from_logits, bool)
+    assert isinstance(loss.label_smoothing, float)
     assert isinstance(loss.name, str)
 
 
-@pytest.mark.parametrize("discriminator_from_logits", [False, True])
-def test_loss_use_no_weights(discriminator_from_logits):
+@pytest.mark.parametrize("from_logits", [False, True])
+def test_loss_use_no_weights(from_logits):
     from calotron.losses import BinaryCrossentropy
 
     loss = BinaryCrossentropy(
-        discriminator_from_logits=discriminator_from_logits,
-        discriminator_label_smoothing=0.0,
+        noise_stddev=0.05,
+        from_logits=from_logits,
+        label_smoothing=0.0,
     )
-    if discriminator_from_logits:
+    if from_logits:
         model.add(tf.keras.layers.Dense(1, activation="tanh"))
     else:
         model.add(tf.keras.layers.Dense(1, activation="sigmoid"))
@@ -66,16 +72,17 @@ def test_loss_use_no_weights(discriminator_from_logits):
     assert out1.numpy() * FROM_MEAN_TO_SUM > out2.numpy()
 
 
-@pytest.mark.parametrize("discriminator_from_logits", [False, True])
-def test_loss_use_with_weights(discriminator_from_logits):
-    w = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE, 1)) > 0.5
+@pytest.mark.parametrize("from_logits", [False, True])
+def test_loss_use_with_weights(from_logits):
+    w = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE, 1))
     from calotron.losses import BinaryCrossentropy
 
     loss = BinaryCrossentropy(
-        discriminator_from_logits=discriminator_from_logits,
-        discriminator_label_smoothing=0.0,
+        noise_stddev=0.05,
+        from_logits=from_logits,
+        label_smoothing=0.0,
     )
-    if discriminator_from_logits:
+    if from_logits:
         model.add(tf.keras.layers.Dense(1, activation="tanh"))
     else:
         model.add(tf.keras.layers.Dense(1, activation="sigmoid"))

@@ -8,7 +8,6 @@ class BaseLoss:
                 f"`name` should be a string " f"instead {type(name)} passed"
             )
         self._name = name
-        self._loss = None
 
     def discriminator_loss(
         self,

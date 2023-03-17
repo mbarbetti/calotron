@@ -4,9 +4,9 @@ import tensorflow as tf
 
 CHUNK_SIZE = int(1e4)
 
-source_true = np.random.uniform(1.0, 0.5, size=(CHUNK_SIZE, 4))
-target_true = np.random.uniform(0.4, 0.5, size=(CHUNK_SIZE, 8))
-target_pred = np.random.uniform(0.2, 0.5, size=(CHUNK_SIZE, 8))
+source_true = np.random.uniform(1.0, 0.5, size=(CHUNK_SIZE, 8, 2))
+target_true = np.random.uniform(0.4, 0.5, size=(CHUNK_SIZE, 4, 2))
+target_pred = np.random.uniform(0.2, 0.5, size=(CHUNK_SIZE, 4, 2))
 
 model = tf.keras.Sequential(
     [
