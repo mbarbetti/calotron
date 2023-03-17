@@ -6,11 +6,7 @@ from calotron.losses.BaseLoss import BaseLoss
 
 class BinaryCrossentropy(BaseLoss):
     def __init__(
-        self,
-        noise_stddev=0.05,
-        from_logits=False,
-        label_smoothing=0.0,
-        name="bce_loss",
+        self, noise_stddev=0.05, from_logits=False, label_smoothing=0.0, name="bce_loss"
     ) -> None:
         super().__init__(name)
 
@@ -80,20 +76,18 @@ class BinaryCrossentropy(BaseLoss):
             tf.shape(target_pred), stddev=self._noise_stddev, dtype=target_pred.dtype
         )
         y_pred = discriminator(target_pred + rnd_pred, training=discriminator_training)
-        adv_loss = self._loss(
-            tf.ones_like(y_pred), y_pred, sample_weight=sample_weight
-        )
+        adv_loss = self._loss(tf.ones_like(y_pred), y_pred, sample_weight=sample_weight)
         adv_loss = tf.cast(adv_loss, dtype=target_pred.dtype)
         return adv_loss
-    
+
     @property
     def noise_stddev(self) -> float:
         return self._noise_stddev
-    
+
     @property
     def from_logits(self) -> bool:
         return self._from_logits
-    
+
     @property
     def label_smoothing(self) -> float:
         return self._label_smoothing

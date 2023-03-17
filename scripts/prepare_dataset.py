@@ -1,14 +1,14 @@
 from argparse import ArgumentParser
-from time import time
 from glob import glob
+from time import time
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import uproot
 import yaml
-from sklearn.utils import shuffle
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
+from sklearn.utils import shuffle
 from tqdm import tqdm
 
 MAX_INPUT_PHOTONS = 128
@@ -67,12 +67,8 @@ cluster_list = list()
 
 for fname in data_fnames:
     with uproot.open(fname) as file:
-        photon_list.append(
-            file["CaloTupler/calo_true"].arrays(library="pd")
-        )
-        cluster_list.append(
-            file["CaloTupler/neutral_protos"].arrays(library="pd")
-        )
+        photon_list.append(file["CaloTupler/calo_true"].arrays(library="pd"))
+        cluster_list.append(file["CaloTupler/neutral_protos"].arrays(library="pd"))
 
 print(f"[INFO] Data correctly loaded in {time()-start:.2f} s")
 
@@ -82,7 +78,9 @@ print(f"[INFO] DataFrame of {len(photon_df)} generated photons correctly created
 
 cluster_df = pd.concat(cluster_list, ignore_index=True).dropna()
 cluster_df = shuffle(cluster_df).reset_index(drop=True)[:chunk_size]
-print(f"[INFO] DataFrame of {len(cluster_df)} reconstructed calo-clusters correctly created")
+print(
+    f"[INFO] DataFrame of {len(cluster_df)} reconstructed calo-clusters correctly created"
+)
 
 # +----------------------+
 # |   Photon DataFrame   |

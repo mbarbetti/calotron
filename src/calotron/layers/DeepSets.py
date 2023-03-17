@@ -38,14 +38,24 @@ class DeepSets(tf.keras.layers.Layer):
         for _ in range(self._num_layers - 1):
             self._seq.append(
                 tf.keras.layers.Dense(
-                    self._hidden_units, activation="relu", name="ds_dense", dtype=self.dtype
+                    self._hidden_units,
+                    activation="relu",
+                    name="ds_dense",
+                    dtype=self.dtype,
                 )
             )
             self._seq.append(
-                tf.keras.layers.Dropout(self._dropout_rate, name="ds_dropout", dtype=self.dtype)
+                tf.keras.layers.Dropout(
+                    self._dropout_rate, name="ds_dropout", dtype=self.dtype
+                )
             )
         self._seq += [
-            tf.keras.layers.Dense(self._latent_dim, activation="relu", name="ds_output_layer", dtype=self.dtype)
+            tf.keras.layers.Dense(
+                self._latent_dim,
+                activation="relu",
+                name="ds_output_layer",
+                dtype=self.dtype,
+            )
         ]
 
     def call(self, x) -> tf.Tensor:

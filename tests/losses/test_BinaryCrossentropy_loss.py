@@ -22,9 +22,7 @@ def loss():
     from calotron.losses import BinaryCrossentropy
 
     loss_ = BinaryCrossentropy(
-        noise_stddev=0.05,
-        from_logits=False,
-        label_smoothing=0.0
+        noise_stddev=0.05, from_logits=False, label_smoothing=0.0
     )
     return loss_
 
@@ -47,9 +45,7 @@ def test_loss_use_no_weights(from_logits):
     from calotron.losses import BinaryCrossentropy
 
     loss = BinaryCrossentropy(
-        noise_stddev=0.05,
-        from_logits=from_logits,
-        label_smoothing=0.0,
+        noise_stddev=0.05, from_logits=from_logits, label_smoothing=0.0
     )
     if from_logits:
         model.add(tf.keras.layers.Dense(1, activation="tanh"))
@@ -78,9 +74,7 @@ def test_loss_use_with_weights(from_logits):
     from calotron.losses import BinaryCrossentropy
 
     loss = BinaryCrossentropy(
-        noise_stddev=0.05,
-        from_logits=from_logits,
-        label_smoothing=0.0,
+        noise_stddev=0.05, from_logits=from_logits, label_smoothing=0.0
     )
     if from_logits:
         model.add(tf.keras.layers.Dense(1, activation="tanh"))

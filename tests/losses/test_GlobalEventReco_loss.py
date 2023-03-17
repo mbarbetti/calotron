@@ -23,10 +23,7 @@ def loss():
     from calotron.losses import GlobalEventReco
 
     loss_ = GlobalEventReco(
-        alpha=0.1,
-        noise_stddev=0.05,
-        from_logits=False,
-        label_smoothing=0.0
+        alpha=0.1, noise_stddev=0.05, from_logits=False, label_smoothing=0.0
     )
     return loss_
 

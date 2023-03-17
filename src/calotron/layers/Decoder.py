@@ -190,9 +190,7 @@ class Decoder(tf.keras.layers.Layer):
 
         # Dropout layer
         self._dropout = tf.keras.layers.Dropout(
-            self._dropout_rate, 
-            name="dec_dropout", 
-            dtype=self.dtype,
+            self._dropout_rate, name="dec_dropout", dtype=self.dtype
         )
 
         # Decoder layers
@@ -204,7 +202,7 @@ class Decoder(tf.keras.layers.Layer):
                 fnn_units=self._fnn_units,
                 dropout_rate=self._dropout_rate,
                 residual_smoothing=self._residual_smoothing,
-                name=f"dec_layer_{i}", 
+                name=f"dec_layer_{i}",
                 dtype=self.dtype,
             )
             for i in range(self._num_layers)

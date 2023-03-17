@@ -50,7 +50,7 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
             activation="linear",
             kernel_initializer="glorot_uniform",
             name=f"{prefix}_seq_ord_dense" if name else None,
-            dtype=self.dtype
+            dtype=self.dtype,
         )
 
     def call(self, x) -> tf.Tensor:

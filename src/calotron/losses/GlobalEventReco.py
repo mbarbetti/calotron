@@ -99,19 +99,19 @@ class GlobalEventReco(BaseLoss):
         )
         adv_loss = tf.cast(adv_loss, dtype=target_pred.dtype)
         return mse_loss + self._alpha * adv_loss
-    
+
     @property
     def alpha(self) -> float:
         return self._alpha
-    
+
     @property
     def noise_stddev(self) -> float:
         return self._noise_stddev
-    
+
     @property
     def from_logits(self) -> bool:
         return self._from_logits
-    
+
     @property
     def label_smoothing(self) -> float:
         return self._label_smoothing

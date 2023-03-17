@@ -179,9 +179,7 @@ class Encoder(tf.keras.layers.Layer):
 
         # Dropout layer
         self._dropout = tf.keras.layers.Dropout(
-            self._dropout_rate, 
-            name="enc_dropout", 
-            dtype=self.dtype,
+            self._dropout_rate, name="enc_dropout", dtype=self.dtype
         )
 
         # Encoder layers

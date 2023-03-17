@@ -29,7 +29,7 @@ def loss():
         max_match_distance=0.01,
         noise_stddev=0.05,
         from_logits=False,
-        label_smoothing=0.0
+        label_smoothing=0.0,
     )
     return loss_
 

@@ -60,11 +60,16 @@ class Discriminator(tf.keras.Model):
         for _ in range(2):
             self._seq.append(
                 tf.keras.layers.Dense(
-                    self._latent_dim, activation="relu", name="d_dense", dtype=self.dtype
+                    self._latent_dim,
+                    activation="relu",
+                    name="d_dense",
+                    dtype=self.dtype,
                 )
             )
             self._seq.append(
-                tf.keras.layers.Dropout(self._dropout_rate, name="d_dropout", dtype=self.dtype)
+                tf.keras.layers.Dropout(
+                    self._dropout_rate, name="d_dropout", dtype=self.dtype
+                )
             )
 
         # Output layer

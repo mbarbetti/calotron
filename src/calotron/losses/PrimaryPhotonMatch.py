@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.losses import MeanSquaredError as TF_MSE
 from tensorflow.keras.losses import BinaryCrossentropy as TF_BCE
+from tensorflow.keras.losses import MeanSquaredError as TF_MSE
 
 from calotron.losses.BaseLoss import BaseLoss
 
@@ -142,34 +142,36 @@ class PrimaryPhotonMatch(BaseLoss):
         adv_loss = tf.cast(adv_loss, dtype=target_pred.dtype)
 
         # Global event reco loss
-        reco_loss = self._mse_loss(target_true, target_pred, sample_weight=sample_weight)
+        reco_loss = self._mse_loss(
+            target_true, target_pred, sample_weight=sample_weight
+        )
         reco_loss = tf.cast(reco_loss, dtype=target_true.dtype)
         return match_loss + self._alpha * adv_loss + self._beta * reco_loss
-    
+
     @property
     def alpha(self) -> float:
         return self._alpha
-    
+
     @property
     def beta(self) -> float:
         return self._beta
-    
+
     @property
     def coords_indices(self) -> list:
         return self._coords_indices
-    
+
     @property
     def max_match_distance(self) -> float:
         return self._max_match_distance
-    
+
     @property
     def noise_stddev(self) -> float:
         return self._noise_stddev
-    
+
     @property
     def from_logits(self) -> bool:
         return self._from_logits
-    
+
     @property
     def label_smoothing(self) -> float:
         return self._label_smoothing
