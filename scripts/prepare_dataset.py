@@ -1,10 +1,13 @@
 from argparse import ArgumentParser
 from time import time
+from glob import glob
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import uproot
 import yaml
+from sklearn.utils import shuffle
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
 from tqdm import tqdm
 
@@ -17,7 +20,11 @@ MAX_OUTPUT_CLUSTERS_DEMO = 16
 # |   Parser setup   |
 # +------------------+
 
-parser = ArgumentParser(description="data preparation setup")
+parser = ArgumentParser(description="dataset preparation setup")
+
+parser.add_argument("-f", "--filename", required=True)
+parser.add_argument("-m", "--max_files", default=10)
+parser.add_argument("-c", "--chunk_size", default=-1)
 
 parser.add_argument("--demo", action="store_true")
 parser.add_argument("--no-demo", dest="saving", action="store_false")
@@ -33,70 +40,88 @@ args = parser.parse_args()
 # |   Initial setup   |
 # +-------------------+
 
+if "*" in args.filename:
+    data_fnames = np.array(glob(args.filename))
+else:
+    data_fnames = np.array([args.filename])
+
+max_files = int(args.max_files)
+chunk_size = int(args.chunk_size)
+
+indices = np.random.permutation(len(data_fnames))
+data_fnames = data_fnames[indices][:max_files]
+
 with open("config/directories.yml") as file:
     config_dir = yaml.full_load(file)
 
-data_dir = config_dir["data_dir"]
+export_data_dir = config_dir["data_dir"]
 images_dir = config_dir["images_dir"]
 
-data_fname = f"{data_dir}/LamarrTraining.root"
-
-# +------------------------------+
-# |   Generated photons import   |
-# +------------------------------+
+# +------------------+
+# |   Data loading   |
+# +------------------+
 
 start = time()
-calo_true = uproot.open(data_fname)["CaloTupler/calo_true"].arrays(
-    library="pd"
-)  # pandas DataFrame
-print(
-    f"[INFO] Generated photons DataFrame ({len(calo_true)} "
-    f"rows) correctly loaded in {time()-start:.2f} s"
-)
+photon_list = list()
+cluster_list = list()
 
-calo_true["p"] = np.linalg.norm(calo_true[["px", "py", "pz"]], axis=1)
-calo_true["tx"] = calo_true.px / calo_true.pz
-calo_true["ty"] = calo_true.py / calo_true.pz
+for fname in data_fnames:
+    with uproot.open(fname) as file:
+        photon_list.append(
+            file["CaloTupler/calo_true"].arrays(library="pd")
+        )
+        cluster_list.append(
+            file["CaloTupler/neutral_protos"].arrays(library="pd")
+        )
+
+print(f"[INFO] Data correctly loaded in {time()-start:.2f} s")
+
+photon_df = pd.concat(photon_list, ignore_index=True).dropna()
+photon_df = shuffle(photon_df).reset_index(drop=True)[:chunk_size]
+print(f"[INFO] DataFrame of {len(photon_df)} generated photons correctly created")
+
+cluster_df = pd.concat(cluster_list, ignore_index=True).dropna()
+cluster_df = shuffle(cluster_df).reset_index(drop=True)[:chunk_size]
+print(f"[INFO] DataFrame of {len(cluster_df)} reconstructed calo-clusters correctly created")
+
+# +----------------------+
+# |   Photon DataFrame   |
+# +----------------------+
+
+photon_df["p"] = np.linalg.norm(photon_df[["px", "py", "pz"]], axis=1)
+photon_df["tx"] = photon_df.px / photon_df.pz
+photon_df["ty"] = photon_df.py / photon_df.pz
 
 true_vars = ["ecal_x", "ecal_y", "p", "tx", "ty"]
 if args.verbose:
-    print(calo_true[true_vars].describe())
+    print(photon_df[true_vars].describe())
 
-# +--------------------------------+
-# |   Photons data preprocessing   |
-# +--------------------------------+
+# +---------------------------+
+# |   Photons preprocessing   |
+# +---------------------------+
 
-p_calo_true = calo_true.copy()
+p_photon_df = photon_df.copy()
 
 ECAL_W = 8e3
 ECAL_H = 5e3
 p_scaler = QuantileTransformer()
 
 start = time()
-p_calo_true["ecal_x"] = p_calo_true.ecal_x / ECAL_W * 2
-p_calo_true["ecal_y"] = p_calo_true.ecal_y / ECAL_H * 2
-p_calo_true["p"] = p_scaler.fit_transform(np.c_[np.log(p_calo_true.p)])
+p_photon_df["ecal_x"] = p_photon_df.ecal_x / ECAL_W * 2
+p_photon_df["ecal_y"] = p_photon_df.ecal_y / ECAL_H * 2
+p_photon_df["p"] = p_scaler.fit_transform(
+    np.c_[np.log(np.where(p_photon_df.p != 0.0, p_photon_df.p, 1e-12))]
+)
 print(f"[INFO] Generated photons preprocessing completed in {time()-start:.2f} s")
 
 if args.verbose:
-    print(p_calo_true[true_vars].describe())
+    print(p_photon_df[true_vars].describe())
 
-# +-----------------------------------+
-# |   Reconstructed clusters import   |
-# +-----------------------------------+
+# +-----------------------+
+# |   Cluster DataFrame   |
+# +-----------------------+
 
-start = time()
-neutral_protos = (
-    uproot.open(data_fname)["CaloTupler/neutral_protos"]
-    .arrays(library="pd")  # pandas DataFrame
-    .query("Pi0Merged == 0 and E > 0")
-)
-print(
-    f"[INFO] Reconstructed calo-clusters DataFrame ({len(neutral_protos)} "
-    f"rows) correctly loaded in {time()-start:.2f} s"
-)
-
-neutral_protos["NotPadding"] = 1.0
+cluster_df["NotPadding"] = 1.0
 
 if args.demo:
     reco_vars = ["x", "y", "E"]
@@ -114,31 +139,33 @@ else:
         "IsNotH",
     ]
 if args.verbose:
-    print(neutral_protos[reco_vars].describe())
+    print(cluster_df[reco_vars].describe())
 
-# +---------------------------------+
-# |   Clusters data preprocessing   |
-# +---------------------------------+
+# +----------------------------+
+# |   Clusters preprocessing   |
+# +----------------------------+
 
-p_neutral_protos = neutral_protos.copy()
+p_cluster_df = cluster_df.copy()
 
 e_scaler = QuantileTransformer()
 rec_scaler = StandardScaler()
 
 start = time()
-p_neutral_protos["x"] = p_neutral_protos.x / ECAL_W * 2
-p_neutral_protos["y"] = p_neutral_protos.y / ECAL_H * 2
-p_neutral_protos["E"] = e_scaler.fit_transform(np.c_[np.log(p_neutral_protos.E)])
+p_cluster_df["x"] = p_cluster_df.x / ECAL_W * 2
+p_cluster_df["y"] = p_cluster_df.y / ECAL_H * 2
+p_cluster_df["E"] = e_scaler.fit_transform(
+    np.c_[np.log(np.where(p_cluster_df.E != 0.0, p_cluster_df.E, 1e-12))]
+)
 if not args.demo:
-    p_neutral_protos[reco_vars[7:]] = rec_scaler.fit_transform(
-        neutral_protos[reco_vars[7:]].values
+    p_cluster_df[reco_vars[7:]] = rec_scaler.fit_transform(
+        cluster_df[reco_vars[7:]].values
     )
 print(
     f"[INFO] Reconstructed calo-clusters preprocessing completed in {time()-start:.2f} s"
 )
 
 if args.verbose:
-    print(p_neutral_protos[reco_vars].describe())
+    print(p_cluster_df[reco_vars].describe())
 
 # +--------------------------------+
 # |   Data processing per events   |
@@ -147,17 +174,17 @@ if args.verbose:
 X = list()
 Y = list()
 
-events = np.unique(p_neutral_protos.evtNumber)
+events = np.unique(p_cluster_df.evtNumber)
 
 start = time()
 for iEvent, event in enumerate(events):
     true = (
-        p_calo_true[p_calo_true.evtNumber == event]
+        p_photon_df[p_photon_df.evtNumber == event]
         .query("mcID == 22")  # photons
         .sort_values("p", ascending=False)
     )
-    reco = p_neutral_protos[
-        (p_neutral_protos.evtNumber == event) & (~p_neutral_protos.E.isnull())
+    reco = p_cluster_df[
+        (p_cluster_df.evtNumber == event) & (~p_cluster_df.E.isnull())
     ].sort_values("E", ascending=False)
     X.append(true[true_vars].values)
     Y.append(reco[reco_vars].values)
@@ -311,6 +338,7 @@ plt.close()
 # |   Training data export   |
 # +--------------------------+
 
-data_fname = "train-data-demo" if args.demo else "train-data"
-np.savez(f"{data_dir}/{data_fname}.npz", photon=pad_X, cluster=pad_Y)
-print(f"[INFO] Training data correctly saved to {data_fname}")
+export_data_fname = "calo-train-data-demo" if args.demo else "calo-train-data"
+npz_fname = f"{export_data_dir}/{export_data_fname}.npz"
+np.savez(npz_fname, photon=pad_X, cluster=pad_Y)
+print(f"[INFO] Training data of {len(pad_X)} instances correctly saved to {npz_fname}")
