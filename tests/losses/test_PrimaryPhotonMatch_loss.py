@@ -6,9 +6,9 @@ FROM_MEAN_TO_SUM = 2
 ALPHA_TO_INF = 1e4
 CHUNK_SIZE = int(1e4)
 
-source_true = np.random.uniform(1.0, 0.5, size=(CHUNK_SIZE, 8, 2))
-target_true = np.random.uniform(0.4, 0.5, size=(CHUNK_SIZE, 4, 2))
-target_pred = np.random.uniform(0.2, 0.5, size=(CHUNK_SIZE, 4, 2))
+source_true = np.random.uniform(1.0, 0.5, size=(CHUNK_SIZE, 8, 5))
+target_true = np.random.uniform(0.4, 0.5, size=(CHUNK_SIZE, 4, 3))
+target_pred = np.random.uniform(0.2, 0.5, size=(CHUNK_SIZE, 4, 3))
 
 model = tf.keras.Sequential(
     [
@@ -25,7 +25,6 @@ def loss():
     loss_ = PrimaryPhotonMatch(
         alpha=0.1,
         beta=0.0,
-        coords_indices=[0, 1],
         max_match_distance=0.01,
         noise_stddev=0.05,
         from_logits=False,
@@ -42,6 +41,8 @@ def test_loss_configuration(loss):
 
     assert isinstance(loss, PrimaryPhotonMatch)
     assert isinstance(loss.alpha, float)
+    assert isinstance(loss.beta, float)
+    assert isinstance(loss.max_match_distance, float)
     assert isinstance(loss.noise_stddev, float)
     assert isinstance(loss.from_logits, bool)
     assert isinstance(loss.label_smoothing, float)
@@ -55,7 +56,6 @@ def test_loss_use_no_weights(from_logits):
     loss = PrimaryPhotonMatch(
         alpha=ALPHA_TO_INF,
         beta=0.0,
-        coords_indices=[0, 1],
         max_match_distance=0.01,
         noise_stddev=0.05,
         from_logits=from_logits,
@@ -90,7 +90,6 @@ def test_loss_use_with_weights(from_logits):
     loss = PrimaryPhotonMatch(
         alpha=ALPHA_TO_INF,
         beta=0.0,
-        coords_indices=[0, 1],
         max_match_distance=0.01,
         noise_stddev=0.05,
         from_logits=from_logits,

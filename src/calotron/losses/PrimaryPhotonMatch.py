@@ -11,7 +11,6 @@ class PrimaryPhotonMatch(BaseLoss):
         self,
         alpha=0.1,
         beta=0.0,
-        coords_indices=[0, 1],
         max_match_distance=0.01,
         noise_stddev=0.05,
         from_logits=False,
@@ -29,15 +28,6 @@ class PrimaryPhotonMatch(BaseLoss):
         assert isinstance(beta, (int, float))
         assert beta >= 0.0
         self._beta = float(beta)
-
-        # Coordinates indices
-        assert isinstance(coords_indices, (list, tuple, np.ndarray))
-        assert len(np.unique(coords_indices)) == 2
-        assert len(coords_indices) == 2
-        self._coords_indices = list()
-        for idx in coords_indices:
-            assert isinstance(idx, (int, float))
-            self._coords_indices.append(int(idx))
 
         # Max distance for photon-cluster matching
         assert isinstance(max_match_distance, (int, float))
@@ -109,13 +99,11 @@ class PrimaryPhotonMatch(BaseLoss):
         discriminator_training=False,
     ) -> tf.Tensor:
         # Photon-cluster matching weights
-        source_coords = tf.gather(source_true, indices=self._coords_indices, axis=2)
         source_coords = tf.tile(
-            source_coords[:, None, :, :], (1, tf.shape(target_true)[1], 1, 1)
+            source_true[:, None, :, :2], (1, tf.shape(target_true)[1], 1, 1)
         )
-        target_coords = tf.gather(target_true, indices=self._coords_indices, axis=2)
         target_coords = tf.tile(
-            target_coords[:, :, None, :], (1, 1, tf.shape(source_true)[1], 1)
+            target_true[:, :, None, :2], (1, 1, tf.shape(source_true)[1], 1)
         )
         pairwise_distance = tf.norm(
             target_coords - source_coords, ord="euclidean", axis=-1
@@ -143,7 +131,7 @@ class PrimaryPhotonMatch(BaseLoss):
 
         # Global event reco loss
         reco_loss = self._mse_loss(
-            target_true, target_pred, sample_weight=sample_weight
+            target_true[:, :, 2:], target_pred[:, :, 2:], sample_weight=sample_weight
         )
         reco_loss = tf.cast(reco_loss, dtype=target_true.dtype)
         return match_loss + self._alpha * adv_loss + self._beta * reco_loss
@@ -155,10 +143,6 @@ class PrimaryPhotonMatch(BaseLoss):
     @property
     def beta(self) -> float:
         return self._beta
-
-    @property
-    def coords_indices(self) -> list:
-        return self._coords_indices
 
     @property
     def max_match_distance(self) -> float:
