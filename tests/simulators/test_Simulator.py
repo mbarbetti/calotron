@@ -7,8 +7,8 @@ from calotron.models import Transformer
 CHUNK_SIZE = int(1e4)
 BATCH_SIZE = 100
 
-source = tf.random.normal(shape=(CHUNK_SIZE, 32, 5))
-target = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
+source = tf.random.normal(shape=(CHUNK_SIZE, 8, 3))
+target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
 
 model = Transformer(
     output_depth=target.shape[2],
@@ -24,11 +24,11 @@ model = Transformer(
     seq_ord_normalizations=10_000,
     residual_smoothing=True,
     output_activations="relu",
-    start_token_initializer="zeros",
+    start_token_initializer="ones",
 )
 
 start_token_tf = model.get_start_token(target[:BATCH_SIZE])
-start_token_np = np.zeros(target.shape[2])
+start_token_np = np.array([0, 0, 1])
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def test_simulator_configuration(simulator):
 
     assert isinstance(simulator, Simulator)
     assert isinstance(simulator.transformer, Transformer)
-    assert isinstance(simulator.start_token, tf.Tensor)
+    assert isinstance(simulator.start_token, np.ndarray)
 
 
 @pytest.mark.parametrize("start_token", [start_token_tf, start_token_np])

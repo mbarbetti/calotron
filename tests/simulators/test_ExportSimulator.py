@@ -13,8 +13,11 @@ BATCH_SIZE = 100
 here = os.path.dirname(__file__)
 export_dir = f"{here}/tmp/simulator"
 
-source = tf.random.normal(shape=(CHUNK_SIZE, 32, 5))
-target = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
+source = tf.random.normal(shape=(CHUNK_SIZE, 8, 3))
+target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
+dataset = tf.data.Dataset.from_tensor_slices(source[:BATCH_SIZE]).batch(
+    10, drop_remainder=True
+)
 
 model = Transformer(
     output_depth=target.shape[2],
@@ -30,12 +33,10 @@ model = Transformer(
     seq_ord_normalizations=10_000,
     residual_smoothing=True,
     output_activations="relu",
-    start_token_initializer="zeros",
+    start_token_initializer="ones",
 )
 
-simulator = Simulator(
-    transformer=model, start_token=model.get_start_token(target[:BATCH_SIZE])
-)
+simulator = Simulator(transformer=model, start_token=[0, 0, 1])
 
 
 @pytest.fixture
@@ -58,12 +59,12 @@ def test_export_simulator_configuration(export_simulator):
 
 
 def test_export_use(export_simulator):
-    output = export_simulator(source=source[:BATCH_SIZE])
+    output = export_simulator(dataset)
     test_shape = list(target.shape)
     test_shape[0] = BATCH_SIZE
     assert output.shape == tuple(test_shape)
     tf.saved_model.save(export_simulator, export_dir=export_dir)
     reloaded = tf.saved_model.load(export_dir)
-    output_reloaded = reloaded(source=source[:BATCH_SIZE])
+    output_reloaded = reloaded(dataset)
     comparison = output.numpy() == output_reloaded.numpy()
     assert comparison.all()
