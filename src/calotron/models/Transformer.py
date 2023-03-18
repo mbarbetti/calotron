@@ -22,7 +22,7 @@ class Transformer(tf.keras.Model):
         seq_ord_normalizations=10_000,
         residual_smoothing=True,
         output_activations=None,
-        start_token_initializer="zeros",
+        start_token_initializer="ones",
         name=None,
         dtype=None,
     ) -> None:
@@ -230,7 +230,9 @@ class Transformer(tf.keras.Model):
         if self._start_token_initializer == "zeros":
             start_token = tf.zeros((tf.shape(target)[0], 1, tf.shape(target)[2]))
         elif self._start_token_initializer == "ones":
-            start_token = tf.ones((tf.shape(target)[0], 1, tf.shape(target)[2]))
+            zeros = tf.ones((tf.shape(target)[0], 1, 2))
+            ones = tf.ones((tf.shape(target)[0], 1, tf.shape(target)[2] - 2))
+            start_token = tf.concat([zeros, ones], axis=-1)
         elif self._start_token_initializer == "means":
             start_token = tf.reduce_mean(target, axis=(0, 1))[None, None, :]
             start_token = tf.tile(start_token, (tf.shape(target)[0], 1, 1))
@@ -240,7 +242,9 @@ class Transformer(tf.keras.Model):
         if self._start_token_initializer == "zeros":
             start_token = tf.zeros((tf.shape(target)[0], tf.shape(target)[2]))
         elif self._start_token_initializer == "ones":
-            start_token = tf.ones((tf.shape(target)[0], tf.shape(target)[2]))
+            zeros = tf.ones((tf.shape(target)[0], 2))
+            ones = tf.ones((tf.shape(target)[0], tf.shape(target)[2] - 2))
+            start_token = tf.concat([zeros, ones], axis=-1)
         elif self._start_token_initializer == "means":
             start_token = tf.reduce_mean(target, axis=(0, 1))[None, :]
             start_token = tf.tile(start_token, (tf.shape(target)[0], 1))

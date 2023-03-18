@@ -26,7 +26,7 @@ def model():
         seq_ord_normalizations=10_000,
         residual_smoothing=True,
         output_activations="relu",
-        start_token_initializer="zeros",
+        start_token_initializer="ones",
     )
 
     disc = Discriminator(

@@ -30,7 +30,7 @@ def model():
         seq_ord_normalizations=10_000,
         residual_smoothing=True,
         output_activations="relu",
-        start_token_initializer="zeros",
+        start_token_initializer="ones",
     )
     return trans
 
@@ -56,7 +56,7 @@ def test_model_configuration(output_activations):
         seq_ord_normalizations=10_000,
         residual_smoothing=True,
         output_activations=output_activations,
-        start_token_initializer="zeros",
+        start_token_initializer="ones",
     )
     assert isinstance(model, Transformer)
     assert isinstance(model.output_depth, int)
