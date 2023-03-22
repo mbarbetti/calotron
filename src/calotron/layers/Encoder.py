@@ -65,6 +65,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         self._ff_net = FeedForward(
             output_units=self._output_depth,
             hidden_units=self._fnn_units,
+            dropout_rate=self._dropout_rate,
             residual_smoothing=self._residual_smoothing,
             name=f"{prefix}_fnn_{suffix}" if name else None,
             dtype=self.dtype,
@@ -172,7 +173,6 @@ class Encoder(tf.keras.layers.Layer):
             latent_dim=self._seq_ord_latent_dim,
             max_length=self._seq_ord_max_length,
             normalization=self._seq_ord_normalization,
-            dropout_rate=self._dropout_rate,
             name="enc_seq_ord_embedding",
             dtype=self.dtype,
         )

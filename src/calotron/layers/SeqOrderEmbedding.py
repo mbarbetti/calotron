@@ -4,13 +4,7 @@ import tensorflow as tf
 
 class SeqOrderEmbedding(tf.keras.layers.Layer):
     def __init__(
-        self,
-        latent_dim=16,
-        max_length=512,
-        normalization=10_000,
-        dropout_rate=0.1,
-        name=None,
-        dtype=None,
+        self, latent_dim=16, max_length=512, normalization=10_000, name=None, dtype=None
     ) -> None:
         super().__init__(name=name, dtype=dtype)
         if name is not None:
@@ -30,11 +24,6 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
         assert isinstance(normalization, (int, float))
         assert normalization > 0.0
         self._normalization = float(normalization)
-
-        # Dropout rate
-        assert isinstance(dropout_rate, (int, float))
-        assert dropout_rate >= 0.0 and dropout_rate < 1.0
-        self._dropout_rate = float(dropout_rate)
 
         # Sequence order encoding
         self._seq_ord_encoding = self._seq_order_encoding(
@@ -87,7 +76,3 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
     @property
     def normalization(self) -> float:
         return self._normalization
-
-    @property
-    def dropout_rate(self) -> float:
-        return self._dropout_rate
