@@ -230,7 +230,7 @@ class Transformer(tf.keras.Model):
         if self._start_token_initializer == "zeros":
             start_token = tf.zeros((tf.shape(target)[0], 1, tf.shape(target)[2]))
         elif self._start_token_initializer == "ones":
-            zeros = tf.ones((tf.shape(target)[0], 1, 2))
+            zeros = tf.zeros((tf.shape(target)[0], 1, 2))
             ones = tf.ones((tf.shape(target)[0], 1, tf.shape(target)[2] - 2))
             start_token = tf.concat([zeros, ones], axis=-1)
         elif self._start_token_initializer == "means":
@@ -242,7 +242,7 @@ class Transformer(tf.keras.Model):
         if self._start_token_initializer == "zeros":
             start_token = tf.zeros((tf.shape(target)[0], tf.shape(target)[2]))
         elif self._start_token_initializer == "ones":
-            zeros = tf.ones((tf.shape(target)[0], 2))
+            zeros = tf.zeros((tf.shape(target)[0], 2))
             ones = tf.ones((tf.shape(target)[0], tf.shape(target)[2] - 2))
             start_token = tf.concat([zeros, ones], axis=-1)
         elif self._start_token_initializer == "means":
