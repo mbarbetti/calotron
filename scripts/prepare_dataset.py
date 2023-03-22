@@ -8,13 +8,14 @@ import numpy as np
 import pandas as pd
 import uproot
 import yaml
-from sklearn.preprocessing import QuantileTransformer, StandardScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.utils import shuffle
 from tqdm import tqdm
 
 ECAL_W = 8000
 ECAL_H = 6500
-DEFAULT_ENERGY = -4
+ENERGY_MIN = 1.0
+PADDING_VALUE = 0.0
 MAX_INPUT_PHOTONS = 128
 MAX_OUTPUT_CLUSTERS = 64
 MAX_INPUT_PHOTONS_DEMO = 32
@@ -92,10 +93,11 @@ print(
 # +----------------------+
 
 photon_df["p"] = np.linalg.norm(photon_df[["px", "py", "pz"]], axis=1)
+photon_df["log_p"] = np.log(np.maximum(photon_df.p, ENERGY_MIN))
 photon_df["tx"] = photon_df.px / photon_df.pz
 photon_df["ty"] = photon_df.py / photon_df.pz
 
-true_vars = ["ecal_x", "ecal_y", "p", "tx", "ty"]
+true_vars = ["ecal_x", "ecal_y", "log_p", "tx", "ty"]
 
 if args.verbose:
     print(photon_df[true_vars].describe())
@@ -106,14 +108,12 @@ if args.verbose:
 
 p_photon_df = photon_df.copy()
 
-p_scaler = QuantileTransformer(output_distribution="normal")
+p_scaler = MinMaxScaler()
 
 start = time()
 p_photon_df["ecal_x"] = p_photon_df.ecal_x / ECAL_W * 2
 p_photon_df["ecal_y"] = p_photon_df.ecal_y / ECAL_H * 2
-p_photon_df["p"] = p_scaler.fit_transform(
-    np.c_[np.log(np.maximum(p_photon_df.p, 1e-8))]
-)
+p_photon_df["log_p"] = p_scaler.fit_transform(np.c_[p_photon_df.log_p])
 print(f"[INFO] Generated photons preprocessing completed in {time()-start:.2f} s")
 
 if args.verbose:
@@ -123,23 +123,15 @@ if args.verbose:
 # |   Cluster DataFrame   |
 # +-----------------------+
 
+cluster_df["log_E"] = np.log(np.maximum(cluster_df.E, ENERGY_MIN))
 cluster_df["NotPadding"] = 1.0
 
-if args.demo:
-    reco_vars = ["x", "y", "E"]
-else:
-    reco_vars = [
-        "x",
-        "y",
-        "E",
-        "PhotonFromMergedPi0",
-        "Pi0Merged",
-        "Photon",
-        "NotPadding",
-        "PhotonID",
-        "IsNotE",
-        "IsNotH",
-    ]
+reco_vars = ["x", "y", "log_E"]
+
+if not args.demo:
+    bool_vars = ["PhotonFromMergedPi0", "Pi0Merged", "Photon", "NotPadding"]
+    pid_vars = ["PhotonID", "IsNotE", "IsNotH"]
+    reco_vars += bool_vars + pid_vars
 
 if args.verbose:
     print(cluster_df[reco_vars].describe())
@@ -150,19 +142,15 @@ if args.verbose:
 
 p_cluster_df = cluster_df.copy()
 
-e_scaler = QuantileTransformer(output_distribution="normal")
-rec_scaler = StandardScaler()
+e_scaler = MinMaxScaler()
+pid_scaler = StandardScaler()
 
 start = time()
 p_cluster_df["x"] = p_cluster_df.x / ECAL_W * 2
 p_cluster_df["y"] = p_cluster_df.y / ECAL_H * 2
-p_cluster_df["E"] = e_scaler.fit_transform(
-    np.c_[np.log(np.maximum(p_cluster_df.E, 1e-8))]
-)
+p_cluster_df["log_E"] = e_scaler.fit_transform(np.c_[p_cluster_df.log_E])
 if not args.demo:
-    p_cluster_df[reco_vars[-3:]] = rec_scaler.fit_transform(
-        cluster_df[reco_vars[-3:]].values
-    )
+    p_cluster_df[pid_vars] = pid_scaler.fit_transform(cluster_df[pid_vars].values)
 print(
     f"[INFO] Reconstructed calo-clusters preprocessing completed in {time()-start:.2f} s"
 )
@@ -178,23 +166,19 @@ true_photons = list()
 reco_clusters = list()
 
 events = np.unique(p_cluster_df.evtNumber)
+nEvents = len(events)
 
-start = time()
-for iEvent, event in enumerate(events):
+for iEvent, event in tqdm(enumerate(events), total=nEvents, desc="Processing events"):
     true = (
         p_photon_df[p_photon_df.evtNumber == event]
         .query("mcID == 22")  # photons
         .sort_values("p", ascending=False)
     )
-    reco = p_cluster_df[
-        (p_cluster_df.evtNumber == event) & (~p_cluster_df.E.isnull())
-    ].sort_values("E", ascending=False)
+    reco = p_cluster_df[p_cluster_df.evtNumber == event].sort_values(
+        "E", ascending=False
+    )
     true_photons.append(true[true_vars].values)
     reco_clusters.append(reco[reco_vars].values)
-
-print(
-    f"[INFO] Photons and clusters from {len(events)} events collected in {time()-start:.2f} s"
-)
 
 # +-------------------+
 # |   Event example   |
@@ -204,35 +188,23 @@ event_number = 42
 photon = np.array(true_photons[event_number])
 cluster = np.array(reco_clusters[event_number])
 
-plt.figure(figsize=(8, 6), dpi=100)
+plt.figure(figsize=(8, 6), dpi=300)
 plt.xlabel("$x$ coordinate", fontsize=12)
 plt.ylabel("$y$ coordinate", fontsize=12)
-x, y = photon[:, 0], photon[:, 1]
-w = (
-    50.0
-    * p_scaler.inverse_transform(np.c_[photon[:, 2]])
-    / e_scaler.inverse_transform(np.c_[cluster[:, 2]]).max()
-)
 plt.scatter(
-    x,
-    y,
-    s=w,
+    photon[:, 0],
+    photon[:, 1],
+    s=50.0 * photon[:, 2] / cluster[:, 2].max(),
     marker="o",
     facecolors="none",
     edgecolors="#d7191c",
     lw=0.75,
     label="Generated photon",
 )
-x, y = cluster[:, 0], cluster[:, 1]
-w = (
-    50.0
-    * e_scaler.inverse_transform(np.c_[cluster[:, 2]])
-    / e_scaler.inverse_transform(np.c_[cluster[:, 2]]).max()
-)
 plt.scatter(
-    x,
-    y,
-    s=w,
+    cluster[:, 0],
+    cluster[:, 1],
+    s=50.0 * cluster[:, 2] / cluster[:, 2].max(),
     marker="s",
     facecolors="none",
     edgecolors="#2b83ba",
@@ -249,7 +221,7 @@ plt.close()
 # |   Event multiplicity histogram   |
 # +----------------------------------+
 
-plt.figure(figsize=(8, 5), dpi=100)
+plt.figure(figsize=(8, 5), dpi=300)
 plt.xlabel("Event multipilcity", fontsize=12)
 plt.ylabel("Number of events", fontsize=12)
 bins = np.linspace(0, 400, 51)
@@ -275,25 +247,17 @@ plt.close()
 # |   Training set preparation   |
 # +------------------------------+
 
-nEvents = len(events)
 max_input_photons = MAX_INPUT_PHOTONS_DEMO if args.demo else MAX_INPUT_PHOTONS
 max_output_clusters = MAX_OUTPUT_CLUSTERS_DEMO if args.demo else MAX_OUTPUT_CLUSTERS
 
-pad_photons = np.zeros((nEvents, max_input_photons, len(true_vars)))
-pad_clusters = np.zeros((nEvents, max_output_clusters, len(reco_vars)))
+pad_photons = PADDING_VALUE * np.ones((nEvents, max_input_photons, len(true_vars)))
+pad_clusters = PADDING_VALUE * np.ones((nEvents, max_output_clusters, len(reco_vars)))
 
-pad_photons[:, :, 2] = DEFAULT_ENERGY
-pad_clusters[:, :, 2] = DEFAULT_ENERGY
-
-for iRow, photon in tqdm(
-    enumerate(true_photons), total=len(true_photons), desc="Padding photons  "
-):
+for iRow, photon in enumerate(true_photons):
     photons_trunkated = photon[:max_input_photons]
     pad_photons[iRow, : len(photons_trunkated)] = photons_trunkated
 
-for iRow, cluster in tqdm(
-    enumerate(reco_clusters), total=len(reco_clusters), desc="Padding clusters "
-):
+for iRow, cluster in enumerate(reco_clusters):
     clusters_trunkated = cluster[:max_output_clusters]
     pad_clusters[iRow, : len(clusters_trunkated)] = clusters_trunkated
 
@@ -301,26 +265,18 @@ for iRow, cluster in tqdm(
 # |   Calorimeter deposits   |
 # +--------------------------+
 
-plt.figure(figsize=(16, 5), dpi=100)
+plt.figure(figsize=(16, 5), dpi=300)
 
 plt.subplot(1, 2, 1)
 plt.title("Generated photons", fontsize=14)
 plt.xlabel("$x$ coordinate", fontsize=12)
 plt.ylabel("$y$ coordinate", fontsize=12)
-x_min = pad_photons[:, :, 0].flatten().min()
-x_max = pad_photons[:, :, 0].flatten().max()
-x_bins = np.linspace(x_min, x_max, 101)
-y_min = pad_photons[:, :, 1].flatten().min()
-y_max = pad_photons[:, :, 1].flatten().max()
-y_bins = np.linspace(y_min, y_max, 101)
-x = pad_photons[:, :, 0].flatten()
-y = pad_photons[:, :, 1].flatten()
-filter = (x != 0.0) & (y != 0.0)
-w = p_scaler.inverse_transform(np.c_[pad_photons[:, :, 2].flatten()]).flatten()
+x_bins = np.linspace(-1.0, 1.0, 101)
+y_bins = np.linspace(-1.0, 1.0, 101)
 plt.hist2d(
-    x[filter],
-    y[filter],
-    weights=w[filter],
+    pad_photons[:, :, 0].flatten(),
+    pad_photons[:, :, 1].flatten(),
+    weights=pad_photons[:, :, 2].flatten(),
     bins=(x_bins, y_bins),
     cmin=0,
     cmap="gist_heat",
@@ -330,20 +286,12 @@ plt.subplot(1, 2, 2)
 plt.title("Reconstructed calo-clusters", fontsize=14)
 plt.xlabel("$x$ coordinate", fontsize=12)
 plt.ylabel("$y$ coordinate", fontsize=12)
-x_min = pad_clusters[:, :, 0].flatten().min()
-x_max = pad_clusters[:, :, 0].flatten().max()
-x_bins = np.linspace(x_min, x_max, 101)
-y_min = pad_clusters[:, :, 1].flatten().min()
-y_max = pad_clusters[:, :, 1].flatten().max()
-y_bins = np.linspace(y_min, y_max, 101)
-x = pad_clusters[:, :, 0].flatten()
-y = pad_clusters[:, :, 1].flatten()
-filter = (x != 0.0) & (y != 0.0)
-w = e_scaler.inverse_transform(np.c_[pad_clusters[:, :, 2].flatten()]).flatten()
+x_bins = np.linspace(-1.0, 1.0, 101)
+y_bins = np.linspace(-1.0, 1.0, 101)
 plt.hist2d(
-    x[filter],
-    y[filter],
-    weights=w[filter],
+    pad_clusters[:, :, 0].flatten(),
+    pad_clusters[:, :, 1].flatten(),
+    weights=pad_clusters[:, :, 2].flatten(),
     bins=(x_bins, y_bins),
     cmin=0,
     cmap="gist_heat",
@@ -357,23 +305,19 @@ plt.close()
 # |   Energy sequences   |
 # +----------------------+
 
-plt.figure(figsize=(16, 10), dpi=100)
+plt.figure(figsize=(16, 10), dpi=300)
 
 plt.subplot(1, 2, 1)
 plt.title("Generated photons", fontsize=14)
 plt.xlabel("Photon energy", fontsize=12)
 plt.ylabel("Events", fontsize=12)
-energy = pad_photons[:64, :, 2].flatten()
-energy = p_scaler.inverse_transform(np.c_[energy])
-plt.imshow(energy.reshape(64, max_input_photons), aspect="auto", interpolation="none")
+plt.imshow(pad_photons[:64, :, 2], aspect="auto", cmap="gist_heat")
 
 plt.subplot(1, 2, 2)
 plt.title("Reconstructed calo-clusters", fontsize=14)
 plt.xlabel("Cluster energy deposits", fontsize=12)
 plt.ylabel("Events", fontsize=12)
-energy = pad_clusters[:64, :, 2].flatten()
-energy = e_scaler.inverse_transform(np.c_[energy])
-plt.imshow(energy.reshape(64, max_output_clusters), aspect="auto", interpolation="none")
+plt.imshow(pad_clusters[:64, :, 2], aspect="auto", cmap="gist_heat")
 
 img_name = "energy-seq-demo" if args.demo else "energy-seq"
 plt.savefig(fname=f"{images_dir}/{img_name}.png")
@@ -407,5 +351,5 @@ print(f"[INFO] Cluster energy scaler correctly saved to {pkl_fname}")
 if not args.demo:
     export_scaler_fname = "cluster-pid-scaler"
     pkl_fname = f"{models_dir}/{export_scaler_fname}.pkl"
-    pickle.dump(rec_scaler, open(pkl_fname, "wb"))
+    pickle.dump(pid_scaler, open(pkl_fname, "wb"))
     print(f"[INFO] Cluster PID scaler correctly saved to {pkl_fname}")
