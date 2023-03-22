@@ -3,12 +3,20 @@ import socket
 from argparse import ArgumentParser
 from datetime import datetime
 
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import yaml
 from html_reports import Report
 from sklearn.utils import shuffle
+from utils import (
+    calorimeter_deposits,
+    energy_sequences,
+    event_example,
+    learn_rate_scheduling,
+    learning_curves,
+    metric_curves,
+    validation_histogram,
+)
 
 from calotron.callbacks.schedulers import ExponentialDecay
 from calotron.losses import PrimaryPhotonMatch
@@ -20,7 +28,7 @@ DTYPE = np.float32
 TRAIN_RATIO = 0.7
 BATCHSIZE = 128
 ALPHA = 0.2
-BETA = 0.75
+BETA = 0.5
 EPOCHS = 500
 
 # +------------------+
@@ -53,7 +61,7 @@ reports_dir = config_dir["reports_dir"]
 # |   Data loading   |
 # +------------------+
 
-npzfile = np.load(f"{data_dir}/train-data-demo.npz")
+npzfile = np.load(f"{data_dir}/calo-train-data-demo.npz")
 photon = npzfile["photon"].astype(DTYPE)
 cluster = npzfile["cluster"].astype(DTYPE)
 
@@ -111,13 +119,13 @@ transformer = Transformer(
     ),
     seq_ord_normalizations=hp.get("t_seq_ord_normalizations", 10_000),
     residual_smoothing=hp.get("t_residual_smoothing", True),
-    output_activations=hp.get("t_output_activations", ["linear", "linear", "sigmoid"]),
+    output_activations=hp.get("t_output_activations", ["tanh", "tanh", "sigmoid"]),
     start_token_initializer=hp.get("t_start_toke_initializer", "ones"),
     dtype=DTYPE,
 )
 
 discriminator = Discriminator(
-    latent_dim=hp.get("d_latent_dim", 64),
+    latent_dim=hp.get("d_latent_dim", 128),
     output_units=hp.get("d_output_units", 1),
     output_activation=hp.get("d_output_activation", "sigmoid"),
     deepsets_num_layers=hp.get("d_deepsets_num_layers", 5),
@@ -149,10 +157,11 @@ hp.get("d_lr0", d_lr0)
 # |   Training configuration   |
 # +----------------------------+
 
-loss = PrimaryPhotonMatch(alpha=ALPHA, beta=BETA)
+loss = PrimaryPhotonMatch(alpha=ALPHA, beta=BETA, label_smoothing=0.1)
 hp.get("loss", loss.name)
 hp.get("loss_alpha", loss.alpha)
 hp.get("loss_beta", loss.beta)
+hp.get("loss_label_smoothing", loss.label_smoothing)
 
 model.compile(
     loss=loss,
@@ -238,12 +247,13 @@ for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
     prefix += time + unit  # YYYYMMDD-HHhMMmSSs
 prefix += "_calotron"
 
+export_model_fname = f"{models_dir}/{prefix}_model"
+export_img_dirname = f"{images_dir}/{prefix}_img"
+
 if args.saving:
-    export_model_fname = f"{models_dir}/{prefix}_model"
     tf.saved_model.save(exp_sim, models_dir=export_model_fname)
     hp.dump(f"{export_model_fname}/hyperparams.yml")  # export also list of hyperparams
     print(f"[INFO] Trained model correctly exported to {export_model_fname}")
-    export_img_dirname = f"{images_dir}/{prefix}_img"
     os.makedirs(export_img_dirname)  # need to save images
 
 # +---------------------+
@@ -293,113 +303,57 @@ report.add_markdown('<h2 align="center">Training plots</h2>')
 start_epoch = int(EPOCHS / 20)
 
 #### Learning curves
-plt.figure(figsize=(8, 5), dpi=100)
-plt.title("Learning curves", fontsize=14)
-plt.xlabel("Training epochs", fontsize=12)
-plt.ylabel("Loss", fontsize=12)
-ratio = (
-    np.array(train.history["d_loss"])[start_epoch:]
-    / np.array(train.history["t_loss"])[start_epoch:]
+learning_curves(
+    report=report,
+    history=train,
+    start_epoch=start_epoch,
+    keys=["t_loss", "d_loss"],
+    colors=["#3288bd", "#fc8d59"],
+    labels=["transformer", "discriminator"],
+    save_figure=args.saving,
+    scale_curves=True,
+    export_fname=f"{export_img_dirname}/learn-curves.png",
 )
-ratio = int(np.mean(ratio)) + 1
-plt.plot(
-    np.arange(EPOCHS)[start_epoch:],
-    np.array(train.history["t_loss"])[start_epoch:],
-    lw=1.5,
-    color="#3288bd",
-    label=f"transformer [x {1:.1f}]",
-)
-plt.plot(
-    np.arange(EPOCHS)[start_epoch:],
-    np.array(train.history["d_loss"])[start_epoch:] / ratio,
-    lw=1.5,
-    color="#fc8d59",
-    label=f"discriminator [x {1/ratio:.1f}]",
-)
-# plt.yscale("log")
-plt.legend(loc="upper right", fontsize=10)
-if args.saving:
-    plt.savefig(fname=f"{export_img_dirname}/learn-curves.png")
-report.add_figure(options="width=45%")
-plt.close()
 
 #### Learning rate scheduling
-plt.figure(figsize=(8, 5), dpi=100)
-plt.title("Learning rate scheduling", fontsize=14)
-plt.xlabel("Training epochs", fontsize=12)
-plt.ylabel("Learning rate", fontsize=12)
-plt.plot(
-    np.arange(EPOCHS),
-    np.array(train.history["t_lr"]),
-    lw=1.5,
-    color="#3288bd",
-    label="transformer",
+learn_rate_scheduling(
+    report=report,
+    history=train,
+    start_epoch=0,
+    keys=["t_lr", "d_lr"],
+    colors=["#3288bd", "#fc8d59"],
+    labels=["transformer", "discriminator"],
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/lr-sched.png",
 )
-plt.plot(
-    np.arange(EPOCHS),
-    np.array(train.history["d_lr"]),
-    lw=1.5,
-    color="#fc8d59",
-    label="discriminator",
-)
-plt.yscale("log")
-plt.legend(loc="upper right", fontsize=10)
-if args.saving:
-    plt.savefig(fname=f"{export_img_dirname}/lr-sched.png")
-report.add_figure(options="width=45%")
-plt.close()
 
 #### Accuracy curves
-plt.figure(figsize=(8, 5), dpi=100)
-plt.title("Metric curves", fontsize=14)
-plt.xlabel("Training epochs", fontsize=12)
-plt.ylabel("Accuracy", fontsize=12)
-plt.plot(
-    np.arange(EPOCHS)[start_epoch:],
-    np.array(train.history["accuracy"])[start_epoch:],
-    lw=1.5,
-    color="#4dac26",
-    label="training set",
+metric_curves(
+    report=report,
+    history=train,
+    start_epoch=start_epoch,
+    key="accuracy",
+    ylabel="Accuracy",
+    validation_set=(TRAIN_RATIO != 1.0),
+    colors=["#d01c8b", "#4dac26"],
+    labels=["training set", "validation set"],
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/accuracy-curves.png",
 )
-if TRAIN_RATIO != 1.0:
-    plt.plot(
-        np.arange(EPOCHS)[start_epoch:],
-        np.array(train.history["val_accuracy"])[start_epoch:],
-        lw=1.5,
-        color="#d01c8b",
-        label="validation set",
-    )
-plt.legend(loc="upper left", fontsize=10)
-if args.saving:
-    plt.savefig(fname=f"{export_img_dirname}/metric-curves-0.png")
-report.add_figure(options="width=45%")
-plt.close()
 
 #### BCE curves
-plt.figure(figsize=(8, 5), dpi=100)
-plt.title("Metric curves", fontsize=14)
-plt.xlabel("Training epochs", fontsize=12)
-plt.ylabel("Binary cross-entropy", fontsize=12)
-plt.plot(
-    np.arange(EPOCHS)[start_epoch:],
-    np.array(train.history["bce"])[start_epoch:],
-    lw=1.5,
-    color="#4dac26",
-    label="training set",
+metric_curves(
+    report=report,
+    history=train,
+    start_epoch=start_epoch,
+    key="bce",
+    ylabel="Binary cross-entropy",
+    validation_set=(TRAIN_RATIO != 1.0),
+    colors=["#d01c8b", "#4dac26"],
+    labels=["training set", "validation set"],
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/bce-curves.png",
 )
-if TRAIN_RATIO != 1.0:
-    plt.plot(
-        np.arange(EPOCHS)[start_epoch:],
-        np.array(train.history["val_bce"])[start_epoch:],
-        lw=1.5,
-        color="#d01c8b",
-        label="validation set",
-    )
-plt.legend(loc="upper right", fontsize=10)
-if args.saving:
-    plt.savefig(fname=f"{export_img_dirname}/metric-curves-1.png")
-report.add_figure(options="width=45%")
-plt.close()
 
 report.add_markdown("---")
 
@@ -407,171 +361,88 @@ report.add_markdown("---")
 report.add_markdown('<h2 align="center">Validation plots</h2>')
 
 #### X histogram
-plt.figure(figsize=(8, 5), dpi=100)
-plt.xlabel("$x$ coordinate", fontsize=12)
-plt.ylabel("Candidates", fontsize=12)
-x_min = cluster_val[:, :, 0].flatten().min()
-x_max = cluster_val[:, :, 0].flatten().max()
-x_bins = np.linspace(x_min, x_max, 101)
-plt.hist(
-    cluster_val[:, :, 0].flatten(), bins=x_bins, color="#3288bd", label="Training data"
+validation_histogram(
+    report=report,
+    ref_data=cluster_val[:, :, 0].flatten(),
+    gen_data=output[:, :, 0].flatten(),
+    scaler=None,
+    xlabel="$x$ coordinate",
+    ref_label="Training data",
+    gen_label="Calotron output",
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/x-hist.png",
 )
-plt.hist(
-    output[:, :, 0].flatten(),
-    bins=x_bins,
-    histtype="step",
-    color="#fc8d59",
-    lw=2,
-    label="Calotron output",
-)
-plt.yscale("log")
-plt.legend(loc="upper left", fontsize=10)
-if args.saving:
-    plt.savefig(f"{export_img_dirname}/x-hist.png")
-report.add_figure(options="width=45%")
-plt.close()
 
 #### Y histogram
-plt.figure(figsize=(8, 5), dpi=100)
-plt.xlabel("$y$ coordinate", fontsize=12)
-plt.ylabel("Candidates", fontsize=12)
-y_min = cluster_val[:, :, 1].flatten().min()
-y_max = cluster_val[:, :, 1].flatten().max()
-y_bins = np.linspace(y_min, y_max, 101)
-plt.hist(
-    cluster_val[:, :, 1].flatten(), bins=y_bins, color="#3288bd", label="Training data"
+validation_histogram(
+    report=report,
+    ref_data=cluster_val[:, :, 1].flatten(),
+    gen_data=output[:, :, 1].flatten(),
+    scaler=None,
+    xlabel="$y$ coordinate",
+    ref_label="Training data",
+    gen_label="Calotron output",
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/y-hist.png",
 )
-plt.hist(
-    output[:, :, 1].flatten(),
-    bins=y_bins,
-    histtype="step",
-    color="#fc8d59",
-    lw=2,
-    label="Calotron output",
-)
-plt.yscale("log")
-plt.legend(loc="upper left", fontsize=10)
-if args.saving:
-    plt.savefig(f"{export_img_dirname}/y-hist.png")
-report.add_figure(options="width=45%")
-plt.close()
 
-#### XY 2D-histogram
-plt.figure(figsize=(16, 5), dpi=100)
-plt.subplot(1, 2, 1)
-plt.title("Training data", fontsize=14)
-plt.xlabel("$x$ coordinate", fontsize=12)
-plt.ylabel("$y$ coordinate", fontsize=12)
-plt.hist2d(
-    cluster_val[:, :, 0].flatten(),
-    cluster_val[:, :, 1].flatten(),
-    weights=cluster_val[:, :, 2].flatten(),
-    bins=(x_bins, y_bins),
-    cmin=0,
-    cmap="gist_heat",
+#### Calorimeter deposits
+calorimeter_deposits(
+    report=report,
+    ref_coords=(cluster_val[:, :, 0].flatten(), cluster_val[:, :, 1].flatten()),
+    gen_coords=(output[:, :, 0].flatten(), output[:, :, 1].flatten()),
+    ref_energy=cluster_val[:, :, 2].flatten(),
+    gen_energy=output[:, :, 2].flatten(),
+    scaler=None,
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/calo-deposits.png",
 )
-plt.subplot(1, 2, 2)
-plt.title("Calotron output", fontsize=14)
-plt.xlabel("$x$ coordinate", fontsize=12)
-plt.ylabel("$y$ coordinate", fontsize=12)
-plt.hist2d(
-    output[:, :, 0].flatten(),
-    output[:, :, 1].flatten(),
-    weights=output[:, :, 2].flatten(),
-    bins=(x_bins, y_bins),
-    cmin=0,
-    cmap="gist_heat",
-)
-if args.saving:
-    plt.savefig(f"{export_img_dirname}/xy-hist2d.png")
-report.add_figure(options="width=95%")
-plt.close()
 
 #### Event examples
 for i in range(4):
     evt = int(np.random.uniform(0, len(cluster_val)))
-    plt.figure(figsize=(8, 6), dpi=100)
-    plt.xlabel("$x$ coordinate", fontsize=12)
-    plt.ylabel("$y$ coordinate", fontsize=12)
-    plt.scatter(
-        photon_val[evt, :, 0].flatten(),
-        photon_val[evt, :, 1].flatten(),
-        s=50 * photon_val[evt, :, 2].flatten() / cluster_val[evt, :, 2].flatten().max(),
-        marker="o",
-        facecolors="none",
-        edgecolors="#d7191c",
-        lw=0.75,
-        label="True photon",
+    event_example(
+        report=report,
+        photon_coords=(
+            photon_val[evt, :, 0].flatten(),
+            photon_val[evt, :, 1].flatten(),
+        ),
+        cluster_coords=(
+            cluster_val[evt, :, 0].flatten(),
+            cluster_val[evt, :, 1].flatten(),
+        ),
+        output_coords=(output[evt, :, 0].flatten(), output[evt, :, 1].flatten()),
+        photon_energy=photon_val[evt, :, 2].flatten(),
+        cluster_energy=cluster_val[evt, :, 2].flatten(),
+        output_energy=output[evt, :, 2].flatten(),
+        photon_scaler=None,
+        cluster_scaler=None,
+        save_figure=args.saving,
+        export_fname=f"{export_img_dirname}/evt-example-{i}.png",
     )
-    plt.scatter(
-        cluster_val[evt, :, 0].flatten(),
-        cluster_val[evt, :, 1].flatten(),
-        s=50
-        * cluster_val[evt, :, 2].flatten()
-        / cluster_val[evt, :, 2].flatten().max(),
-        marker="s",
-        facecolors="none",
-        edgecolors="#2b83ba",
-        lw=0.75,
-        label="Calo neutral cluster",
-    )
-    plt.scatter(
-        output[evt, :, 0].flatten(),
-        output[evt, :, 1].flatten(),
-        s=50 * output[evt, :, 2].flatten() / cluster_val[evt, :, 2].flatten().max(),
-        marker="^",
-        facecolors="none",
-        edgecolors="#1a9641",
-        lw=0.75,
-        label="Calotron output",
-    )
-    plt.legend()
-    if args.saving:
-        plt.savefig(f"{export_img_dirname}/evt-example-{i}.png")
-    report.add_figure(options="width=45%")
-plt.close()
 
 #### Energy histogram
-plt.figure(figsize=(8, 5), dpi=100)
-plt.xlabel("Preprocessed energy [a.u]", fontsize=12)
-plt.ylabel("Candidates", fontsize=12)
-e_min = cluster_val[:, :, 2].flatten().min()
-e_max = cluster_val[:, :, 2].flatten().max()
-e_bins = np.linspace(e_min, e_max, 101)
-plt.hist(
-    cluster_val[:, :, 2].flatten(), bins=e_bins, color="#3288bd", label="Training data"
+validation_histogram(
+    report=report,
+    ref_data=cluster_val[:, :, 2].flatten(),
+    gen_data=output[:, :, 2].flatten(),
+    scaler=None,
+    xlabel="Preprocessed energy [a.u]",
+    ref_label="Training data",
+    gen_label="Calotron output",
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/energy-hist.png",
 )
-plt.hist(
-    output[:, :, 2].flatten(),
-    bins=e_bins,
-    histtype="step",
-    color="#fc8d59",
-    lw=2,
-    label="Calotron output",
-)
-plt.yscale("log")
-plt.legend(loc="upper left", fontsize=10)
-if args.saving:
-    plt.savefig(f"{export_img_dirname}/energy-hist.png")
-report.add_figure(options="width=45%")
-plt.close()
 
-#### Energy batches plot
-plt.figure(figsize=(16, 10), dpi=100)
-plt.subplot(1, 2, 1)
-plt.title("Training data", fontsize=14)
-plt.xlabel("Cluster energy deposits", fontsize=12)
-plt.ylabel("Events", fontsize=12)
-plt.imshow(cluster_val[:128, :, 2], aspect="auto", interpolation="none")
-plt.subplot(1, 2, 2)
-plt.title("Calotron output", fontsize=14)
-plt.xlabel("Cluster energy deposits", fontsize=12)
-plt.ylabel("Events", fontsize=12)
-plt.imshow(output[:128, :, 2], aspect="auto", interpolation="none")
-if args.saving:
-    plt.savefig(f"{export_img_dirname}/energy-batches.png")
-report.add_figure(options="width=95%")
-plt.close()
+#### Energy sequences
+energy_sequences(
+    report=report,
+    ref_energy=cluster_val[:128, :, 2],
+    gen_energy=output[:128, :, 2],
+    scaler=None,
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/energy-seq.png",
+)
 
 report.add_markdown("---")
 
