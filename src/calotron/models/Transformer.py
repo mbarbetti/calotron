@@ -212,9 +212,8 @@ class Transformer(tf.keras.Model):
                 name="t_filter",
                 dtype=self.dtype,
             )
-            self._output_activations = self._multi_activations.output_activations
         else:
-            self._output_activations = None
+            self._multi_activations = None
 
     def call(self, inputs) -> tf.Tensor:
         source, target = inputs
@@ -222,7 +221,7 @@ class Transformer(tf.keras.Model):
         condition = self._encoder(source)
         output = self._decoder(target, condition)
         output = self._output_layer(output)
-        if self._output_activations is not None:
+        if self._multi_activations is not None:
             output = self._multi_activations(output)
         return output
 
