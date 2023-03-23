@@ -9,6 +9,7 @@ def learning_curves(
     keys=["loss"],
     colors=None,
     labels=None,
+    legend_loc="upper right",
     save_figure=False,
     scale_curves=True,
     export_fname="./images/learn-curves.png",
@@ -23,7 +24,6 @@ def learning_curves(
             for k in keys
         ]
         scales = np.around(np.mean(scales, axis=-1))
-        scales = np.where(scales == 1.0, scales, scales + 1)
         for i in range(len(labels)):
             labels[i] += f" [x {1/scales[i]:.1f}]"
 
@@ -41,11 +41,11 @@ def learning_curves(
     plt.title("Learning curves", fontsize=14)
     plt.xlabel("Training epochs", fontsize=12)
     plt.ylabel("Loss", fontsize=12)
-    for k, l, c in zip(keys, labels, colors):
+    for i, (k, l, c) in enumerate(zip(keys, labels, colors)):
         num_epochs = np.arange(len(history.history[k]))[start_epoch:]
         loss = np.array(history.history[k])[start_epoch:] / scales[i]
         plt.plot(num_epochs, loss, lw=1.5, color=c, label=l)
-    plt.legend(loc="upper right", fontsize=10)
+    plt.legend(loc=legend_loc, fontsize=10)
     if save_figure:
         plt.savefig(export_fname)
     report.add_figure(options="width=45%")
@@ -59,6 +59,7 @@ def learn_rate_scheduling(
     keys=["lr"],
     colors=None,
     labels=None,
+    legend_loc="upper right",
     save_figure=False,
     export_fname="./images/lr-sched.png",
 ) -> None:
@@ -80,7 +81,8 @@ def learn_rate_scheduling(
         num_epochs = np.arange(len(history.history[k]))[start_epoch:]
         lr = np.array(history.history[k])[start_epoch:]
         plt.plot(num_epochs, lr, lw=1.5, color=c, label=l)
-    plt.legend(loc="upper right", fontsize=10)
+    plt.legend(loc=legend_loc, fontsize=10)
+    plt.yscale("log")
     if save_figure:
         plt.savefig(export_fname)
     report.add_figure(options="width=45%")
@@ -96,6 +98,7 @@ def metric_curves(
     validation_set=False,
     colors=None,
     labels=None,
+    legend_loc="upper right",
     save_figure=False,
     export_fname="./images/metric-curves.png",
 ) -> None:
@@ -123,7 +126,7 @@ def metric_curves(
         metric = np.array(history.history[k])[start_epoch:]
         plt.plot(num_epochs, metric, lw=1.5, color=c, label=l, zorder=zorder)
         zorder -= 1
-    plt.legend(loc="upper right", fontsize=10)
+    plt.legend(loc=legend_loc, fontsize=10)
     if save_figure:
         plt.savefig(export_fname)
     report.add_figure(options="width=45%")
@@ -138,6 +141,7 @@ def validation_histogram(
     xlabel=None,
     ref_label=None,
     gen_label=None,
+    legend_loc="upper left",
     save_figure=False,
     export_fname="./images/val-hist.png",
 ) -> None:
@@ -157,7 +161,7 @@ def validation_histogram(
         gen_data, bins=bins, histtype="step", color="#fc8d59", lw=2, label=gen_label
     )
     plt.yscale("log")
-    plt.legend(loc="upper left", fontsize=10)
+    plt.legend(loc=legend_loc, fontsize=10)
     if save_figure:
         plt.savefig(export_fname)
     report.add_figure(options="width=45%")
