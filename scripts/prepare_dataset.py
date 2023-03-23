@@ -14,7 +14,8 @@ from tqdm import tqdm
 
 ECAL_W = 8000
 ECAL_H = 6500
-ENERGY_MIN = 1.0
+PHOTON_ENERGY_MIN = 75
+CLUSTER_ENERGY_MIN = 500
 PADDING_VALUE = 0.0
 MAX_INPUT_PHOTONS = 128
 MAX_OUTPUT_CLUSTERS = 64
@@ -93,7 +94,7 @@ print(
 # +----------------------+
 
 photon_df["p"] = np.linalg.norm(photon_df[["px", "py", "pz"]], axis=1)
-photon_df["log_p"] = np.log(np.maximum(photon_df.p, ENERGY_MIN))
+photon_df["log_p"] = np.log(np.maximum(photon_df.p, PHOTON_ENERGY_MIN))
 photon_df["tx"] = photon_df.px / photon_df.pz
 photon_df["ty"] = photon_df.py / photon_df.pz
 
@@ -123,7 +124,7 @@ if args.verbose:
 # |   Cluster DataFrame   |
 # +-----------------------+
 
-cluster_df["log_E"] = np.log(np.maximum(cluster_df.E, ENERGY_MIN))
+cluster_df["log_E"] = np.log(np.maximum(cluster_df.E, CLUSTER_ENERGY_MIN))
 cluster_df["NotPadding"] = 1.0
 
 reco_vars = ["x", "y", "log_E"]
