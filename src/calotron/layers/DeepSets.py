@@ -33,7 +33,7 @@ class DeepSets(tf.keras.layers.Layer):
         assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
-        # Layers
+        # Hidden layers
         self._seq = list()
         for _ in range(self._num_layers - 1):
             self._seq.append(
@@ -49,6 +49,8 @@ class DeepSets(tf.keras.layers.Layer):
                     self._dropout_rate, name="ds_dropout", dtype=self.dtype
                 )
             )
+
+        # Output layer
         self._seq += [
             tf.keras.layers.Dense(
                 self._latent_dim,
@@ -58,15 +60,14 @@ class DeepSets(tf.keras.layers.Layer):
             )
         ]
 
+        # Normalization layer
+        self._layer_norm = tf.keras.layers.LayerNormalization()
+
     def call(self, x) -> tf.Tensor:
-        batch_size = tf.shape(x)[0]
-        length = tf.shape(x)[1]
-        depth = tf.shape(x)[2]
-        output = tf.reshape(x, (batch_size * length, depth))
         for layer in self._seq:
-            output = layer(output)
-        output = tf.reshape(output, (batch_size, length, self._latent_dim))
-        output = tf.reduce_sum(output, axis=1)
+            x = layer(x)
+        output = tf.reduce_sum(x, axis=1)
+        output = self._layer_norm(output)
         return output
 
     @property
