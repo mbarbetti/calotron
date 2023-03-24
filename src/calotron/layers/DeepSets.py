@@ -40,6 +40,8 @@ class DeepSets(tf.keras.layers.Layer):
                 tf.keras.layers.Dense(
                     self._hidden_units,
                     activation="relu",
+                    kernel_initializer="glorot_normal",
+                    bias_initializer="he_normal",
                     name="ds_dense",
                     dtype=self.dtype,
                 )
@@ -55,6 +57,8 @@ class DeepSets(tf.keras.layers.Layer):
             tf.keras.layers.Dense(
                 self._latent_dim,
                 activation="relu",
+                kernel_initializer="he_normal",
+                bias_initializer="he_normal",
                 name="ds_output_layer",
                 dtype=self.dtype,
             )

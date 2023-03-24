@@ -62,6 +62,8 @@ class Discriminator(tf.keras.Model):
                 tf.keras.layers.Dense(
                     self._latent_dim,
                     activation="relu",
+                    kernel_initializer="glorot_normal",
+                    bias_initializer="he_normal",
                     name="d_dense",
                     dtype=self.dtype,
                 )
@@ -77,6 +79,8 @@ class Discriminator(tf.keras.Model):
             tf.keras.layers.Dense(
                 self._output_units,
                 activation=self._output_activation,
+                kernel_initializer="he_normal",
+                bias_initializer="zeros",
                 name="d_output_layer",
                 dtype=self.dtype,
             )
