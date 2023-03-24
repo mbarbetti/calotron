@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from calotron.models import Discriminator, Transformer, AuxClassifier
+from calotron.models import AuxClassifier, Discriminator, Transformer
 
 FROM_MEAN_TO_SUM = 2
 ALPHA_TO_INF = 1e4
@@ -40,10 +40,7 @@ disc = Discriminator(
 )
 
 aux = AuxClassifier(
-    transformer=transf,
-    output_depth=1,
-    output_activation=None,
-    dropout_rate=0.1,
+    transformer=transf, output_depth=1, output_activation=None, dropout_rate=0.1
 )
 
 
@@ -92,10 +89,14 @@ def test_loss_use_no_weights(from_logits):
     )
     if from_logits:
         disc._seq += [tf.keras.layers.Dense(1, activation="tanh")]
-        aux._seq += [tf.keras.layers.Dense(1, activation="tanh", kernel_initializer="zeros")]
+        aux._seq += [
+            tf.keras.layers.Dense(1, activation="tanh", kernel_initializer="zeros")
+        ]
     else:
         disc._seq += [tf.keras.layers.Dense(1, activation="sigmoid")]
-        aux._seq += [tf.keras.layers.Dense(1, activation="sigmoid", kernel_initializer="zeros")]
+        aux._seq += [
+            tf.keras.layers.Dense(1, activation="sigmoid", kernel_initializer="zeros")
+        ]
     out1 = loss.discriminator_loss(
         transformer=transf,
         discriminator=disc,
@@ -138,10 +139,14 @@ def test_loss_use_with_weights(from_logits):
     )
     if from_logits:
         disc._seq += [tf.keras.layers.Dense(1, activation="tanh")]
-        aux._seq += [tf.keras.layers.Dense(1, activation="tanh", kernel_initializer="zeros")]
+        aux._seq += [
+            tf.keras.layers.Dense(1, activation="tanh", kernel_initializer="zeros")
+        ]
     else:
         disc._seq += [tf.keras.layers.Dense(1, activation="sigmoid")]
-        aux._seq += [tf.keras.layers.Dense(1, activation="sigmoid", kernel_initializer="zeros")]
+        aux._seq += [
+            tf.keras.layers.Dense(1, activation="sigmoid", kernel_initializer="zeros")
+        ]
     out1 = loss.discriminator_loss(
         transformer=transf,
         discriminator=disc,

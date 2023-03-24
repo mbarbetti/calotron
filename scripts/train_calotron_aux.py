@@ -20,7 +20,7 @@ from utils import (
 
 from calotron.callbacks.schedulers import ExponentialDecay
 from calotron.losses import PrimaryPhotonMatch
-from calotron.models import Calotron, Discriminator, Transformer, AuxClassifier
+from calotron.models import AuxClassifier, Calotron, Discriminator, Transformer
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
@@ -143,9 +143,7 @@ aux_classifier = AuxClassifier(
 )
 
 model = Calotron(
-    transformer=transformer,
-    discriminator=discriminator,
-    aux_classifier=aux_classifier,
+    transformer=transformer, discriminator=discriminator, aux_classifier=aux_classifier
 )
 
 output = model((photon[:BATCHSIZE], cluster[:BATCHSIZE]))

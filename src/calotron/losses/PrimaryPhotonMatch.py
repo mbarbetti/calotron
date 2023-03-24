@@ -69,12 +69,8 @@ class PrimaryPhotonMatch(BaseLoss):
         training=True,
     ) -> tf.Tensor:
         # Photon-cluster matching weights
-        source_coords = tf.tile(
-            source[:, None, :, :2], (1, tf.shape(target)[1], 1, 1)
-        )
-        target_coords = tf.tile(
-            target[:, :, None, :2], (1, 1, tf.shape(source)[1], 1)
-        )
+        source_coords = tf.tile(source[:, None, :, :2], (1, tf.shape(target)[1], 1, 1))
+        target_coords = tf.tile(target[:, :, None, :2], (1, 1, tf.shape(source)[1], 1))
         pairwise_distance = tf.norm(
             target_coords - source_coords, ord="euclidean", axis=-1
         )
@@ -106,7 +102,7 @@ class PrimaryPhotonMatch(BaseLoss):
         )
         reco_loss = tf.cast(reco_loss, dtype=target.dtype)
         return match_loss + self._alpha * adv_loss + self._beta * reco_loss
-    
+
     def discriminator_loss(
         self,
         transformer,
@@ -137,22 +133,13 @@ class PrimaryPhotonMatch(BaseLoss):
         )
         fake_loss = tf.cast(fake_loss, dtype=output.dtype)
         return (real_loss + fake_loss) / 2.0
-    
+
     def aux_classifier_loss(
-        self,
-        aux_classifier,
-        source,
-        target,
-        sample_weight=None,
-        training=True,
+        self, aux_classifier, source, target, sample_weight=None, training=True
     ) -> tf.Tensor:
         # Photon-cluster matching labels
-        source_coords = tf.tile(
-            source[:, :, None, :2], (1, 1, tf.shape(target)[1], 1)
-        )
-        target_coords = tf.tile(
-            target[:, None, :, :2], (1, tf.shape(source)[1], 1, 1)
-        )
+        source_coords = tf.tile(source[:, :, None, :2], (1, 1, tf.shape(target)[1], 1))
+        target_coords = tf.tile(target[:, None, :, :2], (1, tf.shape(source)[1], 1, 1))
         pairwise_distance = tf.norm(
             target_coords - source_coords, ord="euclidean", axis=-1
         )
@@ -164,7 +151,7 @@ class PrimaryPhotonMatch(BaseLoss):
         # Classification loss
         output = tf.reshape(
             aux_classifier(source, training=training),
-            (tf.shape(source)[0], tf.shape(source)[1])
+            (tf.shape(source)[0], tf.shape(source)[1]),
         )
         clf_loss = self._bce_loss(labels, output, sample_weight=sample_weight)
         clf_loss = tf.cast(clf_loss, dtype=output.dtype)

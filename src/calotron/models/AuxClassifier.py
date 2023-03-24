@@ -38,9 +38,7 @@ class AuxClassifier(tf.keras.Model):
         # Output layers
         self._seq = [
             tf.keras.layers.Dropout(
-                self._dropout_rate,
-                name="a_dropout",
-                dtype=self.dtype
+                self._dropout_rate, name="a_dropout", dtype=self.dtype
             ),
             tf.keras.layers.Dense(
                 self._output_depth,
@@ -48,23 +46,23 @@ class AuxClassifier(tf.keras.Model):
                 kernel_initializer="glorot_uniform",
                 name="a_output_layer",
                 dtype=self.dtype,
-            )
+            ),
         ]
-        
+
     def call(self, x) -> tf.Tensor:
         output = self._encoder(x)
         for layer in self._seq:
             output = layer(output)
         return output
-    
+
     @property
     def output_depth(self) -> int:
         return self._output_depth
-    
+
     @property
     def output_activation(self):  # TODO: add Union[None, activation]
         return self.output_activation
-    
+
     @property
     def dropout_rate(self) -> float:
         return self._dropout_rate

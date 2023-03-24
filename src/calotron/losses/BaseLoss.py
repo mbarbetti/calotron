@@ -22,7 +22,7 @@ class BaseLoss:
             "Only `BaseLoss` subclasses have the "
             "`transformer_loss()` method implemented."
         )
-    
+
     def discriminator_loss(
         self,
         transformer,
@@ -38,12 +38,7 @@ class BaseLoss:
         )
 
     def aux_classifier_loss(
-        self,
-        aux_classifier,
-        source,
-        target,
-        sample_weight=None,
-        training=True,
+        self, aux_classifier, source, target, sample_weight=None, training=True
     ) -> tf.Tensor:
         raise NotImplementedError(
             "Only some `BaseLoss` subclasses have the "

@@ -8,13 +8,8 @@ from calotron.utils.checks import checkLoss, checkMetrics, checkOptimizer
 
 class Calotron(tf.keras.Model):
     def __init__(
-            self,
-            transformer,
-            discriminator,
-            aux_classifier=None,
-            name=None,
-            dtype=None
-        ) -> None:
+        self, transformer, discriminator, aux_classifier=None, name=None, dtype=None
+    ) -> None:
         super().__init__(name=name, dtype=dtype)
 
         # Transformer
@@ -82,7 +77,7 @@ class Calotron(tf.keras.Model):
         else:
             self._a_loss = None
         self._metrics = checkMetrics(metrics)
-            
+
         # Optimizers
         self._t_opt = checkOptimizer(transformer_optimizer)
         self._d_opt = checkOptimizer(discriminator_optimizer)
@@ -281,7 +276,7 @@ class Calotron(tf.keras.Model):
     @property
     def discriminator(self) -> Discriminator:
         return self._discriminator
-    
+
     @property
     def aux_classifier(self) -> AuxClassifier:
         return self._aux_classifier
@@ -300,7 +295,7 @@ class Calotron(tf.keras.Model):
     @property
     def discriminator_optimizer(self) -> tf.keras.optimizers.Optimizer:
         return self._d_opt
-    
+
     @property
     def aux_classifier_optimizer(self) -> tf.keras.optimizers.Optimizer:
         return self._a_opt
@@ -312,7 +307,7 @@ class Calotron(tf.keras.Model):
     @property
     def discriminator_upds_per_batch(self) -> int:
         return self._d_upds_per_batch
-    
+
     @property
     def aux_classifier_upds_per_batch(self) -> int:
         return self._a_upds_per_batch

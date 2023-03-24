@@ -135,9 +135,7 @@ discriminator = Discriminator(
 )
 
 model = Calotron(
-    transformer=transformer,
-    discriminator=discriminator,
-    aux_classifier=None,
+    transformer=transformer, discriminator=discriminator, aux_classifier=None
 )
 
 output = model((photon[:BATCHSIZE], cluster[:BATCHSIZE]))
