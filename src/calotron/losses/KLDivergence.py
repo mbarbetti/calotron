@@ -9,32 +9,34 @@ class KLDivergence(BaseLoss):
         super().__init__(name)
         self._loss = TF_KLDivergence(reduction="auto")
 
-    def discriminator_loss(
-        self,
-        discriminator,
-        source_true,
-        target_true,
-        target_pred,
-        sample_weight=None,
-        discriminator_training=True,
-    ) -> tf.Tensor:
-        y_true = discriminator(target_true, training=discriminator_training)
-        y_pred = discriminator(target_pred, training=discriminator_training)
-        loss = self._loss(y_true, y_pred, sample_weight=sample_weight)
-        loss = tf.cast(loss, dtype=target_true.dtype)
-        return -loss  # divergence maximization
-
     def transformer_loss(
         self,
+        transformer,
         discriminator,
-        source_true,
-        target_true,
-        target_pred,
+        source,
+        target,
         sample_weight=None,
-        discriminator_training=False,
+        training=True,
     ) -> tf.Tensor:
-        y_true = discriminator(target_true, training=discriminator_training)
-        y_pred = discriminator(target_pred, training=discriminator_training)
+        output = transformer((source, target), training=training)
+        y_true = discriminator(target, training=False)
+        y_pred = discriminator(output, training=False)
         loss = self._loss(y_true, y_pred, sample_weight=sample_weight)
-        loss = tf.cast(loss, dtype=target_true.dtype)
+        loss = tf.cast(loss, dtype=target.dtype)
         return loss  # divergence minimization
+
+    def discriminator_loss(
+        self,
+        transformer,
+        discriminator,
+        source,
+        target,
+        sample_weight=None,
+        training=True,
+    ) -> tf.Tensor:
+        output = transformer((source, target), training=False)
+        y_true = discriminator(target, training=training)
+        y_pred = discriminator(output, training=training)
+        loss = self._loss(y_true, y_pred, sample_weight=sample_weight)
+        loss = tf.cast(loss, dtype=target.dtype)
+        return -loss  # divergence maximization

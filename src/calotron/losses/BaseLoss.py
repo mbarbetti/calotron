@@ -9,32 +9,45 @@ class BaseLoss:
             )
         self._name = name
 
+    def transformer_loss(
+        self,
+        transformer,
+        discriminator,
+        source,
+        target,
+        sample_weight=None,
+        training=True,
+    ) -> tf.Tensor:
+        raise NotImplementedError(
+            "Only `BaseLoss` subclasses have the "
+            "`transformer_loss()` method implemented."
+        )
+    
     def discriminator_loss(
         self,
+        transformer,
         discriminator,
-        source_true,
-        target_true,
-        target_pred,
+        source,
+        target,
         sample_weight=None,
-        discriminator_training=True,
+        training=True,
     ) -> tf.Tensor:
         raise NotImplementedError(
             "Only `BaseLoss` subclasses have the "
             "`discriminator_loss()` method implemented."
         )
 
-    def transformer_loss(
+    def aux_classifier_loss(
         self,
-        discriminator,
-        source_true,
-        target_true,
-        target_pred,
+        aux_classifier,
+        source,
+        target,
         sample_weight=None,
-        discriminator_training=False,
+        training=True,
     ) -> tf.Tensor:
         raise NotImplementedError(
-            "Only `BaseLoss` subclasses have the "
-            "`transformer_loss()` method implemented."
+            "Only some `BaseLoss` subclasses have the "
+            "`aux_classifier_loss()` method implemented."
         )
 
     @property

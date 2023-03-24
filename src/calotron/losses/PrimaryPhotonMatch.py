@@ -59,51 +59,21 @@ class PrimaryPhotonMatch(BaseLoss):
             reduction="auto",
         )
 
-    def discriminator_loss(
-        self,
-        discriminator,
-        source_true,
-        target_true,
-        target_pred,
-        sample_weight=None,
-        discriminator_training=True,
-    ) -> tf.Tensor:
-        # Real target loss
-        rnd_true = tf.random.normal(
-            tf.shape(target_true), stddev=self._noise_stddev, dtype=target_true.dtype
-        )
-        y_true = discriminator(target_true + rnd_true, training=discriminator_training)
-        real_loss = self._bce_loss(
-            tf.ones_like(y_true), y_true, sample_weight=sample_weight
-        )
-        real_loss = tf.cast(real_loss, dtype=target_true.dtype)
-
-        # Fake target loss
-        rnd_pred = tf.random.normal(
-            tf.shape(target_pred), stddev=self._noise_stddev, dtype=target_pred.dtype
-        )
-        y_pred = discriminator(target_pred + rnd_pred, training=discriminator_training)
-        fake_loss = self._bce_loss(
-            tf.zeros_like(y_pred), y_pred, sample_weight=sample_weight
-        )
-        fake_loss = tf.cast(fake_loss, dtype=target_pred.dtype)
-        return (real_loss + fake_loss) / 2.0
-
     def transformer_loss(
         self,
+        transformer,
         discriminator,
-        source_true,
-        target_true,
-        target_pred,
+        source,
+        target,
         sample_weight=None,
-        discriminator_training=False,
+        training=True,
     ) -> tf.Tensor:
         # Photon-cluster matching weights
         source_coords = tf.tile(
-            source_true[:, None, :, :2], (1, tf.shape(target_true)[1], 1, 1)
+            source[:, None, :, :2], (1, tf.shape(target)[1], 1, 1)
         )
         target_coords = tf.tile(
-            target_true[:, :, None, :2], (1, 1, tf.shape(source_true)[1], 1)
+            target[:, :, None, :2], (1, 1, tf.shape(source)[1], 1)
         )
         pairwise_distance = tf.norm(
             target_coords - source_coords, ord="euclidean", axis=-1
@@ -116,25 +86,89 @@ class PrimaryPhotonMatch(BaseLoss):
             weights *= sample_weight
 
         # Photon-cluster matching loss
-        match_loss = self._mse_loss(target_true, target_pred, sample_weight=weights)
-        match_loss = tf.cast(match_loss, dtype=target_true.dtype)
+        output = transformer((source, target), training=training)
+        match_loss = self._mse_loss(target, output, sample_weight=weights)
+        match_loss = tf.cast(match_loss, dtype=target.dtype)
 
         # Adversarial loss
         rnd_pred = tf.random.normal(
-            tf.shape(target_pred), stddev=self._noise_stddev, dtype=target_pred.dtype
+            tf.shape(output), stddev=self._noise_stddev, dtype=output.dtype
         )
-        y_pred = discriminator(target_pred + rnd_pred, training=discriminator_training)
+        y_pred = discriminator(output + rnd_pred, training=False)
         adv_loss = self._bce_loss(
             tf.ones_like(y_pred), y_pred, sample_weight=sample_weight
         )
-        adv_loss = tf.cast(adv_loss, dtype=target_pred.dtype)
+        adv_loss = tf.cast(adv_loss, dtype=output.dtype)
 
         # Global event reco loss
         reco_loss = self._mse_loss(
-            target_true[:, :, 2:], target_pred[:, :, 2:], sample_weight=sample_weight
+            target[:, :, 2:], output[:, :, 2:], sample_weight=sample_weight
         )
-        reco_loss = tf.cast(reco_loss, dtype=target_true.dtype)
+        reco_loss = tf.cast(reco_loss, dtype=target.dtype)
         return match_loss + self._alpha * adv_loss + self._beta * reco_loss
+    
+    def discriminator_loss(
+        self,
+        transformer,
+        discriminator,
+        source,
+        target,
+        sample_weight=None,
+        training=True,
+    ) -> tf.Tensor:
+        # Real target loss
+        rnd_true = tf.random.normal(
+            tf.shape(target), stddev=self._noise_stddev, dtype=target.dtype
+        )
+        y_true = discriminator(target + rnd_true, training=training)
+        real_loss = self._bce_loss(
+            tf.ones_like(y_true), y_true, sample_weight=sample_weight
+        )
+        real_loss = tf.cast(real_loss, dtype=target.dtype)
+
+        # Fake target loss
+        output = transformer((source, target), training=False)
+        rnd_pred = tf.random.normal(
+            tf.shape(output), stddev=self._noise_stddev, dtype=output.dtype
+        )
+        y_pred = discriminator(output + rnd_pred, training=training)
+        fake_loss = self._bce_loss(
+            tf.zeros_like(y_pred), y_pred, sample_weight=sample_weight
+        )
+        fake_loss = tf.cast(fake_loss, dtype=output.dtype)
+        return (real_loss + fake_loss) / 2.0
+    
+    def aux_classifier_loss(
+        self,
+        aux_classifier,
+        source,
+        target,
+        sample_weight=None,
+        training=True,
+    ) -> tf.Tensor:
+        # Photon-cluster matching labels
+        source_coords = tf.tile(
+            source[:, :, None, :2], (1, 1, tf.shape(target)[1], 1)
+        )
+        target_coords = tf.tile(
+            target[:, None, :, :2], (1, tf.shape(source)[1], 1, 1)
+        )
+        pairwise_distance = tf.norm(
+            target_coords - source_coords, ord="euclidean", axis=-1
+        )
+        pairwise_distance = tf.reduce_min(pairwise_distance, axis=-1)
+        labels = tf.cast(
+            pairwise_distance < self._max_match_distance, dtype=source.dtype
+        )
+
+        # Classification loss
+        output = tf.reshape(
+            aux_classifier(source, training=training),
+            (tf.shape(source)[0], tf.shape(source)[1])
+        )
+        clf_loss = self._bce_loss(labels, output, sample_weight=sample_weight)
+        clf_loss = tf.cast(clf_loss, dtype=output.dtype)
+        return clf_loss
 
     @property
     def alpha(self) -> float:
