@@ -20,7 +20,7 @@ from utils import (
 
 from calotron.callbacks.schedulers import ExponentialDecay
 from calotron.losses import PrimaryPhotonMatch
-from calotron.models import Calotron, Discriminator, Transformer
+from calotron.models import Calotron, Discriminator, Transformer, AuxClassifier
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
@@ -134,10 +134,18 @@ discriminator = Discriminator(
     dtype=DTYPE,
 )
 
+aux_classifier = AuxClassifier(
+    transformer=transformer,
+    output_depth=hp.get("a_output_depth", 1),
+    output_activation=hp.get("a_output_activation", "sigmoid"),
+    dropout_rate=hp.get("a_dropout", 0.1),
+    dtype=DTYPE,
+)
+
 model = Calotron(
     transformer=transformer,
     discriminator=discriminator,
-    aux_classifier=None,
+    aux_classifier=aux_classifier,
 )
 
 output = model((photon[:BATCHSIZE], cluster[:BATCHSIZE]))
@@ -157,6 +165,11 @@ d_opt = tf.keras.optimizers.RMSprop(d_lr0)
 hp.get("d_optimizer", "RMSprop")
 hp.get("d_lr0", d_lr0)
 
+a_lr0 = 1e-3
+a_opt = tf.keras.optimizers.RMSprop(a_lr0)
+hp.get("a_optimizer", "RMSprop")
+hp.get("a_lr0", a_lr0)
+
 # +----------------------------+
 # |   Training configuration   |
 # +----------------------------+
@@ -172,10 +185,10 @@ model.compile(
     metrics=hp.get("metrics", ["accuracy", "bce"]),
     transformer_optimizer=t_opt,
     discriminator_optimizer=d_opt,
-    aux_classifier_optimizer=None,
+    aux_classifier_optimizer=a_opt,
     transformer_upds_per_batch=hp.get("transformer_upds_per_batch", 1),
     discriminator_upds_per_batch=hp.get("discriminator_upds_per_batch", 1),
-    aux_classifier_upds_per_batch=None,
+    aux_classifier_upds_per_batch=hp.get("aux_classifier_upds_per_batch", 1),
 )
 
 # +------------------------------+
@@ -200,6 +213,15 @@ hp.get("d_sched", "ExponentialDecay")
 hp.get("d_decay_rate", d_decay_rate)
 hp.get("d_decay_steps", d_decay_steps)
 
+a_decay_rate = 0.10
+a_decay_steps = 150_000
+a_sched = ExponentialDecay(
+    model.aux_classifier_optimizer, decay_rate=a_decay_rate, decay_steps=a_decay_steps
+)
+hp.get("a_sched", "ExponentialDecay")
+hp.get("a_decay_rate", a_decay_rate)
+hp.get("a_decay_steps", a_decay_steps)
+
 # +------------------------+
 # |   Training procedure   |
 # +------------------------+
@@ -209,7 +231,7 @@ train = model.fit(
     train_ds,
     epochs=hp.get("epochs", EPOCHS),
     validation_data=val_ds,
-    callbacks=[t_sched, d_sched],
+    callbacks=[t_sched, d_sched, a_sched],
 )
 stop = datetime.now()
 
@@ -251,7 +273,7 @@ prefix = ""
 timestamp = timestamp.split(".")[0].replace("-", "").replace(" ", "-")
 for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
     prefix += time + unit  # YYYYMMDD-HHhMMmSSs
-prefix += "_calotron"
+prefix += "_calotron_aux"
 
 export_model_fname = f"{models_dir}/{prefix}_model"
 export_img_dirname = f"{images_dir}/{prefix}_img"
@@ -303,6 +325,14 @@ report.add_markdown(f"**Total params:** {num_params}")
 
 report.add_markdown("---")
 
+## Auxiliary Classifier architecture
+report.add_markdown('<h2 align="center">Auxiliary Classifier architecture</h2>')
+html_table, num_params = getSummaryHTML(model.aux_classifier)
+report.add_markdown(html_table)
+report.add_markdown(f"**Total params:** {num_params}")
+
+report.add_markdown("---")
+
 ## Training plots
 report.add_markdown('<h2 align="center">Training plots</h2>')
 
@@ -313,9 +343,9 @@ learning_curves(
     report=report,
     history=train,
     start_epoch=start_epoch,
-    keys=["t_loss", "d_loss"],
-    colors=["#3288bd", "#fc8d59"],
-    labels=["transformer", "discriminator"],
+    keys=["t_loss", "d_loss", "a_loss"],
+    colors=["#3288bd", "#fc8d59", "#4dac26"],
+    labels=["transformer", "discriminator", "aux-classifier"],
     legend_loc="upper right",
     save_figure=args.saving,
     scale_curves=True,
@@ -327,9 +357,9 @@ learn_rate_scheduling(
     report=report,
     history=train,
     start_epoch=0,
-    keys=["t_lr", "d_lr"],
-    colors=["#3288bd", "#fc8d59"],
-    labels=["transformer", "discriminator"],
+    keys=["t_lr", "d_lr", "a_lr"],
+    colors=["#3288bd", "#fc8d59", "#4dac26"],
+    labels=["transformer", "discriminator", "aux-classifier"],
     legend_loc="upper right",
     save_figure=args.saving,
     export_fname=f"{export_img_dirname}/lr-sched.png",
