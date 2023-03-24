@@ -156,6 +156,9 @@ class Transformer(tf.keras.Model):
                 assert isinstance(flag, bool)
                 self._residual_smoothing.append(flag)
 
+        # Output activations
+        self._output_activations = output_activations
+
         # Start token initializer
         if start_token_initializer not in START_TOKEN_INITIALIZERS:
             raise ValueError(

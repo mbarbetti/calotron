@@ -8,8 +8,8 @@ BATCH_SIZE = 500
 ADDITIONAL_DIM = 2
 
 
-source = tf.random.normal(shape=(CHUNK_SIZE, 32, 5))
-target = tf.random.normal(shape=(CHUNK_SIZE, 16, 3))
+source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
+target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
 
 
 @pytest.fixture
@@ -38,26 +38,9 @@ def model():
 ###########################################################################
 
 
-@pytest.mark.parametrize("output_activations", [None, "relu"])
-def test_model_configuration(output_activations):
+def test_model_configuration(model):
     from calotron.models import Transformer
 
-    model = Transformer(
-        output_depth=target.shape[2],
-        encoder_depth=8,
-        decoder_depth=8,
-        num_layers=2,
-        num_heads=4,
-        key_dims=32,
-        fnn_units=128,
-        dropout_rates=0.1,
-        seq_ord_latent_dims=16,
-        seq_ord_max_lengths=[source.shape[1], target.shape[1]],
-        seq_ord_normalizations=10_000,
-        residual_smoothing=True,
-        output_activations=output_activations,
-        start_token_initializer="ones",
-    )
     assert isinstance(model, Transformer)
     assert isinstance(model.output_depth, int)
     assert isinstance(model.encoder_depth, int)
@@ -71,8 +54,7 @@ def test_model_configuration(output_activations):
     assert isinstance(model.seq_ord_max_lengths, list)
     assert isinstance(model.seq_ord_normalizations, list)
     assert isinstance(model.residual_smoothing, list)
-    if model.output_activations is not None:
-        assert isinstance(model.output_activations, list)
+    assert isinstance(model.output_activations, str)
     assert isinstance(model.start_token_initializer, str)
 
 

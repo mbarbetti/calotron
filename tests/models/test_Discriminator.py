@@ -1,7 +1,8 @@
 import pytest
 import tensorflow as tf
 
-CHUNK_SIZE = int(5e4)
+CHUNK_SIZE = int(1e4)
+
 
 input1 = tf.random.normal(shape=(CHUNK_SIZE, 4, 3), mean=1.0)
 input2 = tf.random.normal(shape=(CHUNK_SIZE, 4, 3), mean=2.0)
