@@ -106,7 +106,9 @@ def test_model_compilation(model, metrics):
     assert isinstance(model.aux_classifier_upds_per_batch, int)
 
 
-@pytest.mark.parametrize("adversarial_metrics", ["binary-crossentropy", "wasserstein-distance"])
+@pytest.mark.parametrize(
+    "adversarial_metrics", ["binary-crossentropy", "wasserstein-distance"]
+)
 def test_model_train(model, adversarial_metrics):
     dataset = (
         tf.data.Dataset.from_tensor_slices((source, target))

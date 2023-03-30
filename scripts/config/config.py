@@ -16,7 +16,9 @@ parser.add_argument("-I", "--images_dir", default="./images")
 parser.add_argument("-R", "--reports_dir", default="./html")
 config_dir = dict()
 
-parser.add_argument("-s", "--server", default="http://hopaas.cloud.infn.it:11756")  # https://hopaas.cloud.infn.it
+parser.add_argument(
+    "-s", "--server", default="http://hopaas.cloud.infn.it:11756"
+)  # https://hopaas.cloud.infn.it
 parser.add_argument("-t", "--token", default="user-api-token")
 config_hopaas = dict()
 

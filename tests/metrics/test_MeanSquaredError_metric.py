@@ -32,7 +32,6 @@ def test_metric_use_no_weights(metric):
 
 
 def test_metric_use_with_weights(metric):
-    w = [1, 0]
     metric.update_state(y_true, y_pred, sample_weight=weight)
     res = metric.result().numpy()
     assert res
