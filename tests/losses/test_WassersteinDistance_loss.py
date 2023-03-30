@@ -28,7 +28,7 @@ transf = Transformer(
 disc = Discriminator(
     latent_dim=8,
     output_units=1,
-    output_activation=None,
+    output_activation="linear",
     deepsets_num_layers=2,
     deepsets_hidden_units=32,
     dropout_rate=0.1,
@@ -37,9 +37,15 @@ disc = Discriminator(
 
 @pytest.fixture
 def loss():
-    from calotron.losses import KLDivergence
+    from calotron.losses import WassersteinDistance
 
-    loss_ = KLDivergence()
+    loss_ = WassersteinDistance(
+        lipschitz_penalty=100.0,
+        virtual_direction_upds=1,
+        xi=10.0,
+        epsilon_min=0.01,
+        epsilon_max=1.0,
+    )
     return loss_
 
 
@@ -47,14 +53,19 @@ def loss():
 
 
 def test_loss_configuration(loss):
-    from calotron.losses import KLDivergence
+    from calotron.losses import WassersteinDistance
 
-    assert isinstance(loss, KLDivergence)
+    assert isinstance(loss, WassersteinDistance)
+    assert isinstance(loss.lipschitz_penalty, float)
+    assert isinstance(loss.virtual_direction_upds, int)
+    assert isinstance(loss.xi, float)
+    assert isinstance(loss.epsilon_min, float)
+    assert isinstance(loss.epsilon_max, float)
     assert isinstance(loss.name, str)
 
 
 def test_loss_use_no_weights(loss):
-    out1 = loss.transformer_loss(
+    out = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
@@ -62,7 +73,8 @@ def test_loss_use_no_weights(loss):
         sample_weight=None,
         training=False,
     )
-    out2 = loss.discriminator_loss(
+    assert out.numpy()
+    out = loss.discriminator_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
@@ -70,11 +82,11 @@ def test_loss_use_no_weights(loss):
         sample_weight=None,
         training=False,
     )
-    assert out1.numpy() == -out2.numpy()
+    assert out.numpy()
 
 
 def test_loss_use_with_weights(loss):
-    out1 = loss.transformer_loss(
+    out = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
@@ -82,7 +94,8 @@ def test_loss_use_with_weights(loss):
         sample_weight=weight,
         training=False,
     )
-    out2 = loss.discriminator_loss(
+    assert out.numpy()
+    out = loss.discriminator_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
@@ -90,4 +103,4 @@ def test_loss_use_with_weights(loss):
         sample_weight=weight,
         training=False,
     )
-    assert out1.numpy() == -out2.numpy()
+    assert out.numpy()

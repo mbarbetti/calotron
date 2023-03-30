@@ -7,7 +7,7 @@ from calotron.losses.BaseLoss import BaseLoss
 class MeanAbsoluteError(BaseLoss):
     def __init__(self, name="mae_loss") -> None:
         super().__init__(name)
-        self._loss = TF_MAE(reduction="auto")
+        self._loss = TF_MAE()
 
     def transformer_loss(
         self,
@@ -21,7 +21,12 @@ class MeanAbsoluteError(BaseLoss):
         output = transformer((source, target), training=training)
         y_true = discriminator(target, training=False)
         y_pred = discriminator(output, training=False)
-        loss = self._loss(y_true, y_pred, sample_weight=sample_weight)
+
+        if sample_weight is not None:
+            evt_weights = tf.reduce_mean(sample_weight, axis=1)
+        else:
+            evt_weights = None
+        loss = self._loss(y_true, y_pred, sample_weight=evt_weights)
         loss = tf.cast(loss, dtype=target.dtype)
         return loss  # error minimization
 
@@ -37,6 +42,11 @@ class MeanAbsoluteError(BaseLoss):
         output = transformer((source, target), training=False)
         y_true = discriminator(target, training=training)
         y_pred = discriminator(output, training=training)
-        loss = self._loss(y_true, y_pred, sample_weight=sample_weight)
+
+        if sample_weight is not None:
+            evt_weights = tf.reduce_mean(sample_weight, axis=1)
+        else:
+            evt_weights = None
+        loss = self._loss(y_true, y_pred, sample_weight=evt_weights)
         loss = tf.cast(loss, dtype=target.dtype)
         return -loss  # error maximization

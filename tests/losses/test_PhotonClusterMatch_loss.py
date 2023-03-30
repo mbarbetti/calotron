@@ -1,7 +1,7 @@
 import pytest
 import tensorflow as tf
 
-from calotron.models import Discriminator, Transformer
+from calotron.models import AuxClassifier, Discriminator, Transformer
 
 CHUNK_SIZE = int(1e4)
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
@@ -34,13 +34,19 @@ disc = Discriminator(
     dropout_rate=0.1,
 )
 
+aux = AuxClassifier(
+    transformer=transf, output_depth=1, output_activation="sigmoid", dropout_rate=0.1
+)
+
 
 @pytest.fixture
 def loss():
-    from calotron.losses import GlobalEventReco
+    from calotron.losses import PhotonClusterMatch
 
-    loss_ = GlobalEventReco(
+    loss_ = PhotonClusterMatch(
         alpha=0.1,
+        beta=0.0,
+        max_match_distance=0.005,
         adversarial_metric="binary-crossentropy",
         bce_options={
             "injected_noise_stddev": 0.0,
@@ -56,10 +62,12 @@ def loss():
 
 
 def test_loss_configuration(loss):
-    from calotron.losses import GlobalEventReco
+    from calotron.losses import PhotonClusterMatch
 
-    assert isinstance(loss, GlobalEventReco)
+    assert isinstance(loss, PhotonClusterMatch)
     assert isinstance(loss.alpha, float)
+    assert isinstance(loss.beta, float)
+    assert isinstance(loss.max_match_distance, float)
     assert isinstance(loss.adversarial_metric, str)
     assert isinstance(loss.bce_options, dict)
     assert isinstance(loss.wass_options, dict)
@@ -70,14 +78,25 @@ def test_loss_configuration(loss):
     "adversarial_metric", ["binary-crossentropy", "wasserstein-distance"]
 )
 def test_loss_use_no_weights(adversarial_metric):
-    from calotron.losses import GlobalEventReco
+    from calotron.losses import PhotonClusterMatch
 
-    loss = GlobalEventReco(
+    loss = PhotonClusterMatch(
         alpha=0.1,
+        beta=0.0,
+        max_match_distance=0.005,
         adversarial_metric=adversarial_metric,
         bce_options={"injected_noise_stddev": 0.1},
         wass_options={"lipschitz_penalty": 100.0},
     )
+    out = loss.discriminator_loss(
+        transformer=transf,
+        discriminator=disc,
+        source=source,
+        target=target,
+        sample_weight=None,
+        training=False,
+    )
+    assert out.numpy()
     out = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,
@@ -87,9 +106,8 @@ def test_loss_use_no_weights(adversarial_metric):
         training=False,
     )
     assert out.numpy()
-    out = loss.discriminator_loss(
-        transformer=transf,
-        discriminator=disc,
+    out = loss.aux_classifier_loss(
+        aux_classifier=aux,
         source=source,
         target=target,
         sample_weight=None,
@@ -102,14 +120,25 @@ def test_loss_use_no_weights(adversarial_metric):
     "adversarial_metric", ["binary-crossentropy", "wasserstein-distance"]
 )
 def test_loss_use_with_weights(adversarial_metric):
-    from calotron.losses import GlobalEventReco
+    from calotron.losses import PhotonClusterMatch
 
-    loss = GlobalEventReco(
+    loss = PhotonClusterMatch(
         alpha=0.1,
+        beta=0.0,
+        max_match_distance=0.005,
         adversarial_metric=adversarial_metric,
         bce_options={"injected_noise_stddev": 0.1},
         wass_options={"lipschitz_penalty": 100.0},
     )
+    out = loss.discriminator_loss(
+        transformer=transf,
+        discriminator=disc,
+        source=source,
+        target=target,
+        sample_weight=weight,
+        training=False,
+    )
+    assert out.numpy()
     out = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,
@@ -119,9 +148,8 @@ def test_loss_use_with_weights(adversarial_metric):
         training=False,
     )
     assert out.numpy()
-    out = loss.discriminator_loss(
-        transformer=transf,
-        discriminator=disc,
+    out = loss.aux_classifier_loss(
+        aux_classifier=aux,
         source=source,
         target=target,
         sample_weight=weight,

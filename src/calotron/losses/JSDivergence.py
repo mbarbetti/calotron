@@ -7,7 +7,7 @@ from calotron.losses.BaseLoss import BaseLoss
 class JSDivergence(BaseLoss):
     def __init__(self, name="js_loss") -> None:
         super().__init__(name)
-        self._kl_div = TF_KLDivergence(reduction="auto")
+        self._kl_div = TF_KLDivergence()
 
     def transformer_loss(
         self,
@@ -21,7 +21,12 @@ class JSDivergence(BaseLoss):
         output = transformer((source, target), training=training)
         y_true = discriminator(target, training=False)
         y_pred = discriminator(output, training=False)
-        loss = self._js_div(y_true, y_pred, sample_weight=sample_weight)
+
+        if sample_weight is not None:
+            evt_weights = tf.reduce_mean(sample_weight, axis=1)
+        else:
+            evt_weights = None
+        loss = self._js_div(y_true, y_pred, sample_weight=evt_weights)
         loss = tf.cast(loss, dtype=target.dtype)
         return loss  # divergence minimization
 
@@ -37,7 +42,12 @@ class JSDivergence(BaseLoss):
         output = transformer((source, target), training=False)
         y_true = discriminator(target, training=training)
         y_pred = discriminator(output, training=training)
-        loss = self._js_div(y_true, y_pred, sample_weight=sample_weight)
+
+        if sample_weight is not None:
+            evt_weights = tf.reduce_mean(sample_weight, axis=1)
+        else:
+            evt_weights = None
+        loss = self._js_div(y_true, y_pred, sample_weight=evt_weights)
         loss = tf.cast(loss, dtype=target.dtype)
         return -loss  # divergence maximization
 

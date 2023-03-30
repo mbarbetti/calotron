@@ -1,15 +1,12 @@
-import numpy as np
 import pytest
 import tensorflow as tf
 
 from calotron.models import Discriminator, Transformer
 
 CHUNK_SIZE = int(1e4)
-
-
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
-
+weight = tf.random.uniform(shape=(CHUNK_SIZE, target.shape[1], 1))
 
 transf = Transformer(
     output_depth=target.shape[2],
@@ -18,7 +15,7 @@ transf = Transformer(
     num_layers=2,
     num_heads=4,
     key_dims=32,
-    fnn_units=16,
+    mlp_units=16,
     dropout_rates=0.1,
     seq_ord_latent_dims=16,
     seq_ord_max_lengths=[source.shape[1], target.shape[1]],
@@ -57,7 +54,7 @@ def test_loss_configuration(loss):
 
 
 def test_loss_use_no_weights(loss):
-    out1 = loss.discriminator_loss(
+    out1 = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
@@ -65,7 +62,7 @@ def test_loss_use_no_weights(loss):
         sample_weight=None,
         training=False,
     )
-    out2 = loss.transformer_loss(
+    out2 = loss.discriminator_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
@@ -77,21 +74,20 @@ def test_loss_use_no_weights(loss):
 
 
 def test_loss_use_with_weights(loss):
-    w = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE, 1)) > 0.5
-    out1 = loss.discriminator_loss(
+    out1 = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
         target=target,
-        sample_weight=w,
+        sample_weight=weight,
         training=False,
     )
-    out2 = loss.transformer_loss(
+    out2 = loss.discriminator_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
         target=target,
-        sample_weight=w,
+        sample_weight=weight,
         training=False,
     )
     assert out1.numpy() == -out2.numpy()
