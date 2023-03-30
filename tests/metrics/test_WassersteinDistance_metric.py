@@ -9,9 +9,9 @@ weight = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE, 4, 1))
 
 @pytest.fixture
 def metric():
-    from calotron.metrics import JSDivergence
+    from calotron.metrics import WassersteinDistance
 
-    metric_ = JSDivergence()
+    metric_ = WassersteinDistance()
     return metric_
 
 
@@ -19,9 +19,9 @@ def metric():
 
 
 def test_metric_configuration(metric):
-    from calotron.metrics import JSDivergence
+    from calotron.metrics import WassersteinDistance
 
-    assert isinstance(metric, JSDivergence)
+    assert isinstance(metric, WassersteinDistance)
     assert isinstance(metric.name, str)
 
 

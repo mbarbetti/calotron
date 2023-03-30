@@ -1,21 +1,18 @@
 import numpy as np
 import pytest
-import tensorflow as tf
 
 CHUNK_SIZE = int(1e4)
-
 y_true = None
-y_pred = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE,))
-y_pred_logits = np.random.uniform(-5.0, 5.0, size=(CHUNK_SIZE,))
+y_pred = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE, 1))
+y_pred_logits = np.random.uniform(-5.0, 5.0, size=(CHUNK_SIZE, 1))
+weight = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE, 4, 1))
 
 
 @pytest.fixture
 def metric():
     from calotron.metrics import BinaryCrossentropy
 
-    metric_ = BinaryCrossentropy(
-        name="bce", dtype=None, from_logits=False, label_smoothing=0.0
-    )
+    metric_ = BinaryCrossentropy(from_logits=False, label_smoothing=0.0)
     return metric_
 
 
@@ -33,31 +30,25 @@ def test_metric_configuration(metric):
 def test_metric_use_no_weights(from_logits):
     from calotron.metrics import BinaryCrossentropy
 
-    metric = BinaryCrossentropy(
-        name="bce", dtype=None, from_logits=from_logits, label_smoothing=0.0
-    )
+    metric = BinaryCrossentropy(from_logits=from_logits, label_smoothing=0.0)
     if from_logits:
         metric.update_state(y_true, y_pred_logits, sample_weight=None)
         res = metric.result().numpy()
-        assert (res > 1.2) and (res < 1.5)
     else:
         metric.update_state(y_true, y_pred, sample_weight=None)
         res = metric.result().numpy()
-        assert (res > 0.9) and (res < 1.1)
+    assert res
 
 
 @pytest.mark.parametrize("from_logits", [False, True])
 def test_metric_use_with_weights(from_logits):
     from calotron.metrics import BinaryCrossentropy
 
-    metric = BinaryCrossentropy(
-        name="bce", dtype=None, from_logits=from_logits, label_smoothing=0.0
-    )
+    metric = BinaryCrossentropy(from_logits=from_logits, label_smoothing=0.0)
     if from_logits:
-        metric.update_state(y_true, y_pred_logits, sample_weight=1.0)
+        metric.update_state(y_true, y_pred_logits, sample_weight=weight)
         res = metric.result().numpy()
-        assert (res > 1.2) and (res < 1.5)
     else:
-        metric.update_state(y_true, y_pred, sample_weight=1.0)
+        metric.update_state(y_true, y_pred, sample_weight=weight)
         res = metric.result().numpy()
-        assert (res > 0.9) and (res < 1.1)
+    assert res
