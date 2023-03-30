@@ -31,14 +31,14 @@
 The Transformer architecture is freely inspired by Vaswani et al. [[arXiv:1706.03762](https://arxiv.org/abs/1706.03762)] and Dosovitskiy et al. [[arXiv:2010.11929](https://arxiv.org/abs/2010.11929)].
 
 <div align="center">
-  <img alt="calotron transformer architecture" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/transf-scheme.png" width="300"/>
+  <img alt="calotron transformer architecture" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/transf-scheme.png" width="400"/>
 </div>
 
 ### Discriminator
 The Discriminator is implemented through the Deep Sets model proposed by Zaheer et al. [[arXiv:1703.06114](https://arxiv.org/abs/1703.06114)] and its architecture is freely inspired by what developed by the ATLAS Collaboration for flavor tagging [[ATL-PHYS-PUB-2020-014](https://cds.cern.ch/record/2718948)].
 
 <div align="center">
-  <img alt="calotron discriminator architecture" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/disc-scheme.png" width="500"/>
+  <img alt="calotron discriminator architecture" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/disc-scheme.png" width="800"/>
 </div>
 
 ### Credits
