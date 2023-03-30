@@ -23,7 +23,7 @@ def model():
         num_layers=2,
         num_heads=4,
         key_dims=32,
-        fnn_units=128,
+        mlp_units=128,
         dropout_rates=0.1,
         seq_ord_latent_dims=16,
         seq_ord_max_lengths=[source.shape[1], target.shape[1]],
@@ -48,7 +48,7 @@ def test_model_configuration(model):
     assert isinstance(model.num_layers, list)
     assert isinstance(model.num_heads, list)
     assert isinstance(model.key_dims, list)
-    assert isinstance(model.fnn_units, list)
+    assert isinstance(model.mlp_units, list)
     assert isinstance(model.dropout_rates, list)
     assert isinstance(model.seq_ord_latent_dims, list)
     assert isinstance(model.seq_ord_max_lengths, list)
@@ -76,7 +76,7 @@ def test_model_use_residual_smoothing(residual_smoothing):
         num_layers=2,
         num_heads=4,
         key_dims=32,
-        fnn_units=128,
+        mlp_units=128,
         dropout_rates=0.1,
         seq_ord_latent_dims=latent_dim,
         seq_ord_max_lengths=[source.shape[1], target.shape[1]],
@@ -110,7 +110,7 @@ def test_model_use_start_token_initializer(start_token_initializer):
         num_layers=2,
         num_heads=4,
         key_dims=32,
-        fnn_units=128,
+        mlp_units=128,
         dropout_rates=0.1,
         seq_ord_latent_dims=16,
         seq_ord_max_lengths=[source.shape[1], target.shape[1]],
@@ -139,4 +139,4 @@ def test_model_train(model):
     adam = tf.keras.optimizers.Adam(learning_rate=0.001)
     mse = tf.keras.losses.MeanSquaredError()
     model.compile(optimizer=adam, loss=mse)
-    model.fit(dataset, epochs=3)
+    model.fit(dataset, epochs=2)

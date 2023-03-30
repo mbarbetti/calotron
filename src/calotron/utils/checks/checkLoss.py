@@ -5,10 +5,11 @@ from calotron.losses import JSDivergence as JS
 from calotron.losses import KLDivergence as KL
 from calotron.losses import MeanAbsoluteError as MAE
 from calotron.losses import MeanSquaredError as MSE
+from calotron.losses import WassersteinDistance as Wass
 from calotron.losses.BaseLoss import BaseLoss
 
-LOSS_SHORTCUTS = ["bce", "kl", "js", "mse", "mae"]
-CALOTRON_LOSSES = [BCE(), KL(), JS(), MSE(), MAE()]
+LOSS_SHORTCUTS = ["bce", "kl", "js", "mse", "mae", "wass"]
+CALOTRON_LOSSES = [BCE(), KL(), JS(), MSE(), MAE(), Wass()]
 
 
 def checkLoss(loss) -> BaseLoss:

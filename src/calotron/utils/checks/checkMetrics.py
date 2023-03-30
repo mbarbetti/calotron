@@ -5,10 +5,11 @@ from calotron.metrics import KLDivergence as KL
 from calotron.metrics import MeanAbsoluteError as MAE
 from calotron.metrics import MeanSquaredError as MSE
 from calotron.metrics import RootMeanSquaredError as RMSE
+from calotron.metrics import WassersteinDistance as Wass
 from calotron.metrics.BaseMetric import BaseMetric
 
-METRIC_SHORTCUTS = ["accuracy", "bce", "kl_div", "js_div", "mse", "rmse", "mae"]
-CALOTRON_METRICS = [Accuracy(), BCE(), KL(), JS(), MSE(), RMSE(), MAE()]
+METRIC_SHORTCUTS = ["accuracy", "bce", "kl", "js", "mse", "rmse", "mae", "wass"]
+CALOTRON_METRICS = [Accuracy(), BCE(), KL(), JS(), MSE(), RMSE(), MAE(), Wass()]
 
 
 def checkMetrics(metrics):  # TODO: add Union[list, None]

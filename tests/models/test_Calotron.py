@@ -3,8 +3,6 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Optimizer, RMSprop
 
 CHUNK_SIZE = int(1e4)
-
-
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
 
@@ -20,7 +18,7 @@ def model():
         num_layers=2,
         num_heads=4,
         key_dims=32,
-        fnn_units=16,
+        mlp_units=16,
         dropout_rates=0.1,
         seq_ord_latent_dims=16,
         seq_ord_max_lengths=[source.shape[1], target.shape[1]],
@@ -83,9 +81,9 @@ def test_model_use(model):
 
 @pytest.mark.parametrize("metrics", [["bce"], None])
 def test_model_compilation(model, metrics):
-    from calotron.losses import PrimaryPhotonMatch
+    from calotron.losses import PhotonClusterMatch
 
-    loss = PrimaryPhotonMatch(alpha=0.1)
+    loss = PhotonClusterMatch(alpha=0.1)
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     a_opt = RMSprop(learning_rate=0.001)
@@ -108,16 +106,17 @@ def test_model_compilation(model, metrics):
     assert isinstance(model.aux_classifier_upds_per_batch, int)
 
 
-def test_model_train(model):
+@pytest.mark.parametrize("adversarial_metrics", ["binary-crossentropy", "wasserstein-distance"])
+def test_model_train(model, adversarial_metrics):
     dataset = (
         tf.data.Dataset.from_tensor_slices((source, target))
         .batch(batch_size=512, drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
     )
-    from calotron.losses import PrimaryPhotonMatch
+    from calotron.losses import PhotonClusterMatch
 
-    loss = PrimaryPhotonMatch(alpha=0.1)
+    loss = PhotonClusterMatch(alpha=0.1, adversarial_metric=adversarial_metrics)
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     a_opt = RMSprop(learning_rate=0.001)
@@ -131,13 +130,13 @@ def test_model_train(model):
         discriminator_upds_per_batch=1,
         aux_classifier_upds_per_batch=1,
     )
-    model.fit(dataset, epochs=3)
+    model.fit(dataset, epochs=2)
 
 
 def test_model_eval(model):
-    from calotron.losses import PrimaryPhotonMatch
+    from calotron.losses import PhotonClusterMatch
 
-    loss = PrimaryPhotonMatch(alpha=0.1)
+    loss = PhotonClusterMatch(alpha=0.1)
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     a_opt = RMSprop(learning_rate=0.001)

@@ -15,7 +15,7 @@ class Transformer(tf.keras.Model):
         num_layers,
         num_heads,
         key_dims,
-        fnn_units=128,
+        mlp_units=128,
         dropout_rates=0.1,
         seq_ord_latent_dims=16,
         seq_ord_max_lengths=512,
@@ -80,17 +80,17 @@ class Transformer(tf.keras.Model):
                 self._key_dims.append(int(dim))
 
         # Feed-forward net units (encoder/decoder)
-        if isinstance(fnn_units, (int, float)):
-            assert fnn_units >= 1
-            self._fnn_units = [int(fnn_units)] * 2
+        if isinstance(mlp_units, (int, float)):
+            assert mlp_units >= 1
+            self._mlp_units = [int(mlp_units)] * 2
         else:
-            assert isinstance(fnn_units, (list, tuple, np.ndarray))
-            assert len(fnn_units) == 2
-            self._fnn_units = list()
-            for units in fnn_units:
+            assert isinstance(mlp_units, (list, tuple, np.ndarray))
+            assert len(mlp_units) == 2
+            self._mlp_units = list()
+            for units in mlp_units:
                 assert isinstance(units, (int, float))
                 assert units >= 1
-                self._fnn_units.append(int(units))
+                self._mlp_units.append(int(units))
 
         # Dropout rate (encoder/decoder)
         if isinstance(dropout_rates, (int, float)):
@@ -160,6 +160,7 @@ class Transformer(tf.keras.Model):
         self._output_activations = output_activations
 
         # Start token initializer
+        assert isinstance(start_token_initializer, str)
         if start_token_initializer not in START_TOKEN_INITIALIZERS:
             raise ValueError(
                 "`start_token_initializer` should be selected "
@@ -174,7 +175,7 @@ class Transformer(tf.keras.Model):
             num_layers=self._num_layers[0],
             num_heads=self._num_heads[0],
             key_dim=self._key_dims[0],
-            fnn_units=self._fnn_units[0],
+            mlp_units=self._mlp_units[0],
             dropout_rate=self._dropout_rates[0],
             seq_ord_latent_dim=self._seq_ord_latent_dims[0],
             seq_ord_max_length=self._seq_ord_max_lengths[0],
@@ -190,7 +191,7 @@ class Transformer(tf.keras.Model):
             num_layers=self._num_layers[1],
             num_heads=self._num_heads[1],
             key_dim=self._key_dims[1],
-            fnn_units=self._fnn_units[1],
+            mlp_units=self._mlp_units[1],
             dropout_rate=self._dropout_rates[1],
             seq_ord_latent_dim=self._seq_ord_latent_dims[1],
             seq_ord_max_length=self._seq_ord_max_lengths[1],
@@ -204,7 +205,8 @@ class Transformer(tf.keras.Model):
         self._output_layer = tf.keras.layers.Dense(
             units=self._output_depth,
             activation="linear",
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.1),
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.2),
+            bias_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.01),
             name="t_dense_out",
             dtype=self.dtype,
         )
@@ -277,8 +279,8 @@ class Transformer(tf.keras.Model):
         return self._key_dims
 
     @property
-    def fnn_units(self) -> list:
-        return self._fnn_units
+    def mlp_units(self) -> list:
+        return self._mlp_units
 
     @property
     def dropout_rates(self) -> list:

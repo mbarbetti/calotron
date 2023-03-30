@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from calotron.layers.Attention import CausalSelfAttention, CrossAttention
-from calotron.layers.FeedForward import FeedForward
+from calotron.layers.MultilayerPerceptron import MultilayerPerceptron
 from calotron.layers.SeqOrderEmbedding import SeqOrderEmbedding
 
 
@@ -11,9 +11,8 @@ class DecoderLayer(tf.keras.layers.Layer):
         output_depth,
         num_heads,
         key_dim,
-        fnn_units=128,
+        mlp_units=128,
         dropout_rate=0.1,
-        residual_smoothing=True,
         name=None,
         dtype=None,
     ) -> None:
@@ -37,25 +36,20 @@ class DecoderLayer(tf.keras.layers.Layer):
         assert key_dim >= 1
         self._key_dim = int(key_dim)
 
-        # Feed-forward net units
-        assert isinstance(fnn_units, (int, float))
-        assert fnn_units >= 1
-        self._fnn_units = int(fnn_units)
+        # Multilayer perceptron units
+        assert isinstance(mlp_units, (int, float))
+        assert mlp_units >= 1
+        self._mlp_units = int(mlp_units)
 
         # Dropout rate
         assert isinstance(dropout_rate, (int, float))
         assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
-        # Residual smoothing
-        assert isinstance(residual_smoothing, bool)
-        self._residual_smoothing = residual_smoothing
-
         # Masked multi-head attention
         self._causal_attn = CausalSelfAttention(
             num_heads=self._num_heads,
             key_dim=self._key_dim,
-            kernel_initializer="glorot_uniform",
             dropout=self._dropout_rate,
             name=f"{prefix}_causal_attn_{suffix}" if name else None,
             dtype=self.dtype,
@@ -65,26 +59,24 @@ class DecoderLayer(tf.keras.layers.Layer):
         self._cross_attn = CrossAttention(
             num_heads=self._num_heads,
             key_dim=self._key_dim,
-            kernel_initializer="glorot_uniform",
             dropout=self._dropout_rate,
             name=f"{prefix}_cross_attn_{suffix}" if name else None,
             dtype=self.dtype,
         )
 
-        # Feed-forward net
-        self._ff_net = FeedForward(
+        # Multilayer perceptron
+        self._mlp = MultilayerPerceptron(
             output_units=self._output_depth,
-            hidden_units=self._fnn_units,
+            hidden_units=self._mlp_units,
             dropout_rate=self._dropout_rate,
-            residual_smoothing=self._residual_smoothing,
-            name=f"{prefix}_fnn_{suffix}" if name else None,
+            name=f"{prefix}_mlp_{suffix}" if name else None,
             dtype=self.dtype,
         )
 
     def call(self, x, condition) -> tf.Tensor:
         x = self._causal_attn(x)
         output = self._cross_attn(x, condition)
-        output = self._ff_net(output)
+        output = self._mlp(output)
         return output
 
     @property
@@ -100,16 +92,12 @@ class DecoderLayer(tf.keras.layers.Layer):
         return self._key_dim
 
     @property
-    def fnn_units(self) -> int:
-        return self._fnn_units
+    def mlp_units(self) -> int:
+        return self._mlp_units
 
     @property
     def dropout_rate(self) -> float:
         return self._dropout_rate
-
-    @property
-    def residual_smoothing(self) -> bool:
-        return self._residual_smoothing
 
 
 class Decoder(tf.keras.layers.Layer):
@@ -119,7 +107,7 @@ class Decoder(tf.keras.layers.Layer):
         num_layers,
         num_heads,
         key_dim,
-        fnn_units=128,
+        mlp_units=128,
         dropout_rate=0.1,
         seq_ord_latent_dim=16,
         seq_ord_max_length=512,
@@ -150,10 +138,10 @@ class Decoder(tf.keras.layers.Layer):
         assert key_dim >= 1
         self._key_dim = int(key_dim)
 
-        # Feed-forward net units
-        assert isinstance(fnn_units, (int, float))
-        assert fnn_units >= 1
-        self._fnn_units = int(fnn_units)
+        # Multilayer perceptron units
+        assert isinstance(mlp_units, (int, float))
+        assert mlp_units >= 1
+        self._mlp_units = int(mlp_units)
 
         # Dropout rate
         assert isinstance(dropout_rate, (int, float))
@@ -188,10 +176,29 @@ class Decoder(tf.keras.layers.Layer):
             dtype=self.dtype,
         )
 
-        # Dropout layer
-        self._dropout = tf.keras.layers.Dropout(
-            self._dropout_rate, name="dec_dropout", dtype=self.dtype
-        )
+        # Smoothing layer
+        if self._residual_smoothing:
+            self._smooth_layer = tf.keras.Sequential(
+                [
+                    tf.keras.layers.Dense(
+                        units=self._output_depth,
+                        activation="linear",
+                        kernel_initializer=tf.keras.initializers.RandomUniform(
+                            minval=-0.1, maxval=0.1
+                        ),
+                        bias_initializer=tf.keras.initializers.TruncatedNormal(
+                            stddev=0.01
+                        ),
+                        name="dec_smooth_layer",
+                        dtype=self.dtype,
+                    ),
+                    tf.keras.layers.Dropout(
+                        self._dropout_rate, name="dec_dropout", dtype=self.dtype
+                    ),
+                ]
+            )
+        else:
+            self._smooth_layer = None
 
         # Decoder layers
         self._decoder_layers = [
@@ -199,9 +206,8 @@ class Decoder(tf.keras.layers.Layer):
                 output_depth=self._output_depth,
                 num_heads=self._num_heads,
                 key_dim=self._key_dim,
-                fnn_units=self._fnn_units,
+                mlp_units=self._mlp_units,
                 dropout_rate=self._dropout_rate,
-                residual_smoothing=self._residual_smoothing,
                 name=f"dec_layer_{i}",
                 dtype=self.dtype,
             )
@@ -211,7 +217,8 @@ class Decoder(tf.keras.layers.Layer):
     def call(self, x, condition) -> tf.Tensor:
         seq_order = self._seq_ord_embedding(x)
         output = tf.concat([x, seq_order], axis=2)
-        output = self._dropout(output)
+        if self._smooth_layer is not None:
+            output = self._smooth_layer(output)
         for i in range(self._num_layers):
             output = self._decoder_layers[i](output, condition)
         return output
@@ -233,8 +240,8 @@ class Decoder(tf.keras.layers.Layer):
         return self._key_dim
 
     @property
-    def fnn_units(self) -> int:
-        return self._fnn_units
+    def mlp_units(self) -> int:
+        return self._mlp_units
 
     @property
     def dropout_rate(self) -> float:

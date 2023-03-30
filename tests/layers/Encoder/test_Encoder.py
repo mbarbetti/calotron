@@ -11,7 +11,7 @@ def layer():
         num_layers=4,
         num_heads=8,
         key_dim=32,
-        fnn_units=128,
+        mlp_units=128,
         dropout_rate=0.1,
         seq_ord_latent_dim=16,
         seq_ord_max_length=512,
@@ -32,7 +32,7 @@ def test_layer_configuration(layer):
     assert isinstance(layer.num_layers, int)
     assert isinstance(layer.num_heads, int)
     assert isinstance(layer.key_dim, int)
-    assert isinstance(layer.fnn_units, int)
+    assert isinstance(layer.mlp_units, int)
     assert isinstance(layer.dropout_rate, float)
     assert isinstance(layer.seq_ord_latent_dim, int)
     assert isinstance(layer.seq_ord_max_length, int)
@@ -57,7 +57,7 @@ def test_layer_use(residual_smoothing):
         num_layers=4,
         num_heads=8,
         key_dim=32,
-        fnn_units=128,
+        mlp_units=128,
         dropout_rate=0.1,
         seq_ord_latent_dim=latent_dim,
         seq_ord_max_length=max_length,
