@@ -40,8 +40,10 @@ class DeepSets(tf.keras.layers.Layer):
                 tf.keras.layers.Dense(
                     self._hidden_units,
                     activation="relu",
-                    kernel_initializer="glorot_normal",
-                    bias_initializer="he_normal",
+                    kernel_initializer=tf.keras.initializers.RandomUniform(
+                        minval=-0.05, maxval=0.05
+                    ),
+                    bias_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.01),
                     name="ds_dense",
                     dtype=self.dtype,
                 )
@@ -57,21 +59,17 @@ class DeepSets(tf.keras.layers.Layer):
             tf.keras.layers.Dense(
                 self._latent_dim,
                 activation="relu",
-                kernel_initializer="he_normal",
-                bias_initializer="he_normal",
+                kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.1),
+                bias_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.01),
                 name="ds_output_layer",
                 dtype=self.dtype,
             )
         ]
 
-        # Normalization layer
-        self._layer_norm = tf.keras.layers.LayerNormalization()
-
     def call(self, x) -> tf.Tensor:
         for layer in self._seq:
             x = layer(x)
         output = tf.reduce_sum(x, axis=1)
-        output = self._layer_norm(output)
         return output
 
     @property

@@ -71,4 +71,4 @@ def test_model_train(model):
     adam = tf.keras.optimizers.Adam(learning_rate=0.001)
     bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)
     model.compile(optimizer=adam, loss=bce)
-    model.fit(dataset, epochs=3)
+    model.fit(dataset, epochs=2)
