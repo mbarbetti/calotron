@@ -5,8 +5,8 @@ CHUNK_SIZE = int(1e4)
 
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
-label1 = tf.zeros(shape=(int(CHUNK_SIZE/2),))
-label2 = tf.ones(shape=(int(CHUNK_SIZE/2),))
+label1 = tf.zeros(shape=(int(CHUNK_SIZE / 2),))
+label2 = tf.ones(shape=(int(CHUNK_SIZE / 2),))
 labels = tf.concat([label1, label2], axis=0)
 
 

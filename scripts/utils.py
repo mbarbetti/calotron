@@ -30,9 +30,9 @@ def learning_curves(
         scales = np.mean(ratios, axis=-1)
         for i in range(len(scales)):
             if np.abs(scales[i]) >= 1.0:
-                scales[i] = 1/np.around(scales[i])
+                scales[i] = 1 / np.around(scales[i])
             else:
-                scales[i] = np.around(1/scales[i]) 
+                scales[i] = np.around(1 / scales[i])
         for i in range(len(labels)):
             labels[i] += f" [x {scales[i]:.1f}]"
     else:

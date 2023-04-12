@@ -118,10 +118,7 @@ class PhotonClusterMatch(BaseLoss):
         geom_loss = tf.cast(geom_loss, dtype=target.dtype)
 
         # Global event reco loss
-        global_err = tf.reduce_sum(
-            (target[:, :, 2:] - output[:, :, 2:]) ** 2,
-            axis=-1,
-        )
+        global_err = tf.reduce_sum((target[:, :, 2:] - output[:, :, 2:]) ** 2, axis=-1)
         if sample_weight is not None:
             if len(tf.shape(sample_weight)) != len(tf.shape(global_err)):
                 weights = tf.reduce_mean(sample_weight, axis=-1)
@@ -130,15 +127,15 @@ class PhotonClusterMatch(BaseLoss):
             )
         global_loss = tf.reduce_mean(global_err)
         global_loss = tf.cast(global_loss, dtype=target.dtype)
-        
+
         tot_loss = (
-            match_loss 
+            match_loss
             + self._lambda_adv * adv_loss
             + self._lambda_geom * geom_loss
             + self._lambda_global * global_loss
         )
         return tot_loss
-    
+
     def _matching_weights(self, source, target, sample_weight=None) -> tf.Tensor:
         source_xy = tf.tile(source[:, None, :, :2], (1, tf.shape(target)[1], 1, 1))
         target_xy = tf.tile(target[:, :, None, :2], (1, 1, tf.shape(source)[1], 1))
@@ -183,9 +180,7 @@ class PhotonClusterMatch(BaseLoss):
         # Photon-cluster matching labels
         source_coords = tf.tile(source[:, :, None, :2], (1, 1, tf.shape(target)[1], 1))
         target_coords = tf.tile(target[:, None, :, :2], (1, tf.shape(source)[1], 1, 1))
-        pairwise_distance = tf.norm(
-            target_coords - source_coords, axis=-1
-        )
+        pairwise_distance = tf.norm(target_coords - source_coords, axis=-1)
         pairwise_distance = tf.reduce_min(pairwise_distance, axis=-1)
         labels = tf.cast(
             pairwise_distance < self._max_match_distance, dtype=source.dtype
@@ -203,7 +198,7 @@ class PhotonClusterMatch(BaseLoss):
     @property
     def lambda_adv(self) -> float:
         return self._lambda_adv
-    
+
     @property
     def lambda_geom(self) -> float:
         return self._lambda_geom
@@ -227,7 +222,7 @@ class PhotonClusterMatch(BaseLoss):
     @property
     def wass_options(self) -> dict:
         return self._wass_options
-    
+
     @property
     def aux_bce_options(self) -> dict:
         return self._aux_bce_options

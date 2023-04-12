@@ -94,7 +94,7 @@ class WassersteinDistance(BaseLoss):
                 shape=(2 * batch_size, length, depth),
                 minval=-1.0,
                 maxval=1.0,
-                dtype=target.dtype
+                dtype=target.dtype,
             )
             d /= tf.norm(d, axis=[1, 2])[:, None, None]
             tape.watch(d)
@@ -139,10 +139,13 @@ class WassersteinDistance(BaseLoss):
             clip_value_min=tf.reduce_min(output),
             clip_value_max=tf.reduce_max(output),
         )
-        x_diff = tf.abs(
-            tf.concat([target, output], axis=0)
-            - tf.concat([target_hat, output_hat], axis=0)
-        ) + self._epsilon  # non-zero difference
+        x_diff = (
+            tf.abs(
+                tf.concat([target, output], axis=0)
+                - tf.concat([target_hat, output_hat], axis=0)
+            )
+            + self._epsilon
+        )  # non-zero difference
         x_diff = tf.norm(x_diff, axis=[1, 2], keepdims=True)
 
         y_true_hat = discriminator((source, target_hat), training=training)
@@ -178,7 +181,7 @@ class WassersteinDistance(BaseLoss):
     @property
     def sampled_xi_max(self) -> float:
         return self._sampled_xi_max
-    
+
     @property
     def epsilon(self) -> float:
         return self._epsilon

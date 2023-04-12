@@ -114,7 +114,7 @@ class Calotron(tf.keras.Model):
         if self._aux_classifier is not None:
             for _ in range(self._a_upds_per_batch):
                 self._a_train_step(source, target, sample_weight)
-        
+
         for _ in range(self._d_upds_per_batch):
             self._d_train_step(source, target, sample_weight)
         for _ in range(self._t_upds_per_batch):

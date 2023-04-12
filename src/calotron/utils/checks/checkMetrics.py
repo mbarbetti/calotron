@@ -8,8 +8,26 @@ from calotron.metrics import RootMeanSquaredError as RMSE
 from calotron.metrics import WassersteinDistance as Wass_dist
 from calotron.metrics.BaseMetric import BaseMetric
 
-METRIC_SHORTCUTS = ["accuracy", "bce", "kl_div", "js_div", "mse", "rmse", "mae", "wass_dist"]
-CALOTRON_METRICS = [Accuracy(), BCE(), KL_div(), JS_div(), MSE(), RMSE(), MAE(), Wass_dist()]
+METRIC_SHORTCUTS = [
+    "accuracy",
+    "bce",
+    "kl_div",
+    "js_div",
+    "mse",
+    "rmse",
+    "mae",
+    "wass_dist",
+]
+CALOTRON_METRICS = [
+    Accuracy(),
+    BCE(),
+    KL_div(),
+    JS_div(),
+    MSE(),
+    RMSE(),
+    MAE(),
+    Wass_dist(),
+]
 
 
 def checkMetrics(metrics):  # TODO: add Union[list, None]

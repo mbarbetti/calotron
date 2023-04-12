@@ -34,11 +34,12 @@ class PairwiseDiscriminator(Discriminator):
         target_2 = tf.tile(target[:, None, :, :], (1, tf.shape(target)[1], 1, 1))
         pairs = tf.concat([target_1, target_2], axis=-1)
         pairs = tf.reshape(
-            pairs, shape=(
+            pairs,
+            shape=(
                 tf.shape(target)[0],
                 tf.shape(target)[1] ** 2,
                 2 * tf.shape(target)[2],
-            )
+            ),
         )
 
         # Event classification

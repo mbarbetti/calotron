@@ -80,10 +80,7 @@ class GlobalEventReco(BaseLoss):
             training=training,
         )
 
-        tot_loss = (
-            reco_loss 
-            + self._lambda_adv * adv_loss
-        )
+        tot_loss = reco_loss + self._lambda_adv * adv_loss
         return tot_loss
 
     def discriminator_loss(
