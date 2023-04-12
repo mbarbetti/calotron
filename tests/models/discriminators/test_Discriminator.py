@@ -3,13 +3,10 @@ import tensorflow as tf
 
 CHUNK_SIZE = int(1e4)
 
-
-input1 = tf.random.normal(shape=(CHUNK_SIZE, 4, 3), mean=1.0)
-input2 = tf.random.normal(shape=(CHUNK_SIZE, 4, 3), mean=2.0)
-inputs = tf.concat([input1, input2], axis=0)
-
-label1 = tf.zeros(shape=(CHUNK_SIZE,))
-label2 = tf.ones(shape=(CHUNK_SIZE,))
+source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
+target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
+label1 = tf.zeros(shape=(int(CHUNK_SIZE/2),))
+label2 = tf.ones(shape=(int(CHUNK_SIZE/2),))
 labels = tf.concat([label1, label2], axis=0)
 
 
@@ -54,16 +51,16 @@ def test_model_use(activation):
         deepsets_hidden_units=32,
         dropout_rate=0.1,
     )
-    output = model(inputs)
+    output = model((source, target))
     model.summary()
-    test_shape = [inputs.shape[0]]
+    test_shape = [target.shape[0]]
     test_shape.append(model.output_units)
     assert output.shape == tuple(test_shape)
 
 
 def test_model_train(model):
     dataset = (
-        tf.data.Dataset.from_tensor_slices((inputs, labels))
+        tf.data.Dataset.from_tensor_slices(((source, target), labels))
         .batch(batch_size=512, drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
