@@ -4,7 +4,14 @@ import tensorflow as tf
 
 class SeqOrderEmbedding(tf.keras.layers.Layer):
     def __init__(
-        self, latent_dim=16, max_length=512, normalization=10_000, name=None, dtype=None
+        self,
+        latent_dim=16,
+        max_length=512,
+        normalization=10_000,
+        dropout_rate=0.1,
+        epsilon=1e-12,
+        name=None,
+        dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
         if name is not None:
@@ -25,6 +32,16 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
         assert normalization > 0.0
         self._normalization = float(normalization)
 
+        # Dropout rate
+        assert isinstance(dropout_rate, (int, float))
+        assert dropout_rate >= 0.0 and dropout_rate < 1.0
+        self._dropout_rate = float(dropout_rate)
+
+        # Epsilon
+        assert isinstance(epsilon, (int, float))
+        assert epsilon > 0.0
+        self._epsilon = float(epsilon)
+
         # Sequence order encoding
         self._seq_ord_encoding = self._seq_order_encoding(
             length=self._max_length,
@@ -34,13 +51,26 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
         )
 
         # Embedding layer
-        self._embedding = tf.keras.layers.Dense(
-            units=self._latent_dim,
-            activation="linear",
-            kernel_initializer="glorot_uniform",
-            name=f"{prefix}_seq_ord_dense" if name else None,
-            dtype=self.dtype,
+        self._embedding = tf.keras.Sequential(
+            [
+                tf.keras.layers.Dense(
+                    units=self._latent_dim,
+                    activation="linear",
+                    kernel_initializer="glorot_uniform",
+                    bias_initializer="zeros",
+                    name=f"{prefix}_seq_ord_dense" if name else None,
+                    dtype=self.dtype,
+                ),
+                tf.keras.layers.Dropout(
+                    rate=self._dropout_rate,
+                    name=f"{prefix}_dropout" if name else None,
+                    dtype=self.dtype,
+                ),
+            ]
         )
+
+        # Add layer
+        self._add = tf.keras.layers.Add()
 
     def call(self, x) -> tf.Tensor:
         batch_size = tf.shape(x)[0]
@@ -48,9 +78,8 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
         seq_order = tf.tile(
             self._seq_ord_encoding[None, :length, :], (batch_size, 1, 1)
         )
-        output = tf.concat([x, seq_order], axis=2)
-        output = self._embedding(output)
-        output /= tf.norm(output, axis=2, keepdims=True)  # normalized arrays
+        emb_output = self._embedding(x) + self._epsilon
+        output = self._add([emb_output, seq_order])
         return output
 
     @staticmethod
@@ -76,3 +105,7 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
     @property
     def normalization(self) -> float:
         return self._normalization
+    
+    @property
+    def dropout_rate(self) -> float:
+        return self._dropout_rate

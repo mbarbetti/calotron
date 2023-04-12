@@ -1,15 +1,15 @@
 import tensorflow as tf
 
 from calotron.losses import BinaryCrossentropy as BCE
-from calotron.losses import JSDivergence as JS
-from calotron.losses import KLDivergence as KL
+from calotron.losses import JSDivergence as JS_div
+from calotron.losses import KLDivergence as KL_div
 from calotron.losses import MeanAbsoluteError as MAE
 from calotron.losses import MeanSquaredError as MSE
-from calotron.losses import WassersteinDistance as Wass
+from calotron.losses import WassersteinDistance as Wass_dist
 from calotron.losses.BaseLoss import BaseLoss
 
-LOSS_SHORTCUTS = ["bce", "kl", "js", "mse", "mae", "wass"]
-CALOTRON_LOSSES = [BCE(), KL(), JS(), MSE(), MAE(), Wass()]
+LOSS_SHORTCUTS = ["bce", "kl_div", "js_div", "mse", "mae", "wass_dist"]
+CALOTRON_LOSSES = [BCE(), KL_div(), JS_div(), MSE(), MAE(), Wass_dist()]
 
 
 def checkLoss(loss) -> BaseLoss:

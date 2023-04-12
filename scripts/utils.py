@@ -15,19 +15,26 @@ def learning_curves(
     export_fname="./images/learn-curves.png",
 ) -> None:
     if scale_curves:
-        id_min = np.argmin(
-            [np.abs(np.mean(np.array(history[k])[start_epoch:])) for k in keys]
-        )
-        scales = [
-            np.abs(
-                np.array(history[k])[start_epoch:]
-                / np.array(history[keys[id_min]])[start_epoch:]
+        if "t_loss" in keys:
+            scale_key = "t_loss"
+        else:
+            id_min = np.argmin(
+                [np.abs(np.mean(np.array(history[k])[start_epoch:])) for k in keys]
             )
+            scale_key = keys[id_min]
+        ratios = [
+            np.array(history[k])[start_epoch:]
+            / np.array(history[scale_key])[start_epoch:]
             for k in keys
         ]
-        scales = np.around(np.mean(scales, axis=-1))
+        scales = np.mean(ratios, axis=-1)
+        for i in range(len(scales)):
+            if np.abs(scales[i]) >= 1.0:
+                scales[i] = 1/np.around(scales[i])
+            else:
+                scales[i] = np.around(1/scales[i]) 
         for i in range(len(labels)):
-            labels[i] += f" [x {1/scales[i]:.1f}]"
+            labels[i] += f" [x {scales[i]:.1f}]"
     else:
         scales = [1.0 for _ in keys]
 
@@ -47,7 +54,7 @@ def learning_curves(
     plt.ylabel("Loss", fontsize=12)
     for i, (k, l, c) in enumerate(zip(keys, labels, colors)):
         num_epochs = np.arange(len(history[k]))[start_epoch:]
-        loss = np.array(history[k])[start_epoch:] / scales[i]
+        loss = np.array(history[k])[start_epoch:] * scales[i]
         plt.plot(num_epochs, loss, lw=1.5, color=c, label=l)
     plt.legend(loc=legend_loc, fontsize=10)
     if save_figure:
@@ -99,6 +106,7 @@ def metric_curves(
     start_epoch=0,
     key="metric",
     ylabel="Metric",
+    title="Metric curves",
     validation_set=False,
     colors=None,
     labels=None,
@@ -122,7 +130,7 @@ def metric_curves(
 
     zorder = 1
     plt.figure(figsize=(8, 5), dpi=300)
-    plt.title("Metric curves", fontsize=14)
+    plt.title(title, fontsize=14)
     plt.xlabel("Training epochs", fontsize=12)
     plt.ylabel(ylabel, fontsize=12)
     for k, l, c in zip(keys, labels, colors):
@@ -373,7 +381,7 @@ def photon2cluster_corr(
             photon_energy, energy, bins=np.linspace(0, 1, 76)
         )
         nonzero_x, nonzero_y = np.nonzero(h)
-        colors = np.ones_like(photon_energy) / np.sum(h)
+        colors = np.ones_like(photon_energy) / (np.sum(h) + 1e-12)
         for id_x, id_y in zip(nonzero_x, nonzero_y):
             colors[
                 ((photon_energy >= x_edges[id_x]) & (photon_energy < x_edges[id_x + 1]))

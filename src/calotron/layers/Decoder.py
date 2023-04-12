@@ -51,6 +51,8 @@ class DecoderLayer(tf.keras.layers.Layer):
             num_heads=self._num_heads,
             key_dim=self._key_dim,
             dropout=self._dropout_rate,
+            kernel_initializer="glorot_uniform",
+            bias_initializer="zeros",
             name=f"{prefix}_causal_attn_{suffix}" if name else None,
             dtype=self.dtype,
         )
@@ -60,6 +62,8 @@ class DecoderLayer(tf.keras.layers.Layer):
             num_heads=self._num_heads,
             key_dim=self._key_dim,
             dropout=self._dropout_rate,
+            kernel_initializer="glorot_uniform",
+            bias_initializer="zeros",
             name=f"{prefix}_cross_attn_{suffix}" if name else None,
             dtype=self.dtype,
         )
@@ -172,6 +176,7 @@ class Decoder(tf.keras.layers.Layer):
             latent_dim=self._seq_ord_latent_dim,
             max_length=self._seq_ord_max_length,
             normalization=self._seq_ord_normalization,
+            dropout_rate=self._dropout_rate,
             name="dec_seq_ord_embedding",
             dtype=self.dtype,
         )
@@ -183,12 +188,8 @@ class Decoder(tf.keras.layers.Layer):
                     tf.keras.layers.Dense(
                         units=self._output_depth,
                         activation="linear",
-                        kernel_initializer=tf.keras.initializers.RandomUniform(
-                            minval=-0.1, maxval=0.1
-                        ),
-                        bias_initializer=tf.keras.initializers.TruncatedNormal(
-                            stddev=0.01
-                        ),
+                        kernel_initializer="glorot_uniform",
+                        bias_initializer="zeros",
                         name="dec_smooth_layer",
                         dtype=self.dtype,
                     ),
@@ -215,8 +216,7 @@ class Decoder(tf.keras.layers.Layer):
         ]
 
     def call(self, x, condition) -> tf.Tensor:
-        seq_order = self._seq_ord_embedding(x)
-        output = tf.concat([x, seq_order], axis=2)
+        output = self._seq_ord_embedding(x)
         if self._smooth_layer is not None:
             output = self._smooth_layer(output)
         for i in range(self._num_layers):

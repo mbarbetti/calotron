@@ -1,15 +1,15 @@
 from calotron.metrics import Accuracy
 from calotron.metrics import BinaryCrossentropy as BCE
-from calotron.metrics import JSDivergence as JS
-from calotron.metrics import KLDivergence as KL
+from calotron.metrics import JSDivergence as JS_div
+from calotron.metrics import KLDivergence as KL_div
 from calotron.metrics import MeanAbsoluteError as MAE
 from calotron.metrics import MeanSquaredError as MSE
 from calotron.metrics import RootMeanSquaredError as RMSE
-from calotron.metrics import WassersteinDistance as Wass
+from calotron.metrics import WassersteinDistance as Wass_dist
 from calotron.metrics.BaseMetric import BaseMetric
 
-METRIC_SHORTCUTS = ["accuracy", "bce", "kl", "js", "mse", "rmse", "mae", "wass"]
-CALOTRON_METRICS = [Accuracy(), BCE(), KL(), JS(), MSE(), RMSE(), MAE(), Wass()]
+METRIC_SHORTCUTS = ["accuracy", "bce", "kl_div", "js_div", "mse", "rmse", "mae", "wass_dist"]
+CALOTRON_METRICS = [Accuracy(), BCE(), KL_div(), JS_div(), MSE(), RMSE(), MAE(), Wass_dist()]
 
 
 def checkMetrics(metrics):  # TODO: add Union[list, None]

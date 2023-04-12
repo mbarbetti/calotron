@@ -2,11 +2,12 @@ import numpy as np
 import tensorflow as tf
 
 from calotron.layers import Decoder, Encoder, MultiActivations
+from calotron.models.BaseTransformer import BaseTransformer
 
 START_TOKEN_INITIALIZERS = ["zeros", "ones", "means"]
 
 
-class Transformer(tf.keras.Model):
+class Transformer(BaseTransformer):
     def __init__(
         self,
         output_depth,
@@ -205,8 +206,8 @@ class Transformer(tf.keras.Model):
         self._output_layer = tf.keras.layers.Dense(
             units=self._output_depth,
             activation="linear",
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.2),
-            bias_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.01),
+            kernel_initializer="glorot_uniform",
+            bias_initializer="zeros",
             name="t_dense_out",
             dtype=self.dtype,
         )

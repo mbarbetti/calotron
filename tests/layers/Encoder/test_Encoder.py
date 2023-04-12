@@ -1,6 +1,8 @@
 import pytest
 import tensorflow as tf
 
+ADDITIONAL_DIM = 2
+
 
 @pytest.fixture
 def layer():
@@ -42,14 +44,13 @@ def test_layer_configuration(layer):
 
 @pytest.mark.parametrize("residual_smoothing", [True, False])
 def test_layer_use(residual_smoothing):
+    input_dim = 4
     latent_dim = 8
     max_length = 32
     if residual_smoothing:
-        input_dim = 4
-        output_dim = 32  # != 4 (input_dim) + 8 (latent_dim)
+        output_dim = latent_dim + ADDITIONAL_DIM
     else:
-        input_dim = 4
-        output_dim = 12  # = 4 (input_dim) + 8 (latent_dim)
+        output_dim = latent_dim
     from calotron.layers import Encoder
 
     layer = Encoder(
