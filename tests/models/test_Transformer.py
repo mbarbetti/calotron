@@ -7,7 +7,6 @@ CHUNK_SIZE = int(1e4)
 BATCH_SIZE = 500
 ADDITIONAL_DIM = 2
 
-
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
 
@@ -62,11 +61,11 @@ def test_model_configuration(model):
 def test_model_use_residual_smoothing(residual_smoothing):
     latent_dim = 8
     if residual_smoothing:
-        encoder_depth = source.shape[2] + latent_dim + ADDITIONAL_DIM
-        decoder_depth = target.shape[2] + latent_dim + ADDITIONAL_DIM
+        encoder_depth = latent_dim + ADDITIONAL_DIM
+        decoder_depth = latent_dim + ADDITIONAL_DIM
     else:
-        encoder_depth = source.shape[2] + latent_dim
-        decoder_depth = target.shape[2] + latent_dim
+        encoder_depth = latent_dim
+        decoder_depth = latent_dim
     from calotron.models import Transformer
 
     model = Transformer(

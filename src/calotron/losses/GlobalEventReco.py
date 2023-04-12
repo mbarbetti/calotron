@@ -1,6 +1,4 @@
 import tensorflow as tf
-from tensorflow.keras.losses import BinaryCrossentropy as TF_BCE
-from tensorflow.keras.losses import MeanSquaredError as TF_MSE
 
 from calotron.losses.BaseLoss import BaseLoss
 from calotron.losses.BinaryCrossentropy import BinaryCrossentropy
@@ -12,7 +10,7 @@ ADV_METRICS = ["binary-crossentropy", "wasserstein-distance"]
 class GlobalEventReco(BaseLoss):
     def __init__(
         self,
-        alpha=0.1,
+        lambda_adv=0.1,
         adversarial_metric="binary-crossentropy",
         bce_options={
             "injected_noise_stddev": 0.0,
@@ -25,9 +23,9 @@ class GlobalEventReco(BaseLoss):
         super().__init__(name)
 
         # Adversarial strength
-        assert isinstance(alpha, (int, float))
-        assert alpha >= 0.0
-        self._alpha = float(alpha)
+        assert isinstance(lambda_adv, (int, float))
+        assert lambda_adv >= 0.0
+        self._lambda_adv = float(lambda_adv)
 
         # Adversarial metric
         assert isinstance(adversarial_metric, str)
@@ -46,7 +44,6 @@ class GlobalEventReco(BaseLoss):
         self._wass_options = wass_options
 
         # Losses definition
-        self._mse_loss = TF_MSE()
         if self._adversarial_metric == "binary-crossentropy":
             self._adv_loss = BinaryCrossentropy(**self._bce_options)
         elif self._adversarial_metric == "wasserstein-distance":
@@ -61,15 +58,17 @@ class GlobalEventReco(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        if sample_weight is not None:
-            evt_weights = tf.reduce_mean(sample_weight, axis=1)
-        else:
-            evt_weights = None
-
         # Global event reco loss
         output = transformer((source, target), training=training)
-        mse_loss = self._mse_loss(target, output, sample_weight=evt_weights)
-        mse_loss = tf.cast(mse_loss, dtype=target.dtype)
+        errors = tf.reduce_sum((target - output) ** 2, axis=-1)
+        if sample_weight is not None:
+            if len(tf.shape(sample_weight)) != len(tf.shape(errors)):
+                sample_weight = tf.reduce_mean(sample_weight, axis=-1)
+            errors = tf.reduce_sum(sample_weight * errors, axis=-1) / tf.reduce_sum(
+                sample_weight, axis=-1
+            )
+        reco_loss = tf.reduce_mean(errors)
+        reco_loss = tf.cast(reco_loss, dtype=target.dtype)
 
         # Adversarial loss
         adv_loss = self._adv_loss.transformer_loss(
@@ -80,7 +79,12 @@ class GlobalEventReco(BaseLoss):
             sample_weight=sample_weight,
             training=training,
         )
-        return mse_loss + self._alpha * adv_loss
+
+        tot_loss = (
+            reco_loss 
+            + self._lambda_adv * adv_loss
+        )
+        return tot_loss
 
     def discriminator_loss(
         self,
@@ -102,8 +106,8 @@ class GlobalEventReco(BaseLoss):
         return adv_loss
 
     @property
-    def alpha(self) -> float:
-        return self._alpha
+    def lambda_adv(self) -> float:
+        return self._lambda_adv
 
     @property
     def adversarial_metric(self) -> str:

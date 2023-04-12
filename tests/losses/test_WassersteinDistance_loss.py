@@ -42,9 +42,10 @@ def loss():
     loss_ = WassersteinDistance(
         lipschitz_penalty=100.0,
         virtual_direction_upds=1,
-        xi=10.0,
-        epsilon_min=0.01,
-        epsilon_max=1.0,
+        fixed_xi=10.0,
+        sampled_xi_min=0.0,
+        sampled_xi_max=1.0,
+        epsilon=1e-12,
     )
     return loss_
 
@@ -58,9 +59,10 @@ def test_loss_configuration(loss):
     assert isinstance(loss, WassersteinDistance)
     assert isinstance(loss.lipschitz_penalty, float)
     assert isinstance(loss.virtual_direction_upds, int)
-    assert isinstance(loss.xi, float)
-    assert isinstance(loss.epsilon_min, float)
-    assert isinstance(loss.epsilon_max, float)
+    assert isinstance(loss.fixed_xi, float)
+    assert isinstance(loss.sampled_xi_min, float)
+    assert isinstance(loss.sampled_xi_max, float)
+    assert isinstance(loss.epsilon, float)
     assert isinstance(loss.name, str)
 
 

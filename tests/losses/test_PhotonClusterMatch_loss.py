@@ -44,8 +44,9 @@ def loss():
     from calotron.losses import PhotonClusterMatch
 
     loss_ = PhotonClusterMatch(
-        alpha=0.1,
-        beta=0.0,
+        lambda_adv=0.1,
+        lambda_geom=1.0,
+        lambda_global=0.0,
         max_match_distance=0.005,
         adversarial_metric="binary-crossentropy",
         bce_options={
@@ -54,6 +55,7 @@ def loss():
             "label_smoothing": 0.0,
         },
         wass_options={"lipschitz_penalty": 100.0, "virtual_direction_upds": 1},
+        aux_bce_options={"from_logits": False, "label_smoothing": 0.0},
     )
     return loss_
 
@@ -65,12 +67,14 @@ def test_loss_configuration(loss):
     from calotron.losses import PhotonClusterMatch
 
     assert isinstance(loss, PhotonClusterMatch)
-    assert isinstance(loss.alpha, float)
-    assert isinstance(loss.beta, float)
+    assert isinstance(loss.lambda_adv, float)
+    assert isinstance(loss.lambda_geom, float)
+    assert isinstance(loss.lambda_global, float)
     assert isinstance(loss.max_match_distance, float)
     assert isinstance(loss.adversarial_metric, str)
     assert isinstance(loss.bce_options, dict)
     assert isinstance(loss.wass_options, dict)
+    assert isinstance(loss.aux_bce_options, dict)
     assert isinstance(loss.name, str)
 
 
@@ -81,8 +85,8 @@ def test_loss_use_no_weights(adversarial_metric):
     from calotron.losses import PhotonClusterMatch
 
     loss = PhotonClusterMatch(
-        alpha=0.1,
-        beta=0.0,
+        lambda_adv=0.1,
+        lambda_global=0.0,
         max_match_distance=0.005,
         adversarial_metric=adversarial_metric,
         bce_options={"injected_noise_stddev": 0.1},
@@ -123,8 +127,8 @@ def test_loss_use_with_weights(adversarial_metric):
     from calotron.losses import PhotonClusterMatch
 
     loss = PhotonClusterMatch(
-        alpha=0.1,
-        beta=0.0,
+        lambda_adv=0.1,
+        lambda_global=0.0,
         max_match_distance=0.005,
         adversarial_metric=adversarial_metric,
         bce_options={"injected_noise_stddev": 0.1},

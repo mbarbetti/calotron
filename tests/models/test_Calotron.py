@@ -3,6 +3,7 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Optimizer, RMSprop
 
 CHUNK_SIZE = int(1e4)
+
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
 
@@ -83,7 +84,12 @@ def test_model_use(model):
 def test_model_compilation(model, metrics):
     from calotron.losses import PhotonClusterMatch
 
-    loss = PhotonClusterMatch(alpha=0.1)
+    loss = PhotonClusterMatch(
+        lambda_adv=0.1,
+        lambda_global=1.0,
+        max_match_distance=0.005,
+        adversarial_metric="binary-crossentropy",
+    )
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     a_opt = RMSprop(learning_rate=0.001)
@@ -118,7 +124,12 @@ def test_model_train(model, adversarial_metrics):
     )
     from calotron.losses import PhotonClusterMatch
 
-    loss = PhotonClusterMatch(alpha=0.1, adversarial_metric=adversarial_metrics)
+    loss = PhotonClusterMatch(
+        lambda_adv=0.1,
+        lambda_global=1.0,
+        max_match_distance=0.005,
+        adversarial_metric=adversarial_metrics,
+    )
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     a_opt = RMSprop(learning_rate=0.001)
@@ -138,7 +149,12 @@ def test_model_train(model, adversarial_metrics):
 def test_model_eval(model):
     from calotron.losses import PhotonClusterMatch
 
-    loss = PhotonClusterMatch(alpha=0.1)
+    loss = PhotonClusterMatch(
+        lambda_adv=0.1,
+        lambda_global=1.0,
+        max_match_distance=0.005,
+        adversarial_metric="binary-crossentropy",
+    )
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     a_opt = RMSprop(learning_rate=0.001)

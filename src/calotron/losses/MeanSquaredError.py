@@ -19,8 +19,8 @@ class MeanSquaredError(BaseLoss):
         training=True,
     ) -> tf.Tensor:
         output = transformer((source, target), training=training)
-        y_true = discriminator(target, training=False)
-        y_pred = discriminator(output, training=False)
+        y_true = discriminator((source, target), training=False)
+        y_pred = discriminator((source, output), training=False)
 
         if sample_weight is not None:
             evt_weights = tf.reduce_mean(sample_weight, axis=1)
@@ -40,8 +40,8 @@ class MeanSquaredError(BaseLoss):
         training=True,
     ) -> tf.Tensor:
         output = transformer((source, target), training=False)
-        y_true = discriminator(target, training=training)
-        y_pred = discriminator(output, training=training)
+        y_true = discriminator((source, target), training=training)
+        y_pred = discriminator((source, output), training=training)
 
         if sample_weight is not None:
             evt_weights = tf.reduce_mean(sample_weight, axis=1)

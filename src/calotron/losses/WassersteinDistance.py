@@ -10,9 +10,10 @@ class WassersteinDistance(BaseLoss):
         self,
         lipschitz_penalty=100.0,
         virtual_direction_upds=1,
-        xi=10.0,
-        epsilon_min=0.01,
-        epsilon_max=1.0,
+        fixed_xi=10.0,
+        sampled_xi_min=0.0,
+        sampled_xi_max=1.0,
+        epsilon=1e-12,
         name="wass_dist_loss",
     ) -> None:
         super().__init__(name)
@@ -28,17 +29,21 @@ class WassersteinDistance(BaseLoss):
         self._vir_dir_upds = int(virtual_direction_upds)
 
         # Additional ALP-system hyperparameters
-        assert isinstance(xi, (int, float))
-        assert xi > 0.0
-        self._xi = float(xi)
+        assert isinstance(fixed_xi, (int, float))
+        assert fixed_xi > 0.0
+        self._fixed_xi = float(fixed_xi)
 
-        assert isinstance(epsilon_min, (int, float))
-        assert epsilon_min >= 0.0
-        self._epsilon_min = float(epsilon_min)
+        assert isinstance(sampled_xi_min, (int, float))
+        assert sampled_xi_min >= 0.0
+        self._sampled_xi_min = float(sampled_xi_min)
 
-        assert isinstance(epsilon_max, (int, float))
-        assert epsilon_max > epsilon_min
-        self._epsilon_max = float(epsilon_max)
+        assert isinstance(sampled_xi_max, (int, float))
+        assert sampled_xi_max > sampled_xi_min
+        self._sampled_xi_max = float(sampled_xi_max)
+
+        assert isinstance(epsilon, (int, float))
+        assert epsilon > 0.0
+        self._epsilon = float(epsilon)
 
     def transformer_loss(
         self,
@@ -50,13 +55,14 @@ class WassersteinDistance(BaseLoss):
         training=True,
     ) -> tf.Tensor:
         output = transformer((source, target), training=training)
-        y_pred = discriminator(output, training=False)
+        y_true = discriminator((source, target), training=False)
+        y_pred = discriminator((source, output), training=False)
         if sample_weight is not None:
-            sample_weight = tf.reduce_mean(sample_weight, axis=1)
-            loss = tf.reduce_sum(sample_weight * y_pred)
-            loss /= tf.reduce_sum(sample_weight)
+            evt_weights = tf.reduce_mean(sample_weight, axis=1)
+            loss = tf.reduce_sum(evt_weights * (y_pred - y_true))
+            loss /= tf.reduce_sum(evt_weights)
         else:
-            loss = tf.reduce_mean(y_pred)
+            loss = tf.reduce_mean(y_pred - y_true)
         loss = tf.cast(loss, dtype=output.dtype)
         return loss
 
@@ -70,78 +76,84 @@ class WassersteinDistance(BaseLoss):
         training=True,
     ) -> tf.Tensor:
         output = transformer((source, target), training=False)
-        y_true = discriminator(target, training=training)
-        y_pred = discriminator(output, training=training)
+        y_true = discriminator((source, target), training=training)
+        y_pred = discriminator((source, output), training=training)
         if sample_weight is not None:
-            sample_weight = tf.reduce_mean(sample_weight, axis=1)
-            loss = tf.reduce_sum(sample_weight * (y_true - y_pred))
-            loss /= tf.reduce_sum(sample_weight)
+            evt_weights = tf.reduce_mean(sample_weight, axis=1)
+            loss = tf.reduce_sum(evt_weights * (y_true - y_pred))
+            loss /= tf.reduce_sum(evt_weights)
         else:
             loss = tf.reduce_mean(y_true - y_pred)
 
         # Initial virtual adversarial direction
-        d = tf.random.uniform(
-            tf.shape(target), minval=-0.5, maxval=0.5, dtype=target.dtype
-        )
-        d /= tf.norm(d, ord="euclidean", axis=[1, 2])[:, None, None]
+        batch_size = tf.shape(target)[0]
+        length = tf.shape(target)[1]
+        depth = tf.shape(target)[2]
         with tf.GradientTape() as tape:
+            d = tf.random.uniform(
+                shape=(2 * batch_size, length, depth),
+                minval=-1.0,
+                maxval=1.0,
+                dtype=target.dtype
+            )
+            d /= tf.norm(d, axis=[1, 2])[:, None, None]
             tape.watch(d)
             for _ in range(self._vir_dir_upds):
+                d_target, d_output = tf.split(d, 2, axis=0)
                 target_hat = tf.clip_by_value(
-                    target + self._xi * d,
+                    target + self._fixed_xi * d_target,
                     clip_value_min=tf.reduce_min(target),
                     clip_value_max=tf.reduce_max(target),
                 )
                 output_hat = tf.clip_by_value(
-                    output + self._xi * d,
+                    output + self._fixed_xi * d_output,
                     clip_value_min=tf.reduce_min(output),
                     clip_value_max=tf.reduce_max(output),
                 )
-
-                y_true_hat = discriminator(target_hat, training=training)
-                y_pred_hat = discriminator(output_hat, training=training)
+                y_true_hat = discriminator((source, target_hat), training=training)
+                y_pred_hat = discriminator((source, output_hat), training=training)
                 y_diff = tf.abs(
                     tf.concat([y_true, y_pred], axis=0)
                     - tf.concat([y_true_hat, y_pred_hat], axis=0)
                 )
                 y_diff = tf.reduce_mean(y_diff)
-            grad = tape.gradient(y_diff, d)
-            d = grad / tf.norm(grad, ord="euclidean", axis=[1, 2])[:, None, None]
+                grad = tape.gradient(y_diff, d) + self._epsilon  # non-zero gradient
+                d = grad / tf.norm(grad, axis=[1, 2], keepdims=True)
 
         # Virtual adversarial direction
-        eps = tf.math.exp(
-            tf.random.uniform(
-                tf.shape(target),
-                minval=tf.math.log(self._epsilon_min),
-                maxval=tf.math.log(self._epsilon_max),
-                dtype=target.dtype,
-            )
+        xi = tf.random.uniform(
+            shape=(2 * batch_size, length, depth),
+            minval=self._sampled_xi_min,
+            maxval=self._sampled_xi_max,
+            dtype=target.dtype,
         )
+        xi_target, xi_output = tf.split(xi, 2, axis=0)
+        d_target, d_output = tf.split(d, 2, axis=0)
         target_hat = tf.clip_by_value(
-            target + eps * d,
+            target + xi_target * d_target,
             clip_value_min=tf.reduce_min(target),
             clip_value_max=tf.reduce_max(target),
         )
         output_hat = tf.clip_by_value(
-            output + eps * d,
+            output + xi_output * d_output,
             clip_value_min=tf.reduce_min(output),
             clip_value_max=tf.reduce_max(output),
         )
-        x_diff = tf.concat([target, output], axis=0) - tf.concat(
-            [target_hat, output_hat], axis=0
-        )
-        x_diff = tf.maximum(tf.norm(x_diff, ord="euclidean", axis=[1, 2]), 1e-8)
+        x_diff = tf.abs(
+            tf.concat([target, output], axis=0)
+            - tf.concat([target_hat, output_hat], axis=0)
+        ) + self._epsilon  # non-zero difference
+        x_diff = tf.norm(x_diff, axis=[1, 2], keepdims=True)
 
-        y_true_hat = discriminator(target_hat, training=training)
-        y_pred_hat = discriminator(output_hat, training=training)
+        y_true_hat = discriminator((source, target_hat), training=training)
+        y_pred_hat = discriminator((source, output_hat), training=training)
         y_diff = tf.abs(
             tf.concat([y_true, y_pred], axis=0)
             - tf.concat([y_true_hat, y_pred_hat], axis=0)
         )
 
-        alp_term = tf.maximum(
-            y_diff / x_diff - LIPSCHITZ_CONSTANT, 0.0
-        )  # one-side penalty
+        K = y_diff / x_diff
+        alp_term = tf.maximum(K - LIPSCHITZ_CONSTANT, 0.0)  # one-side penalty
         alp_term = tf.reduce_mean(alp_term)
         loss += self._lipschitz_penalty * alp_term**2  # adversarial Lipschitz penalty
         loss = tf.cast(loss, dtype=target.dtype)
@@ -156,13 +168,17 @@ class WassersteinDistance(BaseLoss):
         return self._vir_dir_upds
 
     @property
-    def xi(self) -> float:
-        return self._xi
+    def fixed_xi(self) -> float:
+        return self._fixed_xi
 
     @property
-    def epsilon_min(self) -> float:
-        return self._epsilon_min
+    def sampled_xi_min(self) -> float:
+        return self._sampled_xi_min
 
     @property
-    def epsilon_max(self) -> float:
-        return self._epsilon_max
+    def sampled_xi_max(self) -> float:
+        return self._sampled_xi_max
+    
+    @property
+    def epsilon(self) -> float:
+        return self._epsilon

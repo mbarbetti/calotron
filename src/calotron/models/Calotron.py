@@ -1,8 +1,8 @@
 import tensorflow as tf
 
 from calotron.models.AuxClassifier import AuxClassifier
-from calotron.models.Discriminator import Discriminator
-from calotron.models.Transformer import Transformer
+from calotron.models.BaseDiscriminator import BaseDiscriminator
+from calotron.models.BaseTransformer import BaseTransformer
 from calotron.utils.checks import checkLoss, checkMetrics, checkOptimizer
 
 
@@ -13,17 +13,17 @@ class Calotron(tf.keras.Model):
         super().__init__(name=name, dtype=dtype)
 
         # Transformer
-        if not isinstance(transformer, Transformer):
+        if not isinstance(transformer, BaseTransformer):
             raise TypeError(
-                f"`transformer` should be a calotron's `Transformer`, "
+                f"`transformer` should be a calotron's `BaseTransformer`, "
                 f"instead {type(transformer)} passed"
             )
         self._transformer = transformer
 
         # Discriminator
-        if not isinstance(discriminator, Discriminator):
+        if not isinstance(discriminator, BaseDiscriminator):
             raise TypeError(
-                f"`discriminator` should be a calotron's `Discriminator`, "
+                f"`discriminator` should be a calotron's `BaseDiscriminator`, "
                 f"instead {type(discriminator)} passed"
             )
         self._discriminator = discriminator
@@ -40,8 +40,8 @@ class Calotron(tf.keras.Model):
     def call(self, inputs) -> tuple:
         source, target = inputs
         output = self._transformer((source, target))
-        d_output_true = self._discriminator(target)
-        d_output_pred = self._discriminator(output)
+        d_output_true = self._discriminator((source, target))
+        d_output_pred = self._discriminator((source, output))
         if self._aux_classifier is None:
             return output, d_output_true, d_output_pred
         else:
@@ -114,6 +114,7 @@ class Calotron(tf.keras.Model):
         if self._aux_classifier is not None:
             for _ in range(self._a_upds_per_batch):
                 self._a_train_step(source, target, sample_weight)
+        
         for _ in range(self._d_upds_per_batch):
             self._d_train_step(source, target, sample_weight)
         for _ in range(self._t_upds_per_batch):
@@ -122,8 +123,8 @@ class Calotron(tf.keras.Model):
         train_dict = dict()
         if self._metrics is not None:
             output = self._transformer((source, target), training=False)
-            y_pred = self._discriminator(output, training=False)
-            y_true = self._discriminator(target, training=False)
+            y_pred = self._discriminator((source, output), training=False)
+            y_true = self._discriminator((source, target), training=False)
             for metric in self._metrics:
                 metric.update_state(
                     y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
@@ -236,8 +237,8 @@ class Calotron(tf.keras.Model):
         train_dict = dict()
         if self._metrics is not None:
             output = self._transformer((source, target), training=False)
-            y_pred = self._discriminator(output, training=False)
-            y_true = self._discriminator(target, training=False)
+            y_pred = self._discriminator((source, output), training=False)
+            y_true = self._discriminator((source, target), training=False)
             for metric in self._metrics:
                 metric.update_state(
                     y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
@@ -270,11 +271,11 @@ class Calotron(tf.keras.Model):
         return self._transformer.get_start_token(target)
 
     @property
-    def transformer(self) -> Transformer:
+    def transformer(self) -> BaseTransformer:
         return self._transformer
 
     @property
-    def discriminator(self) -> Discriminator:
+    def discriminator(self) -> BaseDiscriminator:
         return self._discriminator
 
     @property

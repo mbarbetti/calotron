@@ -55,7 +55,7 @@ class BinaryCrossentropy(BaseLoss):
             )
         else:
             rnd_pred = 0.0
-        y_pred = discriminator(output + rnd_pred, training=False)
+        y_pred = discriminator((source, output + rnd_pred), training=False)
         adv_loss = self._loss(tf.ones_like(y_pred), y_pred, sample_weight=evt_weights)
         adv_loss = tf.cast(adv_loss, dtype=output.dtype)
         return adv_loss
@@ -81,7 +81,7 @@ class BinaryCrossentropy(BaseLoss):
             )
         else:
             rnd_true = 0.0
-        y_true = discriminator(target + rnd_true, training=training)
+        y_true = discriminator((source, target + rnd_true), training=training)
         real_loss = self._loss(tf.ones_like(y_true), y_true, sample_weight=evt_weights)
         real_loss = tf.cast(real_loss, dtype=target.dtype)
 
@@ -93,7 +93,7 @@ class BinaryCrossentropy(BaseLoss):
             )
         else:
             rnd_pred = 0.0
-        y_pred = discriminator(output + rnd_pred, training=training)
+        y_pred = discriminator((source, output + rnd_pred), training=training)
         fake_loss = self._loss(tf.zeros_like(y_pred), y_pred, sample_weight=evt_weights)
         fake_loss = tf.cast(fake_loss, dtype=output.dtype)
         return (real_loss + fake_loss) / 2.0
