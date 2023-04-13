@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from calotron.models.Transformer import Transformer
+from calotron.models.transformers import Transformer
 
 
 class AuxClassifier(tf.keras.Model):

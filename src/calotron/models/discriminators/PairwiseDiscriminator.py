@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from calotron.models.Discriminator import Discriminator
+from calotron.models.discriminators.Discriminator import Discriminator
 
 
 class PairwiseDiscriminator(Discriminator):

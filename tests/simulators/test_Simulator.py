@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from calotron.models import Transformer
+from calotron.models.transformers import Transformer
 
 CHUNK_SIZE = int(1e4)
 BATCH_SIZE = 100

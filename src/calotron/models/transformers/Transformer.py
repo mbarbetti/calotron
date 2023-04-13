@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 from calotron.layers import Decoder, Encoder, MultiActivations
-from calotron.models.BaseTransformer import BaseTransformer
+from calotron.models.transformers.BaseTransformer import BaseTransformer
 
 START_TOKEN_INITIALIZERS = ["zeros", "ones", "means"]
 

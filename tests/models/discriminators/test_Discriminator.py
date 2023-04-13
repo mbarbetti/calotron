@@ -12,7 +12,7 @@ labels = tf.concat([label1, label2], axis=0)
 
 @pytest.fixture
 def model():
-    from calotron.models import Discriminator
+    from calotron.models.discriminators import Discriminator
 
     disc = Discriminator(
         output_units=1,
@@ -29,7 +29,7 @@ def model():
 
 
 def test_model_configuration(model):
-    from calotron.models import Discriminator
+    from calotron.models.discriminators import Discriminator
 
     assert isinstance(model, Discriminator)
     assert isinstance(model.output_units, int)
@@ -41,7 +41,7 @@ def test_model_configuration(model):
 
 @pytest.mark.parametrize("activation", ["sigmoid", None])
 def test_model_use(activation):
-    from calotron.models import Discriminator
+    from calotron.models.discriminators import Discriminator
 
     model = Discriminator(
         output_units=1,

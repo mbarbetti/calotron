@@ -10,7 +10,10 @@ target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
 
 @pytest.fixture
 def model():
-    from calotron.models import AuxClassifier, Calotron, Discriminator, Transformer
+    from calotron.models import Calotron
+    from calotron.models.transformers import Transformer
+    from calotron.models.discriminators import Discriminator
+    from calotron.models.auxiliaries import AuxClassifier
 
     transf = Transformer(
         output_depth=target.shape[2],
@@ -53,7 +56,10 @@ def model():
 
 
 def test_model_configuration(model):
-    from calotron.models import AuxClassifier, Calotron, Discriminator, Transformer
+    from calotron.models import Calotron
+    from calotron.models.transformers import Transformer
+    from calotron.models.discriminators import Discriminator
+    from calotron.models.auxiliaries import AuxClassifier
 
     assert isinstance(model, Calotron)
     assert isinstance(model.transformer, Transformer)

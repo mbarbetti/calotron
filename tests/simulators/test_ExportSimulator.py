@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from calotron.models import Transformer
+from calotron.models.transformers import Transformer
 from calotron.simulators import Simulator
 
 CHUNK_SIZE = int(1e4)

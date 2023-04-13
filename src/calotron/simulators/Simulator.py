@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from calotron.models import Transformer
+from calotron.models.transformers import Transformer
 
 
 class Simulator(tf.Module):

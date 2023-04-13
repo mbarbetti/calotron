@@ -1,7 +1,7 @@
 import pytest
 import tensorflow as tf
 
-from calotron.models.Transformer import START_TOKEN_INITIALIZERS
+from calotron.models.transformers.Transformer import START_TOKEN_INITIALIZERS
 
 CHUNK_SIZE = int(1e4)
 BATCH_SIZE = 500
@@ -13,7 +13,7 @@ target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
 
 @pytest.fixture
 def model():
-    from calotron.models import Transformer
+    from calotron.models.transformers import Transformer
 
     trans = Transformer(
         output_depth=target.shape[2],
@@ -38,7 +38,7 @@ def model():
 
 
 def test_model_configuration(model):
-    from calotron.models import Transformer
+    from calotron.models.transformers import Transformer
 
     assert isinstance(model, Transformer)
     assert isinstance(model.output_depth, int)
@@ -66,7 +66,7 @@ def test_model_use_residual_smoothing(residual_smoothing):
     else:
         encoder_depth = latent_dim
         decoder_depth = latent_dim
-    from calotron.models import Transformer
+    from calotron.models.transformers import Transformer
 
     model = Transformer(
         output_depth=target.shape[2],
@@ -100,7 +100,7 @@ def test_model_use_multi_activations(model):
 
 @pytest.mark.parametrize("start_token_initializer", START_TOKEN_INITIALIZERS)
 def test_model_use_start_token_initializer(start_token_initializer):
-    from calotron.models import Transformer
+    from calotron.models.transformers import Transformer
 
     model = Transformer(
         output_depth=target.shape[2],

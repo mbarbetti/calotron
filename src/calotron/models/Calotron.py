@@ -1,8 +1,8 @@
 import tensorflow as tf
 
-from calotron.models.AuxClassifier import AuxClassifier
-from calotron.models.BaseDiscriminator import BaseDiscriminator
-from calotron.models.BaseTransformer import BaseTransformer
+from calotron.models.auxiliaries import AuxClassifier
+from calotron.models.discriminators import BaseDiscriminator
+from calotron.models.transformers import BaseTransformer
 from calotron.utils.checks import checkLoss, checkMetrics, checkOptimizer
 
 
