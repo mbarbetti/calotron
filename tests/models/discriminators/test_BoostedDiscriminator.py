@@ -11,9 +11,9 @@ labels = tf.cast(labels > 0.5, target.dtype)
 
 @pytest.fixture
 def model():
-    from calotron.models.discriminators import Discriminator
+    from calotron.models.discriminators import BoostedDiscriminator
 
-    disc = Discriminator(
+    disc = BoostedDiscriminator(
         output_units=1,
         output_activation="sigmoid",
         latent_dim=8,
@@ -28,9 +28,9 @@ def model():
 
 
 def test_model_configuration(model):
-    from calotron.models.discriminators import Discriminator
+    from calotron.models.discriminators import BoostedDiscriminator
 
-    assert isinstance(model, Discriminator)
+    assert isinstance(model, BoostedDiscriminator)
     assert isinstance(model.output_units, int)
     assert isinstance(model.latent_dim, int)
     assert isinstance(model.deepsets_num_layers, int)
@@ -40,9 +40,9 @@ def test_model_configuration(model):
 
 @pytest.mark.parametrize("activation", ["sigmoid", None])
 def test_model_use(activation):
-    from calotron.models.discriminators import Discriminator
+    from calotron.models.discriminators import BoostedDiscriminator
 
-    model = Discriminator(
+    model = BoostedDiscriminator(
         output_units=1,
         output_activation=activation,
         latent_dim=8,

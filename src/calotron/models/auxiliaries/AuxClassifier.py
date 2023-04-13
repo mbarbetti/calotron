@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from calotron.models.transformers import Transformer
+from calotron.models.transformers import BaseTransformer
 
 
 class AuxClassifier(tf.keras.Model):
@@ -16,9 +16,9 @@ class AuxClassifier(tf.keras.Model):
         super().__init__(name=name, dtype=dtype)
 
         # Transformer's Encoder
-        if not isinstance(transformer, Transformer):
+        if not isinstance(transformer, BaseTransformer):
             raise TypeError(
-                f"`transformer` should be a calotron's `Transformer`, "
+                f"`transformer` should be a calotron's `BaseTransformer`, "
                 f"instead {type(transformer)} passed"
             )
         self._encoder = transformer._encoder
