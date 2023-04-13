@@ -1,9 +1,9 @@
 import pytest
 import tensorflow as tf
 
-from calotron.models.transformers import Transformer
-from calotron.models.discriminators import Discriminator
 from calotron.models.auxiliaries import AuxClassifier
+from calotron.models.discriminators import Discriminator
+from calotron.models.transformers import Transformer
 
 CHUNK_SIZE = int(1e4)
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))

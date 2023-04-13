@@ -11,21 +11,21 @@ labels = tf.random.uniform(shape=(CHUNK_SIZE, 8), minval=0.0, maxval=1.0)
 labels = tf.cast(labels > 0.5, source.dtype)
 
 transf = Transformer(
-        output_depth=target.shape[2],
-        encoder_depth=8,
-        decoder_depth=8,
-        num_layers=2,
-        num_heads=4,
-        key_dims=32,
-        mlp_units=16,
-        dropout_rates=0.1,
-        seq_ord_latent_dims=16,
-        seq_ord_max_lengths=[source.shape[1], target.shape[1]],
-        seq_ord_normalizations=10_000,
-        residual_smoothing=True,
-        output_activations="relu",
-        start_token_initializer="ones",
-    )
+    output_depth=target.shape[2],
+    encoder_depth=8,
+    decoder_depth=8,
+    num_layers=2,
+    num_heads=4,
+    key_dims=32,
+    mlp_units=16,
+    dropout_rates=0.1,
+    seq_ord_latent_dims=16,
+    seq_ord_max_lengths=[source.shape[1], target.shape[1]],
+    seq_ord_normalizations=10_000,
+    residual_smoothing=True,
+    output_activations="relu",
+    start_token_initializer="ones",
+)
 
 
 @pytest.fixture

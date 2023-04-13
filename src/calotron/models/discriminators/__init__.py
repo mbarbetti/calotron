@@ -1,4 +1,4 @@
 from .BaseDiscriminator import BaseDiscriminator
+from .BoostedDiscriminator import BoostedDiscriminator
 from .Discriminator import Discriminator
 from .PairwiseDiscriminator import PairwiseDiscriminator
-from .BoostedDiscriminator import BoostedDiscriminator

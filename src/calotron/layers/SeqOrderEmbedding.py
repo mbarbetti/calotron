@@ -109,7 +109,7 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
     @property
     def dropout_rate(self) -> float:
         return self._dropout_rate
-    
+
     @property
     def epsilon(self) -> float:
         return self._epsilon
