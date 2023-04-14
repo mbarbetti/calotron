@@ -310,3 +310,7 @@ class Transformer(BaseTransformer):
     @property
     def start_token_initializer(self) -> str:
         return self._start_token_initializer
+    
+    @property
+    def attention_weights(self) -> tf.Tensor:
+        return self._decoder._last_attn_scores

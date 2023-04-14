@@ -80,6 +80,7 @@ class DecoderLayer(tf.keras.layers.Layer):
     def call(self, x, condition) -> tf.Tensor:
         x = self._causal_attn(x)
         output = self._cross_attn(x, condition)
+        self._attn_scores = self._cross_attn._attn_scores
         output = self._mlp(output)
         return output
 
@@ -214,6 +215,7 @@ class Decoder(tf.keras.layers.Layer):
             )
             for i in range(self._num_layers)
         ]
+        self._last_attn_scores = None
 
     def call(self, x, condition) -> tf.Tensor:
         output = self._seq_ord_embedding(x)
@@ -221,6 +223,7 @@ class Decoder(tf.keras.layers.Layer):
             output = self._smooth_layer(output)
         for i in range(self._num_layers):
             output = self._decoder_layers[i](output, condition)
+        self._last_attn_scores = self._decoder_layers[-1]._attn_scores
         return output
 
     @property

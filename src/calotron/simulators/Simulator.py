@@ -62,7 +62,11 @@ class Simulator(tf.Module):
             ta_target = ta_target.write(index=i + 1, value=predictions[:, -1, :])
 
         out_target = tf.transpose(ta_target.stack(), perm=[1, 0, 2])
-        return out_target[:, 1:, :]
+        out_target = out_target[:, 1:, :]
+
+        self._transformer((source, out_target), training=False)
+        attention_weights = self._transformer.attention_weights
+        return out_target, attention_weights
 
     @property
     def transformer(self) -> Transformer:

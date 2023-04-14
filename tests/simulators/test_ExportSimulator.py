@@ -59,12 +59,18 @@ def test_export_simulator_configuration(export_simulator):
 
 
 def test_export_use(export_simulator):
-    output = export_simulator(dataset)
+    output, attn_weights = export_simulator(dataset)
     test_shape = list(target.shape)
     test_shape[0] = BATCH_SIZE
     assert output.shape == tuple(test_shape)
+    test_shape = list()
+    test_shape.append(BATCH_SIZE)
+    test_shape.append(model.num_heads[1])
+    test_shape.append(target.shape[1])
+    test_shape.append(source.shape[1])
+    assert attn_weights.shape == tuple(test_shape)
     tf.saved_model.save(export_simulator, export_dir=export_dir)
     reloaded = tf.saved_model.load(export_dir)
-    output_reloaded = reloaded(dataset)
+    output_reloaded, attn_weights_reloaded = reloaded(dataset)
     comparison = output.numpy() == output_reloaded.numpy()
     assert comparison.all()

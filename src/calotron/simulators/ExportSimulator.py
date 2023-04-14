@@ -27,20 +27,37 @@ class ExportSimulator(tf.Module):
         assert isinstance(dataset, tf.data.Dataset)
 
         ta_target = tf.TensorArray(dtype=self._dtype, size=0, dynamic_size=True)
+        ta_weight = tf.TensorArray(dtype=self._dtype, size=0, dynamic_size=True)
 
         idx = 0
         for source in dataset:
             source = tf.cast(source, dtype=self._dtype)
-            ta_target = ta_target.write(
-                index=idx, value=self._simulator(source, self._max_length)
-            )
+            out_target, attn_weights = self._simulator(source, self._max_length)
+
+            ta_target = ta_target.write(index=idx, value=out_target)
+            ta_weight = ta_weight.write(index=idx, value=attn_weights)
             idx += 1
-        output = ta_target.stack()
-        output = tf.reshape(
-            output,
-            (idx * tf.shape(output)[1], tf.shape(output)[2], tf.shape(output)[3]),
+
+        out_target = ta_target.stack()
+        out_target = tf.reshape(
+            out_target,
+            shape=(
+                idx * tf.shape(out_target)[1],
+                tf.shape(out_target)[2],
+                tf.shape(out_target)[3],
+            ),
         )
-        return output
+        attn_weights = ta_weight.stack()
+        attn_weights = tf.reshape(
+            attn_weights,
+            shape=(
+                idx * tf.shape(attn_weights)[1],
+                tf.shape(attn_weights)[2],
+                tf.shape(attn_weights)[3],
+                tf.shape(attn_weights)[4],
+            ),
+        )
+        return out_target, attn_weights
 
     @property
     def simulator(self) -> Simulator:

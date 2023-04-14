@@ -56,7 +56,13 @@ def test_simulator_use(start_token, source):
     from calotron.simulators import Simulator
 
     sim = Simulator(transformer=model, start_token=start_token)
-    output = sim(source=source[:BATCH_SIZE], max_length=target.shape[1])
+    output, attn_weights = sim(source=source[:BATCH_SIZE], max_length=target.shape[1])
     test_shape = list(target.shape)
     test_shape[0] = BATCH_SIZE
     assert output.shape == tuple(test_shape)
+    test_shape = list()
+    test_shape.append(BATCH_SIZE)
+    test_shape.append(model.num_heads[1])
+    test_shape.append(target.shape[1])
+    test_shape.append(source.shape[1])
+    assert attn_weights.shape == tuple(test_shape)

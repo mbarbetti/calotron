@@ -399,3 +399,24 @@ def photon2cluster_corr(
         plt.savefig(export_fname)
     report.add_figure(options="width=95%")
     plt.close()
+
+
+def attention_plot(
+    report,
+    attn_weights,
+    head_id=0,
+    save_figure=False,
+    export_fname="./images/attn-plot.png",
+) -> None:
+    if len(attn_weights.shape) == 4:
+        attn_weights = np.mean(attn_weights, axis=0)
+    plt.figure(figsize=(8, 4), dpi=300)
+    plt.title(f"Last attention weights of head #{head_id+1}", fontsize=14)
+    plt.xlabel("Generated photons", fontsize=12)
+    plt.ylabel("Reconstructed clusters", fontsize=12)
+    plt.imshow(attn_weights[head_id], aspect="auto", cmap="gist_heat")
+    plt.colorbar()
+    if save_figure:
+        plt.savefig(export_fname)
+    report.add_figure(options="width=45%")
+    plt.close()
