@@ -66,8 +66,8 @@ class EncoderLayer(tf.keras.layers.Layer):
             dtype=self.dtype,
         )
 
-    def call(self, x) -> tf.Tensor:
-        output = self._global_attn(x)
+    def call(self, x, global_attn_mask=None) -> tf.Tensor:
+        output = self._global_attn(x, attention_mask=global_attn_mask)
         output = self._mlp(output)
         return output
 
@@ -104,7 +104,7 @@ class Encoder(tf.keras.layers.Layer):
         seq_ord_latent_dim=16,
         seq_ord_max_length=512,
         seq_ord_normalization=10_000,
-        residual_smoothing=True,
+        enable_residual_smoothing=True,
         name=None,
         dtype=None,
     ) -> None:
@@ -156,8 +156,8 @@ class Encoder(tf.keras.layers.Layer):
         self._seq_ord_normalization = float(seq_ord_normalization)
 
         # Residual smoothing
-        assert isinstance(residual_smoothing, bool)
-        self._residual_smoothing = residual_smoothing
+        assert isinstance(enable_residual_smoothing, bool)
+        self._enable_residual_smoothing = enable_residual_smoothing
 
         # Sequence order embedding
         self._seq_ord_embedding = SeqOrderEmbedding(
@@ -170,7 +170,7 @@ class Encoder(tf.keras.layers.Layer):
         )
 
         # Smoothing layer
-        if self._residual_smoothing:
+        if self._enable_residual_smoothing:
             self._smooth_layer = tf.keras.Sequential(
                 [
                     tf.keras.layers.Dense(
@@ -203,12 +203,12 @@ class Encoder(tf.keras.layers.Layer):
             for i in range(self._num_layers)
         ]
 
-    def call(self, x) -> tf.Tensor:
+    def call(self, x, global_attn_mask=None) -> tf.Tensor:
         output = self._seq_ord_embedding(x)
         if self._smooth_layer is not None:
             output = self._smooth_layer(output)
         for i in range(self._num_layers):
-            output = self._encoder_layers[i](output)
+            output = self._encoder_layers[i](output, global_attn_mask)
         return output
 
     @property
@@ -248,5 +248,5 @@ class Encoder(tf.keras.layers.Layer):
         return self._seq_ord_normalization
 
     @property
-    def residual_smoothing(self) -> bool:
-        return self._residual_smoothing
+    def enable_residual_smoothing(self) -> bool:
+        return self._enable_residual_smoothing

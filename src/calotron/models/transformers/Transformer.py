@@ -21,7 +21,7 @@ class Transformer(BaseTransformer):
         seq_ord_latent_dims=16,
         seq_ord_max_lengths=512,
         seq_ord_normalizations=10_000,
-        residual_smoothing=True,
+        enable_residual_smoothing=True,
         output_activations=None,
         start_token_initializer="ones",
         name=None,
@@ -146,16 +146,16 @@ class Transformer(BaseTransformer):
                 self._seq_ord_normalizations.append(float(norm))
 
         # Residual smoothing (encoder/decoder)
-        if isinstance(residual_smoothing, bool):
-            assert isinstance(residual_smoothing, bool)
-            self._residual_smoothing = [residual_smoothing] * 2
+        if isinstance(enable_residual_smoothing, bool):
+            assert isinstance(enable_residual_smoothing, bool)
+            self._enable_residual_smoothing = [enable_residual_smoothing] * 2
         else:
-            assert isinstance(residual_smoothing, (list, tuple, np.ndarray))
-            assert len(residual_smoothing) == 2
-            self._residual_smoothing = list()
-            for flag in residual_smoothing:
+            assert isinstance(enable_residual_smoothing, (list, tuple, np.ndarray))
+            assert len(enable_residual_smoothing) == 2
+            self._enable_residual_smoothing = list()
+            for flag in enable_residual_smoothing:
                 assert isinstance(flag, bool)
-                self._residual_smoothing.append(flag)
+                self._enable_residual_smoothing.append(flag)
 
         # Output activations
         self._output_activations = output_activations
@@ -181,7 +181,7 @@ class Transformer(BaseTransformer):
             seq_ord_latent_dim=self._seq_ord_latent_dims[0],
             seq_ord_max_length=self._seq_ord_max_lengths[0],
             seq_ord_normalization=self._seq_ord_normalizations[0],
-            residual_smoothing=self._residual_smoothing[0],
+            enable_residual_smoothing=self._enable_residual_smoothing[0],
             name="t_encoder",
             dtype=self.dtype,
         )
@@ -197,7 +197,7 @@ class Transformer(BaseTransformer):
             seq_ord_latent_dim=self._seq_ord_latent_dims[1],
             seq_ord_max_length=self._seq_ord_max_lengths[1],
             seq_ord_normalization=self._seq_ord_normalizations[1],
-            residual_smoothing=self._residual_smoothing[1],
+            enable_residual_smoothing=self._enable_residual_smoothing[1],
             name="t_decoder",
             dtype=self.dtype,
         )
@@ -300,8 +300,8 @@ class Transformer(BaseTransformer):
         return self._seq_ord_normalizations
 
     @property
-    def residual_smoothing(self) -> list:
-        return self._residual_smoothing
+    def enable_residual_smoothing(self) -> list:
+        return self._enable_residual_smoothing
 
     @property
     def output_activations(self):  # TODO: add Union[list, None]

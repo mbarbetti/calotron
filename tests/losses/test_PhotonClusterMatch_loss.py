@@ -22,7 +22,7 @@ transf = Transformer(
     seq_ord_latent_dims=16,
     seq_ord_max_lengths=[source.shape[1], target.shape[1]],
     seq_ord_normalizations=10_000,
-    residual_smoothing=True,
+    enable_residual_smoothing=True,
     output_activations="relu",
     start_token_initializer="ones",
 )

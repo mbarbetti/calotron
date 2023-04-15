@@ -27,7 +27,7 @@ def model():
         seq_ord_latent_dims=16,
         seq_ord_max_lengths=[source.shape[1], target.shape[1]],
         seq_ord_normalizations=10_000,
-        residual_smoothing=True,
+        enable_residual_smoothing=True,
         output_activations="relu",
         start_token_initializer="ones",
     )
@@ -52,15 +52,15 @@ def test_model_configuration(model):
     assert isinstance(model.seq_ord_latent_dims, list)
     assert isinstance(model.seq_ord_max_lengths, list)
     assert isinstance(model.seq_ord_normalizations, list)
-    assert isinstance(model.residual_smoothing, list)
+    assert isinstance(model.enable_residual_smoothing, list)
     assert isinstance(model.output_activations, str)
     assert isinstance(model.start_token_initializer, str)
 
 
-@pytest.mark.parametrize("residual_smoothing", [True, False])
-def test_model_use_residual_smoothing(residual_smoothing):
+@pytest.mark.parametrize("enable_residual_smoothing", [True, False])
+def test_model_use_enable_residual_smoothing(enable_residual_smoothing):
     latent_dim = 8
-    if residual_smoothing:
+    if enable_residual_smoothing:
         encoder_depth = latent_dim + ADDITIONAL_DIM
         decoder_depth = latent_dim + ADDITIONAL_DIM
     else:
@@ -80,7 +80,7 @@ def test_model_use_residual_smoothing(residual_smoothing):
         seq_ord_latent_dims=latent_dim,
         seq_ord_max_lengths=[source.shape[1], target.shape[1]],
         seq_ord_normalizations=10_000,
-        residual_smoothing=residual_smoothing,
+        enable_residual_smoothing=enable_residual_smoothing,
         output_activations=None,
     )
     output = model((source, target))
@@ -114,7 +114,7 @@ def test_model_use_start_token_initializer(start_token_initializer):
         seq_ord_latent_dims=16,
         seq_ord_max_lengths=[source.shape[1], target.shape[1]],
         seq_ord_normalizations=10_000,
-        residual_smoothing=True,
+        enable_residual_smoothing=True,
         output_activations="relu",
         start_token_initializer=start_token_initializer,
     )
