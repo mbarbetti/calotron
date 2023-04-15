@@ -74,8 +74,8 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
 
     def call(self, x) -> tf.Tensor:
         seq_order = tf.tile(
-            self._seq_ord_encoding[None, :tf.shape(x)[1], :], 
-            multiples=(tf.shape(x)[0], 1, 1)
+            self._seq_ord_encoding[None, : tf.shape(x)[1], :],
+            multiples=(tf.shape(x)[0], 1, 1),
         )
         emb_output = self._embedding(x) + self._epsilon
         output = self._add([emb_output, seq_order])
