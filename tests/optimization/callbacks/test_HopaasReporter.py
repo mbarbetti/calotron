@@ -10,7 +10,7 @@ NUM_TRIALS = 1
 CHUNK_SIZE = int(1e3)
 
 here = os.path.dirname(__file__)
-tests_dir = "/".join(here.split("/")[:-1])
+tests_dir = "/".join(here.split("/")[:-2])
 with open(f"{tests_dir}/config/hopaas.yml") as file:
     config = yaml.full_load(file)
 
@@ -41,7 +41,7 @@ def callback():
         sampler=hpc.samplers.TPESampler(),
         client=client,
     )
-    from calotron.callbacks import HopaasReporter
+    from calotron.optimization.callbacks import HopaasReporter
 
     with study.trial() as trial:
         report = HopaasReporter(
@@ -55,7 +55,7 @@ def callback():
 
 
 def test_callback_configuration(callback):
-    from calotron.callbacks import HopaasReporter
+    from calotron.optimization.callbacks import HopaasReporter
 
     assert isinstance(callback, HopaasReporter)
     assert isinstance(callback.loss_name, str)
@@ -73,7 +73,7 @@ def test_callback_use(enable_pruning):
         sampler=hpc.samplers.TPESampler(),
         client=client,
     )
-    from calotron.callbacks import HopaasReporter
+    from calotron.optimization.callbacks import HopaasReporter
 
     for _ in range(NUM_TRIALS):
         with study.trial() as trial:

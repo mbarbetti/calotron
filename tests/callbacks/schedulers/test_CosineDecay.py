@@ -25,7 +25,7 @@ mse = tf.keras.losses.MeanSquaredError()
 def scheduler():
     from calotron.callbacks.schedulers import CosineDecay
 
-    sched = CosineDecay(optimizer=adam, decay_steps=1000, alpha=0.95, verbose=True)
+    sched = CosineDecay(optimizer=adam, decay_steps=1000, alpha=0.95, min_learning_rate=0.001, verbose=True)
     return sched
 
 
@@ -39,10 +39,24 @@ def test_sched_configuration(scheduler):
     assert isinstance(scheduler.optimizer, tf.keras.optimizers.Optimizer)
     assert isinstance(scheduler.decay_steps, int)
     assert isinstance(scheduler.alpha, float)
+    assert isinstance(scheduler.min_learning_rate, float)
 
 
-def test_sched_use(scheduler):
+@pytest.mark.parametrize("min_learning_rate", [None, 0.0005])
+def test_sched_use(min_learning_rate):
+    from calotron.callbacks.schedulers import CosineDecay
+
+    scheduler = CosineDecay(
+        optimizer=adam, 
+        decay_steps=1000, 
+        alpha=0.95, 
+        min_learning_rate=min_learning_rate, 
+        verbose=True
+    )
     model.compile(optimizer=adam, loss=mse)
     history = model.fit(X, Y, batch_size=500, epochs=5, callbacks=[scheduler])
     last_lr = float(f"{history.history['lr'][-1]:.4f}")
-    assert last_lr == 0.0001
+    if min_learning_rate is not None:
+        assert last_lr == 0.0005
+    else:
+        assert last_lr == 0.0001
