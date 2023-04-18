@@ -61,7 +61,7 @@ def test_sched_use(staircase, min_learning_rate):
         decay_steps=100,
         staircase=staircase,
         min_learning_rate=min_learning_rate,
-        verbose=True
+        verbose=True,
     )
     model.compile(optimizer=adam, loss=mse)
     history = model.fit(X, Y, batch_size=500, epochs=5, callbacks=[sched])

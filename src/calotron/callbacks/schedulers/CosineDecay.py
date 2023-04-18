@@ -1,17 +1,12 @@
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 
 from calotron.callbacks.schedulers.BaseScheduler import BaseScheduler
 
 
 class CosineDecay(BaseScheduler):
     def __init__(
-        self,
-        optimizer,
-        decay_steps,
-        alpha=0.0,
-        min_learning_rate=None,
-        verbose=False,
+        self, optimizer, decay_steps, alpha=0.0, min_learning_rate=None, verbose=False
     ) -> None:
         super().__init__(optimizer, verbose)
 
@@ -56,7 +51,7 @@ class CosineDecay(BaseScheduler):
     @property
     def alpha(self) -> float:
         return self._alpha
-    
+
     @property
     def min_learning_rate(self) -> float:
         return self._min_learning_rate

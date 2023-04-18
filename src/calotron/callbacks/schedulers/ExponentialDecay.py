@@ -63,7 +63,7 @@ class ExponentialDecay(BaseScheduler):
     @property
     def staircase(self) -> bool:
         return self._staircase
-    
+
     @property
     def min_learning_rate(self) -> float:
         return self._min_learning_rate
