@@ -1,13 +1,12 @@
 import tensorflow as tf
 from tensorflow.keras.losses import BinaryCrossentropy as TF_BCE
-from tensorflow.keras.losses import MeanSquaredError as TF_MSE
 
 from calotron.losses.BaseLoss import BaseLoss
 from calotron.losses.BinaryCrossentropy import BinaryCrossentropy
 from calotron.losses.WassersteinDistance import WassersteinDistance
 
 ADV_METRICS = ["binary-crossentropy", "wasserstein-distance"]
-DEFAULT_DISTANCE = 99.0
+DEFAULT_MAX_DISTANCE = 99.0
 
 
 class PhotonClusterMatch(BaseLoss):
@@ -17,6 +16,7 @@ class PhotonClusterMatch(BaseLoss):
         lambda_geom=1.0,
         lambda_global=0.5,
         max_match_distance=1e-4,
+        ignore_padding=False,
         adversarial_metric="binary-crossentropy",
         bce_options={
             "injected_noise_stddev": 0.0,
@@ -49,6 +49,10 @@ class PhotonClusterMatch(BaseLoss):
         assert max_match_distance > 0.0
         self._max_match_distance = float(max_match_distance)
 
+        # Ignore padding
+        assert isinstance(ignore_padding, bool)
+        self._ignore_padding = ignore_padding
+
         # Adversarial metric
         assert isinstance(adversarial_metric, str)
         if adversarial_metric not in ADV_METRICS:
@@ -62,8 +66,10 @@ class PhotonClusterMatch(BaseLoss):
         # Options
         assert isinstance(bce_options, dict)
         self._bce_options = bce_options
+        self._bce_options.update({"ignore_padding": self._ignore_padding})
         assert isinstance(wass_options, dict)
         self._wass_options = wass_options
+        self._wass_options.update({"ignore_padding": self._ignore_padding})
         assert isinstance(aux_bce_options, dict)
         self._aux_bce_options = aux_bce_options
 
@@ -118,7 +124,7 @@ class PhotonClusterMatch(BaseLoss):
         geom_loss = tf.cast(geom_loss, dtype=target.dtype)
 
         # Global event reco loss
-        global_err = tf.reduce_sum((target[:, :, 2:] - output[:, :, 2:]) ** 2, axis=-1)
+        global_err = tf.reduce_sum((target - output) ** 2, axis=-1)
         if sample_weight is not None:
             if len(tf.shape(sample_weight)) != len(tf.shape(global_err)):
                 weights = tf.reduce_mean(sample_weight, axis=-1)
@@ -140,9 +146,13 @@ class PhotonClusterMatch(BaseLoss):
         source_xy = tf.tile(source[:, None, :, :2], (1, tf.shape(target)[1], 1, 1))
         target_xy = tf.tile(target[:, :, None, :2], (1, 1, tf.shape(source)[1], 1))
         pairwise_distance = tf.norm(target_xy - source_xy, axis=-1)
-        pairwise_distance = tf.reduce_min(pairwise_distance, axis=-1)
+        if self._ignore_padding:
+            pairwise_distance = tf.where(
+                pairwise_distance > 0.0, pairwise_distance, DEFAULT_MAX_DISTANCE
+            )
+        min_pairwise_distance = tf.reduce_min(pairwise_distance, axis=-1)
         match_weights = self._max_match_distance / tf.math.maximum(
-            pairwise_distance, self._max_match_distance
+            min_pairwise_distance, self._max_match_distance
         )
         if sample_weight is not None:
             if len(tf.shape(sample_weight)) != len(tf.shape(match_weights)):
@@ -181,9 +191,13 @@ class PhotonClusterMatch(BaseLoss):
         source_coords = tf.tile(source[:, :, None, :2], (1, 1, tf.shape(target)[1], 1))
         target_coords = tf.tile(target[:, None, :, :2], (1, tf.shape(source)[1], 1, 1))
         pairwise_distance = tf.norm(target_coords - source_coords, axis=-1)
-        pairwise_distance = tf.reduce_min(pairwise_distance, axis=-1)
+        if self._ignore_padding:
+            pairwise_distance = tf.where(
+                pairwise_distance > 0.0, pairwise_distance, DEFAULT_MAX_DISTANCE
+            )
+        min_pairwise_distance = tf.reduce_min(pairwise_distance, axis=-1)
         labels = tf.cast(
-            pairwise_distance < self._max_match_distance, dtype=source.dtype
+            min_pairwise_distance < self._max_match_distance, dtype=source.dtype
         )
 
         # Classification loss
@@ -210,6 +224,10 @@ class PhotonClusterMatch(BaseLoss):
     @property
     def max_match_distance(self) -> float:
         return self._max_match_distance
+    
+    @property
+    def ignore_padding(self) -> bool:
+        return self._ignore_padding
 
     @property
     def adversarial_metric(self) -> str:

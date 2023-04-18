@@ -47,6 +47,7 @@ def loss():
         sampled_xi_min=0.0,
         sampled_xi_max=1.0,
         epsilon=1e-12,
+        ignore_padding=False,
     )
     return loss_
 
@@ -64,6 +65,7 @@ def test_loss_configuration(loss):
     assert isinstance(loss.sampled_xi_min, float)
     assert isinstance(loss.sampled_xi_max, float)
     assert isinstance(loss.epsilon, float)
+    assert isinstance(loss.ignore_padding, bool)
     assert isinstance(loss.name, str)
 
 

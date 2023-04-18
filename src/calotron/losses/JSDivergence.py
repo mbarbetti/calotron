@@ -5,8 +5,14 @@ from calotron.losses.BaseLoss import BaseLoss
 
 
 class JSDivergence(BaseLoss):
-    def __init__(self, name="js_loss") -> None:
+    def __init__(self, ignore_padding=False, name="js_loss") -> None:
         super().__init__(name)
+
+        # Ignore padding
+        assert isinstance(ignore_padding, bool)
+        self._ignore_padding = ignore_padding
+
+        # K-L divergence
         self._kl_div = TF_KLDivergence()
 
     def transformer_loss(
@@ -19,8 +25,13 @@ class JSDivergence(BaseLoss):
         training=True,
     ) -> tf.Tensor:
         output = transformer((source, target), training=training)
-        y_true = discriminator((source, target), training=False)
-        y_pred = discriminator((source, output), training=False)
+
+        if self._ignore_padding:
+            mask = tf.cast(target[:, :, 2] > 0.0, dtype=target.dtype)  # not padded values
+        else:
+            mask = None
+        y_true = discriminator((source, target), mask=mask, training=False)
+        y_pred = discriminator((source, output), mask=mask, training=False)
 
         if sample_weight is not None:
             evt_weights = tf.reduce_mean(sample_weight, axis=1)
@@ -40,8 +51,13 @@ class JSDivergence(BaseLoss):
         training=True,
     ) -> tf.Tensor:
         output = transformer((source, target), training=False)
-        y_true = discriminator((source, target), training=training)
-        y_pred = discriminator((source, output), training=training)
+
+        if self._ignore_padding:
+            mask = tf.cast(target[:, :, 2] > 0.0, dtype=target.dtype)  # not padded values
+        else:
+            mask = None
+        y_true = discriminator((source, target), mask=mask, training=training)
+        y_pred = discriminator((source, output), mask=mask, training=training)
 
         if sample_weight is not None:
             evt_weights = tf.reduce_mean(sample_weight, axis=1)
@@ -58,3 +74,7 @@ class JSDivergence(BaseLoss):
             y_pred, 0.5 * (y_true + y_pred), sample_weight=sample_weight
         )
         return loss
+    
+    @property
+    def ignore_padding(self) -> bool:
+        return self._ignore_padding

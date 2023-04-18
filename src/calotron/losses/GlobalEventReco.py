@@ -11,6 +11,7 @@ class GlobalEventReco(BaseLoss):
     def __init__(
         self,
         lambda_adv=0.1,
+        ignore_padding=False,
         adversarial_metric="binary-crossentropy",
         bce_options={
             "injected_noise_stddev": 0.0,
@@ -27,6 +28,10 @@ class GlobalEventReco(BaseLoss):
         assert lambda_adv >= 0.0
         self._lambda_adv = float(lambda_adv)
 
+        # Ignore padding
+        assert isinstance(ignore_padding, bool)
+        self._ignore_padding = ignore_padding
+
         # Adversarial metric
         assert isinstance(adversarial_metric, str)
         if adversarial_metric not in ADV_METRICS:
@@ -40,8 +45,10 @@ class GlobalEventReco(BaseLoss):
         # Options
         assert isinstance(bce_options, dict)
         self._bce_options = bce_options
+        self._bce_options.update({"ignore_padding": self._ignore_padding})
         assert isinstance(wass_options, dict)
         self._wass_options = wass_options
+        self._wass_options.update({"ignore_padding": self._ignore_padding})
 
         # Losses definition
         if self._adversarial_metric == "binary-crossentropy":
@@ -105,6 +112,10 @@ class GlobalEventReco(BaseLoss):
     @property
     def lambda_adv(self) -> float:
         return self._lambda_adv
+    
+    @property
+    def ignore_padding(self) -> bool:
+        return self._ignore_padding
 
     @property
     def adversarial_metric(self) -> str:

@@ -41,7 +41,7 @@ def loss():
     from calotron.losses import BinaryCrossentropy
 
     loss_ = BinaryCrossentropy(
-        injected_noise_stddev=0.01, from_logits=False, label_smoothing=0.1
+        injected_noise_stddev=0.01, from_logits=False, label_smoothing=0.1, ignore_padding=False,
     )
     return loss_
 
@@ -56,6 +56,7 @@ def test_loss_configuration(loss):
     assert isinstance(loss.injected_noise_stddev, float)
     assert isinstance(loss.from_logits, bool)
     assert isinstance(loss.label_smoothing, float)
+    assert isinstance(loss.ignore_padding, bool)
     assert isinstance(loss.name, str)
 
 
@@ -64,7 +65,7 @@ def test_loss_use_no_weights(from_logits):
     from calotron.losses import BinaryCrossentropy
 
     loss = BinaryCrossentropy(
-        injected_noise_stddev=0.01, from_logits=from_logits, label_smoothing=0.1
+        injected_noise_stddev=0.01, from_logits=from_logits, label_smoothing=0.1, ignore_padding=False
     )
     if from_logits:
         disc._seq += [tf.keras.layers.Dense(1, activation="tanh")]
@@ -95,7 +96,7 @@ def test_loss_use_with_weights(from_logits):
     from calotron.losses import BinaryCrossentropy
 
     loss = BinaryCrossentropy(
-        injected_noise_stddev=0.01, from_logits=from_logits, label_smoothing=0.1
+        injected_noise_stddev=0.01, from_logits=from_logits, label_smoothing=0.1, ignore_padding=False
     )
     if from_logits:
         disc._seq += [tf.keras.layers.Dense(1, activation="tanh")]

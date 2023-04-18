@@ -50,6 +50,7 @@ def loss():
         lambda_geom=1.0,
         lambda_global=0.0,
         max_match_distance=0.005,
+        ignore_padding=False,
         adversarial_metric="binary-crossentropy",
         bce_options={
             "injected_noise_stddev": 0.0,
@@ -73,6 +74,7 @@ def test_loss_configuration(loss):
     assert isinstance(loss.lambda_geom, float)
     assert isinstance(loss.lambda_global, float)
     assert isinstance(loss.max_match_distance, float)
+    assert isinstance(loss.ignore_padding, bool)
     assert isinstance(loss.adversarial_metric, str)
     assert isinstance(loss.bce_options, dict)
     assert isinstance(loss.wass_options, dict)
@@ -88,8 +90,10 @@ def test_loss_use_no_weights(adversarial_metric):
 
     loss = PhotonClusterMatch(
         lambda_adv=0.1,
+        lambda_geom=0.0,
         lambda_global=0.0,
         max_match_distance=0.005,
+        ignore_padding=False,
         adversarial_metric=adversarial_metric,
         bce_options={"injected_noise_stddev": 0.1},
         wass_options={"lipschitz_penalty": 100.0},
@@ -130,8 +134,10 @@ def test_loss_use_with_weights(adversarial_metric):
 
     loss = PhotonClusterMatch(
         lambda_adv=0.1,
+        lambda_geom=0.0,
         lambda_global=0.0,
         max_match_distance=0.005,
+        ignore_padding=False,
         adversarial_metric=adversarial_metric,
         bce_options={"injected_noise_stddev": 0.1},
         wass_options={"lipschitz_penalty": 100.0},

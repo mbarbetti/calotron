@@ -40,7 +40,7 @@ disc = Discriminator(
 def loss():
     from calotron.losses import KLDivergence
 
-    loss_ = KLDivergence()
+    loss_ = KLDivergence(ignore_padding=False)
     return loss_
 
 
@@ -51,6 +51,7 @@ def test_loss_configuration(loss):
     from calotron.losses import KLDivergence
 
     assert isinstance(loss, KLDivergence)
+    assert isinstance(loss.ignore_padding, bool)
     assert isinstance(loss.name, str)
 
 
