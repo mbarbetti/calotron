@@ -40,10 +40,8 @@ class DeepSets(tf.keras.layers.Layer):
                 tf.keras.layers.Dense(
                     self._hidden_units,
                     activation="relu",
-                    kernel_initializer=tf.keras.initializers.RandomUniform(
-                        minval=-0.05, maxval=0.05
-                    ),
-                    bias_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.01),
+                    kernel_initializer="glorot_uniform",
+                    bias_initializer="zeros",
                     name="ds_dense",
                     dtype=self.dtype,
                 )
@@ -59,16 +57,19 @@ class DeepSets(tf.keras.layers.Layer):
             tf.keras.layers.Dense(
                 self._latent_dim,
                 activation="relu",
-                kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.1),
-                bias_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.01),
+                kernel_initializer="truncated_normal",
+                bias_initializer="zeros",
                 name="ds_output_layer",
                 dtype=self.dtype,
             )
         ]
 
-    def call(self, x) -> tf.Tensor:
+    def call(self, x, mask=None) -> tf.Tensor:
         for layer in self._seq:
             x = layer(x)
+        if mask is not None:
+            mask = tf.tile(mask[:, :, None], (1, 1, tf.shape(x)[2]))
+            x = tf.math.multiply(x, mask)
         output = tf.reduce_sum(x, axis=1)
         return output
 

@@ -53,7 +53,13 @@ class BinaryCrossentropy(BaseLoss):
             evt_weights = None
 
         if self._ignore_padding:
-            mask = tf.cast(target[:, :, 2] > 0.0, dtype=target.dtype)  # not padded values
+            source_mask = tf.cast(
+                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
+            )
+            target_mask = tf.cast(
+                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
+            )
+            mask = (source_mask, target_mask)
         else:
             mask = None
 
@@ -85,7 +91,13 @@ class BinaryCrossentropy(BaseLoss):
             evt_weights = None
 
         if self._ignore_padding:
-            mask = tf.cast(target[:, :, 2] > 0.0, dtype=target.dtype)  # not padded values
+            source_mask = tf.cast(
+                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
+            )
+            target_mask = tf.cast(
+                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
+            )
+            mask = (source_mask, target_mask)
         else:
             mask = None
 
@@ -96,7 +108,9 @@ class BinaryCrossentropy(BaseLoss):
             )
         else:
             rnd_true = 0.0
-        y_true = discriminator((source, target + rnd_true), mask=mask, training=training)
+        y_true = discriminator(
+            (source, target + rnd_true), mask=mask, training=training
+        )
         real_loss = self._loss(tf.ones_like(y_true), y_true, sample_weight=evt_weights)
         real_loss = tf.cast(real_loss, dtype=target.dtype)
 
@@ -108,7 +122,9 @@ class BinaryCrossentropy(BaseLoss):
             )
         else:
             rnd_pred = 0.0
-        y_pred = discriminator((source, output + rnd_pred), mask=mask, training=training)
+        y_pred = discriminator(
+            (source, output + rnd_pred), mask=mask, training=training
+        )
         fake_loss = self._loss(tf.zeros_like(y_pred), y_pred, sample_weight=evt_weights)
         fake_loss = tf.cast(fake_loss, dtype=output.dtype)
         return (real_loss + fake_loss) / 2.0
@@ -124,7 +140,7 @@ class BinaryCrossentropy(BaseLoss):
     @property
     def label_smoothing(self) -> float:
         return self._label_smoothing
-    
+
     @property
     def ignore_padding(self) -> bool:
         return self._ignore_padding

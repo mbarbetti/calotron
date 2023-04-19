@@ -27,7 +27,13 @@ class JSDivergence(BaseLoss):
         output = transformer((source, target), training=training)
 
         if self._ignore_padding:
-            mask = tf.cast(target[:, :, 2] > 0.0, dtype=target.dtype)  # not padded values
+            source_mask = tf.cast(
+                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
+            )
+            target_mask = tf.cast(
+                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
+            )
+            mask = (source_mask, target_mask)
         else:
             mask = None
         y_true = discriminator((source, target), mask=mask, training=False)
@@ -53,7 +59,13 @@ class JSDivergence(BaseLoss):
         output = transformer((source, target), training=False)
 
         if self._ignore_padding:
-            mask = tf.cast(target[:, :, 2] > 0.0, dtype=target.dtype)  # not padded values
+            source_mask = tf.cast(
+                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
+            )
+            target_mask = tf.cast(
+                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
+            )
+            mask = (source_mask, target_mask)
         else:
             mask = None
         y_true = discriminator((source, target), mask=mask, training=training)
@@ -74,7 +86,7 @@ class JSDivergence(BaseLoss):
             y_pred, 0.5 * (y_true + y_pred), sample_weight=sample_weight
         )
         return loss
-    
+
     @property
     def ignore_padding(self) -> bool:
         return self._ignore_padding

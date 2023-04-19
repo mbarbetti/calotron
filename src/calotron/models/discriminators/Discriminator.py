@@ -66,10 +66,8 @@ class Discriminator(BaseDiscriminator):
                 tf.keras.layers.Dense(
                     units=int(seq_units),
                     activation="relu",
-                    kernel_initializer=tf.keras.initializers.RandomUniform(
-                        minval=-0.05, maxval=0.05
-                    ),
-                    bias_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.01),
+                    kernel_initializer="glorot_uniform",
+                    bias_initializer="zeros",
                     name="d_dense",
                     dtype=self.dtype,
                 )
@@ -85,16 +83,20 @@ class Discriminator(BaseDiscriminator):
             tf.keras.layers.Dense(
                 units=self._output_units,
                 activation=self._output_activation,
-                kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.05),
-                bias_initializer=tf.keras.initializers.TruncatedNormal(stddev=0.01),
+                kernel_initializer="truncated_normal",
+                bias_initializer="zeros",
                 name="d_output_layer",
                 dtype=self.dtype,
             )
         ]
 
-    def call(self, inputs) -> tf.Tensor:
+    def call(self, inputs, mask=None) -> tf.Tensor:
         _, target = inputs
-        output = self._deep_sets(target)
+        if mask is not None:
+            _, target_mask = mask
+        else:
+            target_mask = None
+        output = self._deep_sets(target, mask=target_mask)
         for layer in self._seq:
             output = layer(output)
         return output
