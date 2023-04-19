@@ -2,9 +2,9 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
 
 
-class HopaasReporter(Callback):
+class HopaasPruner(Callback):
     def __init__(
-        self, trial, loss_name, report_frequency=1, enable_pruning=False
+        self, trial, loss_name, report_frequency=1, enable_pruning=True
     ) -> None:
         super().__init__()
         self._trial = trial

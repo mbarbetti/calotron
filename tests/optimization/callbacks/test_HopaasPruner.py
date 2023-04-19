@@ -34,17 +34,17 @@ model.add(tf.keras.layers.Dense(1))
 @pytest.fixture
 def callback():
     study = hpc.Study(
-        name="Test::Calotron::HopaasReporter(cfg)",
+        name="Test::Calotron::HopaasPruner(cfg)",
         properties=properties,
         direction="minimize",
         pruner=hpc.pruners.MedianPruner(),
         sampler=hpc.samplers.TPESampler(),
         client=client,
     )
-    from calotron.optimization.callbacks import HopaasReporter
+    from calotron.optimization.callbacks import HopaasPruner
 
     with study.trial() as trial:
-        report = HopaasReporter(
+        report = HopaasPruner(
             trial=trial, loss_name="loss", report_frequency=1, enable_pruning=False
         )
         trial.loss = 42
@@ -55,9 +55,9 @@ def callback():
 
 
 def test_callback_configuration(callback):
-    from calotron.optimization.callbacks import HopaasReporter
+    from calotron.optimization.callbacks import HopaasPruner
 
-    assert isinstance(callback, HopaasReporter)
+    assert isinstance(callback, HopaasPruner)
     assert isinstance(callback.loss_name, str)
     assert isinstance(callback.report_frequency, int)
     assert isinstance(callback.enable_pruning, bool)
@@ -66,21 +66,21 @@ def test_callback_configuration(callback):
 @pytest.mark.parametrize("enable_pruning", [False, True])
 def test_callback_use(enable_pruning):
     study = hpc.Study(
-        name="Test::Calotron::HopaasReporter(use)",
+        name="Test::Calotron::HopaasPruner(use)",
         properties=properties,
         direction="minimize",
         pruner=hpc.pruners.MedianPruner(),
         sampler=hpc.samplers.TPESampler(),
         client=client,
     )
-    from calotron.optimization.callbacks import HopaasReporter
+    from calotron.optimization.callbacks import HopaasPruner
 
     for _ in range(NUM_TRIALS):
         with study.trial() as trial:
             adam = tf.keras.optimizers.Adam(learning_rate=trial.learning_rate)
             mse = tf.keras.losses.MeanSquaredError()
 
-            report = HopaasReporter(
+            report = HopaasPruner(
                 trial=trial,
                 loss_name="loss",
                 report_frequency=1,

@@ -1,1 +1,1 @@
-from .HopaasReporter import HopaasReporter
+from .HopaasPruner import HopaasPruner
