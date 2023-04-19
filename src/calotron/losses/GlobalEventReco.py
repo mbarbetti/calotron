@@ -10,7 +10,7 @@ ADV_METRICS = ["binary-crossentropy", "wasserstein-distance"]
 class GlobalEventReco(BaseLoss):
     def __init__(
         self,
-        lambda_adv=0.1,
+        alpha=0.1,
         adversarial_metric="binary-crossentropy",
         bce_options={
             "injected_noise_stddev": 0.0,
@@ -28,9 +28,9 @@ class GlobalEventReco(BaseLoss):
         super().__init__(name)
 
         # Adversarial strength
-        assert isinstance(lambda_adv, (int, float))
-        assert lambda_adv >= 0.0
-        self._lambda_adv = float(lambda_adv)
+        assert isinstance(alpha, (int, float))
+        assert alpha >= 0.0
+        self._alpha = float(alpha)
 
         # Adversarial metric
         assert isinstance(adversarial_metric, str)
@@ -85,7 +85,8 @@ class GlobalEventReco(BaseLoss):
             training=training,
         )
 
-        tot_loss = reco_loss + self._lambda_adv * adv_loss
+        tot_loss = reco_loss / tf.cast(tf.shape(target)[2], dtype=target.dtype)
+        tot_loss += self._alpha * adv_loss
         return tot_loss
 
     def discriminator_loss(
@@ -108,8 +109,8 @@ class GlobalEventReco(BaseLoss):
         return adv_loss
 
     @property
-    def lambda_adv(self) -> float:
-        return self._lambda_adv
+    def alpha(self) -> float:
+        return self._alpha
 
     @property
     def adversarial_metric(self) -> str:

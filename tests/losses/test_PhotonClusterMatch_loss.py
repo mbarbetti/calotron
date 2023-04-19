@@ -46,7 +46,7 @@ def loss():
     from calotron.losses import PhotonClusterMatch
 
     loss_ = PhotonClusterMatch(
-        lambda_adv=0.1,
+        alpha=0.1,
         max_match_distance=0.005,
         adversarial_metric="binary-crossentropy",
         bce_options={
@@ -68,7 +68,7 @@ def test_loss_configuration(loss):
     from calotron.losses import PhotonClusterMatch
 
     assert isinstance(loss, PhotonClusterMatch)
-    assert isinstance(loss.lambda_adv, float)
+    assert isinstance(loss.alpha, float)
     assert isinstance(loss.max_match_distance, float)
     assert isinstance(loss.adversarial_metric, str)
     assert isinstance(loss.bce_options, dict)
@@ -84,7 +84,7 @@ def test_loss_use_no_weights(adversarial_metric):
     from calotron.losses import PhotonClusterMatch
 
     loss = PhotonClusterMatch(
-        lambda_adv=0.1,
+        alpha=0.1,
         max_match_distance=0.005,
         adversarial_metric=adversarial_metric,
         bce_options={"injected_noise_stddev": 0.1},
@@ -125,7 +125,7 @@ def test_loss_use_with_weights(adversarial_metric):
     from calotron.losses import PhotonClusterMatch
 
     loss = PhotonClusterMatch(
-        lambda_adv=0.1,
+        alpha=0.1,
         max_match_distance=0.005,
         adversarial_metric=adversarial_metric,
         bce_options={"injected_noise_stddev": 0.1},

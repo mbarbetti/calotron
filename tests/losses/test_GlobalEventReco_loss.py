@@ -41,7 +41,7 @@ def loss():
     from calotron.losses import GlobalEventReco
 
     loss_ = GlobalEventReco(
-        lambda_adv=0.1,
+        alpha=0.1,
         adversarial_metric="binary-crossentropy",
         bce_options={
             "injected_noise_stddev": 0.0,
@@ -61,7 +61,7 @@ def test_loss_configuration(loss):
     from calotron.losses import GlobalEventReco
 
     assert isinstance(loss, GlobalEventReco)
-    assert isinstance(loss.lambda_adv, float)
+    assert isinstance(loss.alpha, float)
     assert isinstance(loss.adversarial_metric, str)
     assert isinstance(loss.bce_options, dict)
     assert isinstance(loss.wass_options, dict)
@@ -75,7 +75,7 @@ def test_loss_use_no_weights(adversarial_metric):
     from calotron.losses import GlobalEventReco
 
     loss = GlobalEventReco(
-        lambda_adv=0.1,
+        alpha=0.1,
         adversarial_metric=adversarial_metric,
         bce_options={"injected_noise_stddev": 0.1},
         wass_options={"lipschitz_penalty": 100.0},
@@ -107,7 +107,7 @@ def test_loss_use_with_weights(adversarial_metric):
     from calotron.losses import GlobalEventReco
 
     loss = GlobalEventReco(
-        lambda_adv=0.1,
+        alpha=0.1,
         adversarial_metric=adversarial_metric,
         bce_options={"injected_noise_stddev": 0.1},
         wass_options={"lipschitz_penalty": 100.0},
