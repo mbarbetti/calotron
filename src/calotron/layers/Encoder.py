@@ -176,7 +176,7 @@ class Encoder(tf.keras.layers.Layer):
                     tf.keras.layers.Dense(
                         units=self._output_depth,
                         activation="linear",
-                        kernel_initializer="glorot_uniform",
+                        kernel_initializer="truncated_normal",
                         bias_initializer="zeros",
                         name="enc_smooth_layer",
                         dtype=self.dtype,

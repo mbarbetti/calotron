@@ -56,7 +56,7 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
                 tf.keras.layers.Dense(
                     units=self._latent_dim,
                     activation="linear",
-                    kernel_initializer="glorot_uniform",
+                    kernel_initializer="he_normal",
                     bias_initializer="zeros",
                     name=f"{prefix}_seq_ord_dense" if name else None,
                     dtype=self.dtype,

@@ -206,7 +206,7 @@ class Transformer(BaseTransformer):
         self._output_layer = tf.keras.layers.Dense(
             units=self._output_depth,
             activation="linear",
-            kernel_initializer="glorot_uniform",
+            kernel_initializer="truncated_normal",
             bias_initializer="zeros",
             name="t_dense_out",
             dtype=self.dtype,
