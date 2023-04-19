@@ -266,7 +266,7 @@ for iRow, cluster in enumerate(reco_clusters):
 # |   Calorimeter deposits   |
 # +--------------------------+
 
-plt.figure(figsize=(16, 5), dpi=300)
+plt.figure(figsize=(18, 5), dpi=300)
 
 plt.subplot(1, 2, 1)
 plt.title("Generated photons", fontsize=14)
@@ -282,6 +282,7 @@ plt.hist2d(
     cmin=0,
     cmap="gist_heat",
 )
+plt.colorbar()
 
 plt.subplot(1, 2, 2)
 plt.title("Reconstructed calo-clusters", fontsize=14)
@@ -297,6 +298,7 @@ plt.hist2d(
     cmin=0,
     cmap="gist_heat",
 )
+plt.colorbar()
 
 img_name = "calo-deposits-demo" if args.demo else "calo-deposits"
 plt.savefig(fname=f"{images_dir}/{img_name}.png")
@@ -306,7 +308,7 @@ plt.close()
 # |   Energy sequences   |
 # +----------------------+
 
-plt.figure(figsize=(16, 10), dpi=300)
+plt.figure(figsize=(18, 10), dpi=300)
 
 plt.subplot(1, 2, 1)
 plt.title("Generated photons", fontsize=14)
@@ -319,6 +321,7 @@ plt.title("Reconstructed calo-clusters", fontsize=14)
 plt.xlabel("Cluster energy deposits", fontsize=12)
 plt.ylabel("Events", fontsize=12)
 plt.imshow(pad_clusters[:64, :, 2], aspect="auto", cmap="gist_heat")
+plt.colorbar()
 
 img_name = "energy-seq-demo" if args.demo else "energy-seq"
 plt.savefig(fname=f"{images_dir}/{img_name}.png")

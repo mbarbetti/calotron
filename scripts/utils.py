@@ -153,6 +153,7 @@ def validation_histogram(
     xlabel=None,
     ref_label=None,
     gen_label=None,
+    log_scale=False,
     legend_loc="upper left",
     save_figure=False,
     export_fname="./images/val-hist.png",
@@ -172,7 +173,8 @@ def validation_histogram(
     plt.hist(
         gen_data, bins=bins, histtype="step", color="#fc8d59", lw=2, label=gen_label
     )
-    plt.yscale("log")
+    if log_scale:
+        plt.yscale("log")
     plt.legend(loc=legend_loc, fontsize=10)
     if save_figure:
         plt.savefig(export_fname)
@@ -368,7 +370,12 @@ def photon2cluster_corr(
         ).flatten()
         output_energy = cluster_scaler.inverse_transform(np.c_[output_energy]).flatten()
 
+    bins = np.linspace(0, 1, 76)
     energies = [cluster_energy, output_energy]
+    h_max = np.max(
+        [np.histogram2d(photon_energy, energy, bins=bins)[0] for energy in energies]
+    )
+
     titles = ["Photon-to-cluster correlations", "Photon-to-output correlations"]
     ylabels = [
         "Cluster preprocessed energy [a.u.]",
@@ -377,11 +384,9 @@ def photon2cluster_corr(
 
     plt.figure(figsize=(18, 5), dpi=300)
     for i, (energy, title, ylabel) in enumerate(zip(energies, titles, ylabels)):
-        h, x_edges, y_edges = np.histogram2d(
-            photon_energy, energy, bins=np.linspace(0, 1, 76)
-        )
+        h, x_edges, y_edges = np.histogram2d(photon_energy, energy, bins=bins)
         nonzero_x, nonzero_y = np.nonzero(h)
-        colors = np.ones_like(photon_energy) / (np.sum(h) + 1e-12)
+        colors = np.ones_like(photon_energy) / h_max
         for id_x, id_y in zip(nonzero_x, nonzero_y):
             colors[
                 ((photon_energy >= x_edges[id_x]) & (photon_energy < x_edges[id_x + 1]))
@@ -394,6 +399,7 @@ def photon2cluster_corr(
         plt.scatter(photon_energy, energy, s=1, c=colors, cmap="gist_heat")
         plt.xlim(0.0, 1.0)
         plt.ylim(0.0, 1.0)
+        plt.clim(vmin=0.0, vmax=1.0)
         plt.colorbar()
     if save_figure:
         plt.savefig(export_fname)

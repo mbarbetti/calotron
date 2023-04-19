@@ -3,10 +3,7 @@ import tensorflow as tf
 
 class BaseLoss:
     def __init__(self, name="loss") -> None:
-        if not isinstance(name, str):
-            raise TypeError(
-                f"`name` should be a string " f"instead {type(name)} passed"
-            )
+        assert isinstance(name, str)
         self._name = name
 
     def transformer_loss(
