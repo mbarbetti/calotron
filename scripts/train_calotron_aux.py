@@ -23,9 +23,9 @@ from utils import (
 from calotron.callbacks.schedulers import ExponentialDecay, PolynomialDecay
 from calotron.losses import PhotonClusterMatch
 from calotron.models import Calotron
+from calotron.models.auxiliaries import AuxClassifier
 from calotron.models.discriminators import Discriminator
 from calotron.models.transformers import MaskedTransformer
-from calotron.models.auxiliaries import AuxClassifier
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
