@@ -30,11 +30,11 @@ from calotron.optimization.scores import EarthMoverDistance
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
-STUDY_NAME = "Calotron::AdvTerm::V0"
+STUDY_NAME = "Calotron::AdvTerm::v0"
 DTYPE = np.float32
 TRAIN_RATIO = 0.7
 BATCHSIZE = 256
-EPOCHS = 200
+EPOCHS = 250
 
 # +------------------+
 # |   Parser setup   |
@@ -48,7 +48,7 @@ parser.set_defaults(saving=True)
 
 address = socket.gethostbyname(socket.gethostname())
 parser.add_argument("-n", "--node_name", default=f"{address}")
-parser.add_argument("-j", "--num_jobs", default=1)
+parser.add_argument("-j", "--num_jobs", default=10)
 
 args = parser.parse_args()
 
@@ -86,8 +86,8 @@ properties = {
     "alpha": hpc.suggestions.Float(0.0, 1.0),
     "t_lr0": hpc.suggestions.Float(1e-4, 1e-3),
     "d_lr0": hpc.suggestions.Float(1e-5, 1e-4),
-    "t_ds": hpc.suggestions.Int(25_000, 250_000, step=25_000),
-    "d_ds": hpc.suggestions.Int(25_000, 250_000, step=25_000),
+    "t_ds": hpc.suggestions.Int(10_000, 150_000, step=10_000),
+    "d_ds": hpc.suggestions.Int(10_000, 150_000, step=10_000),
 }
 
 study = hpc.Study(
