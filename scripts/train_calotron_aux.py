@@ -294,7 +294,7 @@ export_model_fname = f"{models_dir}/{prefix}_model"
 export_img_dirname = f"{images_dir}/{prefix}_img"
 
 if args.saving:
-    tf.saved_model.save(exp_sim, models_dir=export_model_fname)
+    tf.saved_model.save(exp_sim, export_dir=export_model_fname)
     hp.dump(f"{export_model_fname}/hyperparams.yml")  # export also list of hyperparams
     print(f"[INFO] Trained model correctly exported to {export_model_fname}")
     os.makedirs(export_img_dirname)  # need to save images

@@ -310,7 +310,7 @@ for iTrial in range(int(args.num_jobs)):
         export_img_dirname = f"{images_dir}/{prefix}_img"
 
         if args.saving:
-            tf.saved_model.save(exp_sim, models_dir=export_model_fname)
+            tf.saved_model.save(exp_sim, export_dir=export_model_fname)
             hp.dump(
                 f"{export_model_fname}/hyperparams.yml"
             )  # export also list of hyperparams
