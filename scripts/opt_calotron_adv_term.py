@@ -48,9 +48,18 @@ parser.set_defaults(saving=True)
 
 address = socket.gethostbyname(socket.gethostname())
 parser.add_argument("-n", "--node_name", default=f"{address}")
-parser.add_argument("-j", "--num_jobs", default=10)
+parser.add_argument("-j", "--num_jobs", default=1)
 
 args = parser.parse_args()
+
+# +---------------+
+# |   GPU setup   |
+# +---------------+
+
+avail_gpus = tf.config.list_physical_devices("GPU")
+
+if len(avail_gpus) == 0:
+    raise RuntimeError("No GPUs available for the optimization study")
 
 # +-------------------+
 # |   Initial setup   |
@@ -96,7 +105,7 @@ study = hpc.Study(
     special_properties={"address": address, "node_name": str(args.node_name)},
     direction="minimize",
     pruner=hpc.pruners.NopPruner(),
-    sampler=hpc.samplers.TPESampler(n_startup_trials=20),
+    sampler=hpc.samplers.TPESampler(n_startup_trials=25),
     client=client,
 )
 
@@ -292,35 +301,6 @@ for iTrial in range(int(args.num_jobs)):
         photon_val = photon_val[: len(output)]
         cluster_val = cluster_val[: len(output)]
 
-        # +--------------------------------+
-        # |   Feedbacks to Hopaas server   |
-        # +--------------------------------+
-
-        EMD = EarthMoverDistance(dtype=DTYPE)
-
-        x_emd_score = EMD(
-            x_true=cluster_val[:, :, 0].flatten(),
-            x_pred=output[:, :, 0].flatten(),
-            bins=np.linspace(-1.0, 1.0, 101),
-        )
-
-        y_emd_score = EMD(
-            x_true=cluster_val[:, :, 1].flatten(),
-            x_pred=output[:, :, 1].flatten(),
-            bins=np.linspace(-1.0, 1.0, 101),
-        )
-
-        energy_emd_score = EMD(
-            x_true=cluster_val[:, :, 2].flatten(),
-            x_pred=output[:, :, 2].flatten(),
-            bins=np.linspace(0.0, 1.0, 101),
-        )
-
-        score = np.mean([x_emd_score, y_emd_score, energy_emd_score])
-        trial.loss = score
-
-        print(f"[INFO] Trained model of Trial n. {trial.id} scored {score:.2f}")
-
         # +------------------+
         # |   Model export   |
         # +------------------+
@@ -350,7 +330,8 @@ for iTrial in range(int(args.num_jobs)):
         hour = hour.split(".")[0]
 
         info = [
-            f"- Script executed on **{socket.gethostname()}**",
+            f"- Script executed on **{socket.gethostname()}** (address: {args.node_name})",
+            f"- Trial **#{trial.id:04d}** (suid: {study.study_id})",
             f"- Model training completed in **{duration}**",
             f"- Report generated on **{date}** at **{hour}**",
         ]
@@ -649,3 +630,69 @@ for iTrial in range(int(args.num_jobs)):
         report_fname = f"{reports_dir}/{prefix}_train-report.html"
         report.write_report(filename=report_fname)
         print(f"[INFO] Training report correctly exported to {report_fname}")
+
+        # +--------------------------------+
+        # |   Feedbacks to Hopaas server   |
+        # +--------------------------------+
+
+        scores = list()
+        EMD = EarthMoverDistance(dtype=DTYPE)
+
+        x_emd_score = EMD(
+            x_true=cluster_val[:, :, 0].flatten(),
+            x_pred=output[:, :, 0].flatten(),
+            bins=np.linspace(-1.0, 1.0, 101),
+        )
+        scores.append(x_emd_score)
+
+        x_match_emd_score = EMD(
+            x_true=cluster_val[:, :, 0].flatten()[matches.flatten()],
+            x_pred=output[:, :, 0].flatten()[matches.flatten()],
+            bins=np.linspace(-1.0, 1.0, 101),
+        )
+        scores.append(x_match_emd_score)
+
+        y_emd_score = EMD(
+            x_true=cluster_val[:, :, 1].flatten(),
+            x_pred=output[:, :, 1].flatten(),
+            bins=np.linspace(-1.0, 1.0, 101),
+        )
+        scores.append(y_emd_score)
+
+        y_match_emd_score = EMD(
+            x_true=cluster_val[:, :, 1].flatten()[matches.flatten()],
+            x_pred=output[:, :, 1].flatten()[matches.flatten()],
+            bins=np.linspace(-1.0, 1.0, 101),
+        )
+        scores.append(y_match_emd_score)
+
+        energy_emd_score = EMD(
+            x_true=cluster_val[:, :, 2].flatten(),
+            x_pred=output[:, :, 2].flatten(),
+            bins=np.linspace(0.0, 1.0, 101),
+        )
+        scores.append(energy_emd_score)
+
+        energy_match_emd_score = EMD(
+            x_true=cluster_val[:, :, 2].flatten()[matches.flatten()],
+            x_pred=output[:, :, 2].flatten()[matches.flatten()],
+            bins=np.linspace(0.0, 1.0, 101),
+        )
+        scores.append(energy_match_emd_score)
+
+        final_score = np.mean(scores)
+        trial.loss = final_score
+
+        print(
+            f"[INFO] The trained model of Trial n. {trial.id} scored {final_score:.2f}"
+        )
+
+        # +------------------------+
+        # |   Variables clean-up   |
+        # +------------------------+
+
+        del photon, cluster
+        del photon_train, cluster_train, train_ds
+        del photon_val, cluster_val, val_ds
+        del transformer, discriminator, model
+        del dataset, output, attn_weights

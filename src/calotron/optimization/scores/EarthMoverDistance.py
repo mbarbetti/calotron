@@ -11,8 +11,11 @@ class EarthMoverDistance(BaseScore):
         h_true, bins_ = np.histogram(x_true, bins=bins, range=range)
         h_pred, bins_ = np.histogram(x_pred, bins=bins_, range=None)
 
-        h_true = h_true.astype(self._dtype) / np.sum(h_true, dtype=self._dtype)
-        h_pred = h_pred.astype(self._dtype) / np.sum(h_pred, dtype=self._dtype)
+        h_true = h_true.astype(self._dtype)
+        h_true /= np.sum(h_true) + 1e-12
+
+        h_pred = h_pred.astype(self._dtype)
+        h_pred /= np.sum(h_pred) + 1e-12
 
         emd_scores = np.zeros(shape=(len(bins_)))
         for i in np.arange(len(emd_scores) - 1):
