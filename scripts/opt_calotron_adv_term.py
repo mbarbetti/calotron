@@ -26,7 +26,7 @@ from calotron.losses import PhotonClusterMatch
 from calotron.models import Calotron
 from calotron.models.discriminators import Discriminator
 from calotron.models.transformers import MaskedTransformer
-from calotron.optimization.scores import EarthMoverDistance
+from calotron.optimization.scores import EMDistance
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
@@ -94,9 +94,9 @@ client = hpc.Client(server=server, token=token)
 properties = {
     "alpha": hpc.suggestions.Float(0.0, 1.0),
     "t_lr0": hpc.suggestions.Float(1e-5, 1e-3),
-    "d_lr0": hpc.suggestions.Float(1e-5, 1e-3),
-    "t_ds": hpc.suggestions.Int(25_000, 500_000, step=25_000),
-    "d_ds": hpc.suggestions.Int(25_000, 500_000, step=25_000),
+    "d_lr0": hpc.suggestions.Float(1e-6, 1e-4),
+    "t_ds": hpc.suggestions.Int(10_000, 200_000, step=10_000),
+    "d_ds": hpc.suggestions.Int(10_000, 200_000, step=10_000),
 }
 
 properties.update(
@@ -109,7 +109,7 @@ study = hpc.Study(
     special_properties={"address": address, "node_name": str(args.node_name)},
     direction="minimize",
     pruner=hpc.pruners.NopPruner(),
-    sampler=hpc.samplers.TPESampler(n_startup_trials=25),
+    sampler=hpc.samplers.TPESampler(n_startup_trials=20),
     client=client,
 )
 
@@ -255,7 +255,7 @@ for iTrial in range(int(args.num_jobs)):
             model.transformer_optimizer,
             decay_rate=hp.get("t_decay_rate", 0.10),
             decay_steps=hp.get("t_decay_steps", trial.t_ds),
-            min_learning_rate=hp.get("t_min_learning_rate", 1e-6),
+            min_learning_rate=hp.get("t_min_learning_rate", 1e-8),
         )
         hp.get("t_sched", "ExponentialDecay")
 
@@ -655,31 +655,27 @@ for iTrial in range(int(args.num_jobs)):
         # |   Feedbacks to Hopaas server   |
         # +--------------------------------+
 
-        scores = list()
-        EMD = EarthMoverDistance(dtype=DTYPE)
+        EMD = EMDistance(dtype=DTYPE)
 
-        x_emd_score = EMD(
+        emd_x = EMD(
             x_true=cluster_val[:, :, 0].flatten(),
             x_pred=output[:, :, 0].flatten(),
             bins=np.linspace(-1.0, 1.0, 101),
         )
-        scores.append(x_emd_score)
 
-        y_emd_score = EMD(
+        emd_y = EMD(
             x_true=cluster_val[:, :, 1].flatten(),
             x_pred=output[:, :, 1].flatten(),
             bins=np.linspace(-1.0, 1.0, 101),
         )
-        scores.append(y_emd_score)
 
-        energy_emd_score = EMD(
+        emd_energy = EMD(
             x_true=cluster_val[:, :, 2].flatten(),
             x_pred=output[:, :, 2].flatten(),
             bins=np.linspace(0.0, 1.0, 101),
         )
-        scores.append(energy_emd_score)
 
-        final_score = np.mean(scores)
+        final_score = 0.5 * (emd_x + emd_y) + emd_energy
         trial.loss = final_score
 
         print(

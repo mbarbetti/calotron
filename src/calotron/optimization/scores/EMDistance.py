@@ -3,7 +3,7 @@ import numpy as np
 from calotron.optimization.scores.BaseScore import BaseScore
 
 
-class EarthMoverDistance(BaseScore):
+class EMDistance(BaseScore):
     def __init__(self, name="emd_score", dtype=None) -> None:
         super().__init__(name, dtype)
 

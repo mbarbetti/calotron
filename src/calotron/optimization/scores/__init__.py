@@ -1,1 +1,1 @@
-from .EarthMoverDistance import EarthMoverDistance
+from .EMDistance import EMDistance

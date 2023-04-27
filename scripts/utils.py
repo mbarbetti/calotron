@@ -1,5 +1,5 @@
-import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -342,7 +342,13 @@ def photon2cluster_corr(
         plt.title(title, fontsize=14)
         plt.xlabel("Photon preprocessed energy [a.u.]", fontsize=12)
         plt.ylabel(ylabel, fontsize=12)
-        plt.hist2d(photon_energy, energy, bins=bins, norm=mpl.colors.LogNorm(), cmap="gist_heat")
+        plt.hist2d(
+            photon_energy,
+            energy,
+            bins=bins,
+            norm=mpl.colors.LogNorm(),
+            cmap="gist_heat",
+        )
         # plt.clim(vmin=1e0, vmax=1e4)
         plt.colorbar()
     if save_figure:
