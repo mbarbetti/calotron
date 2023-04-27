@@ -92,7 +92,7 @@ client = hpc.Client(server=server, token=token)
 # +----------------------+
 
 properties = {
-    "alpha": hpc.suggestions.Float(0.0, 1.0),
+    "alpha": hpc.suggestions.Float(0.0, 0.5),
     "t_lr0": hpc.suggestions.Float(1e-5, 1e-3),
     "d_lr0": hpc.suggestions.Float(1e-6, 1e-4),
     "t_ds": hpc.suggestions.Int(10_000, 200_000, step=10_000),
