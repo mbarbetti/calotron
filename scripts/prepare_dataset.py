@@ -74,14 +74,12 @@ cluster_list = list()
 for fname in data_fnames:
     with uproot.open(fname) as file:
         photon_list.append(
-            file["CaloTupler/calo_true"].arrays(library="pd").query(
-                "pz > 750 and abs(ovx) < 50 and abs(ovy) < 50 and abs(ovz) < 150"
-            )
+            file["CaloTupler/calo_true"]
+            .arrays(library="pd")
+            .query("pz > 750 and abs(ovx) < 50 and abs(ovy) < 50 and abs(ovz) < 150")
         )
         cluster_list.append(
-            file["CaloTupler/neutral_protos"].arrays(library="pd").query(
-                "E > 1500"
-            )
+            file["CaloTupler/neutral_protos"].arrays(library="pd").query("E > 1500")
         )
 
 print(f"[INFO] Data correctly loaded in {time()-start:.2f} s")
@@ -164,7 +162,9 @@ p_cluster_df["x"] = p_cluster_df.x / ECAL_W * 2
 p_cluster_df["y"] = p_cluster_df.y / ECAL_H * 2
 p_cluster_df["logE"] = cluster_e_scaler.fit_transform(np.c_[p_cluster_df.logE])
 if not args.demo:
-    p_cluster_df[pid_vars] = cluster_pid_scaler.fit_transform(cluster_df[pid_vars].values)
+    p_cluster_df[pid_vars] = cluster_pid_scaler.fit_transform(
+        cluster_df[pid_vars].values
+    )
 print(
     f"[INFO] Reconstructed calo-clusters preprocessing completed in {time()-start:.2f} s"
 )

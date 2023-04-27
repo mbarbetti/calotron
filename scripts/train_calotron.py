@@ -466,9 +466,9 @@ cluster_xy = np.tile(cluster_val[:, :, None, :2], (1, 1, photon_val.shape[1], 1)
 pairwise_distance = np.linalg.norm(cluster_xy - photon_xy, axis=-1)
 cluster_matched = pairwise_distance.min(axis=-1) <= loss.max_match_distance
 
-photon_not_padded = (photon_val[:, :, 2] > 0.0)
-cluster_not_padded = (cluster_val[:, :, 2] > 0.0)
-output_not_padded = (output[:, :, 2] > 1e-8)
+photon_not_padded = photon_val[:, :, 2] > 0.0
+cluster_not_padded = cluster_val[:, :, 2] > 0.0
+output_not_padded = output[:, :, 2] > 1e-8
 
 #### X histogram
 cluster_x = cluster_val[:, :, 0][cluster_not_padded].flatten()
@@ -488,7 +488,9 @@ for log_scale in [False, True]:
     )
 
 #### X histogram (matched clusters)
-cluster_x_matched = cluster_val[:, :, 0][cluster_not_padded & cluster_not_padded].flatten()
+cluster_x_matched = cluster_val[:, :, 0][
+    cluster_not_padded & cluster_not_padded
+].flatten()
 output_x_matched = output[:, :, 0][output_not_padded & output_not_padded].flatten()
 for log_scale in [False, True]:
     validation_histogram(
@@ -522,7 +524,9 @@ for log_scale in [False, True]:
     )
 
 #### Y histogram (matched clusters)
-cluster_y_matched = cluster_val[:, :, 1][cluster_not_padded & cluster_not_padded].flatten()
+cluster_y_matched = cluster_val[:, :, 1][
+    cluster_not_padded & cluster_not_padded
+].flatten()
 output_y_matched = output[:, :, 1][output_not_padded & output_not_padded].flatten()
 for log_scale in [False, True]:
     validation_histogram(
@@ -582,7 +586,9 @@ for log_scale in [False, True]:
     )
 
 #### Energy histogram (matched clusters)
-cluster_energy_matched = cluster_val[:, :, 2][cluster_not_padded & cluster_not_padded].flatten()
+cluster_energy_matched = cluster_val[:, :, 2][
+    cluster_not_padded & cluster_not_padded
+].flatten()
 output_energy_matched = output[:, :, 2][output_not_padded & output_not_padded].flatten()
 for log_scale in [False, True]:
     validation_histogram(
