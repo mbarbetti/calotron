@@ -30,11 +30,11 @@ from calotron.optimization.scores import EarthMoverDistance
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
-STUDY_NAME = "Calotron::AdvTerm::v0"
+STUDY_NAME = "Calotron::AdvTerm::v1"
 DTYPE = np.float32
 TRAIN_RATIO = 0.7
 BATCHSIZE = 256
-EPOCHS = 250
+EPOCHS = 200
 
 # +------------------+
 # |   Parser setup   |
@@ -71,9 +71,9 @@ with open("config/directories.yml") as file:
     config_dir = yaml.full_load(file)
 
 data_dir = config_dir["data_dir"]
-models_dir = config_dir["models_dir"]
-images_dir = config_dir["images_dir"]
-reports_dir = config_dir["reports_dir"]
+models_dir = f"{config_dir['models_dir']}/opt_studies"
+images_dir = f"{config_dir['images_dir']}/opt_studies"
+reports_dir = f"{config_dir['reports_dir']}/opt_studies"
 
 # +-----------------------------+
 # |    Client initialization    |
@@ -93,11 +93,19 @@ client = hpc.Client(server=server, token=token)
 
 properties = {
     "alpha": hpc.suggestions.Float(0.0, 1.0),
-    "t_lr0": hpc.suggestions.Float(1e-4, 1e-3),
-    "d_lr0": hpc.suggestions.Float(1e-5, 1e-4),
-    "t_ds": hpc.suggestions.Int(10_000, 150_000, step=10_000),
-    "d_ds": hpc.suggestions.Int(10_000, 150_000, step=10_000),
+    "t_lr0": hpc.suggestions.Float(1e-5, 1e-3),
+    "d_lr0": hpc.suggestions.Float(1e-5, 1e-3),
+    "t_ds": hpc.suggestions.Int(25_000, 500_000, step=25_000),
+    "d_ds": hpc.suggestions.Int(25_000, 500_000, step=25_000),
 }
+
+properties.update(
+    {
+        "train_ratio": TRAIN_RATIO,
+        "batch_size": BATCHSIZE,
+        "epochs": EPOCHS,
+    }
+)
 
 study = hpc.Study(
     name=STUDY_NAME,
@@ -117,9 +125,9 @@ for iTrial in range(int(args.num_jobs)):
         # |   Data loading   |
         # +------------------+
 
-        npzfile = np.load(f"{data_dir}/calo-train-data-demo.npz")
-        photon = npzfile["photon"].astype(DTYPE)
-        cluster = npzfile["cluster"].astype(DTYPE)
+        npzfile = np.load(f"{data_dir}/trainset-demo-v1.npz")
+        photon = npzfile["photon"].astype(DTYPE)[:200_000]
+        cluster = npzfile["cluster"].astype(DTYPE)[:200_000]
 
         print(f"[INFO] Generated photons - shape: {photon.shape}")
         print(f"[INFO] Reconstructed clusters - shape: {cluster.shape}")
@@ -409,7 +417,7 @@ for iTrial in range(int(args.num_jobs)):
             validation_set=(TRAIN_RATIO != 1.0),
             colors=["#d01c8b", "#4dac26"],
             labels=["training set", "validation set"],
-            legend_loc="upper right",
+            legend_loc=None,
             save_figure=args.saving,
             export_fname=f"{export_img_dirname}/transf-loss.png",
         )
@@ -425,7 +433,7 @@ for iTrial in range(int(args.num_jobs)):
             validation_set=(TRAIN_RATIO != 1.0),
             colors=["#d01c8b", "#4dac26"],
             labels=["training set", "validation set"],
-            legend_loc="upper right",
+            legend_loc=None,
             save_figure=args.saving,
             export_fname=f"{export_img_dirname}/disc-loss.png",
         )
@@ -468,15 +476,20 @@ for iTrial in range(int(args.num_jobs)):
             cluster_val[:, :, None, :2], (1, 1, photon_val.shape[1], 1)
         )
         pairwise_distance = np.linalg.norm(cluster_xy - photon_xy, axis=-1)
-        matches = pairwise_distance.min(axis=-1) <= loss.max_match_distance
+        cluster_matched = pairwise_distance.min(axis=-1) <= loss.max_match_distance
+
+        photon_not_padded = (photon_val[:, :, 2] > 0.0)
+        cluster_not_padded = (cluster_val[:, :, 2] > 0.0)
+        output_not_padded = (output[:, :, 2] > 1e-8)
 
         #### X histogram
+        cluster_x = cluster_val[:, :, 0][cluster_not_padded].flatten()
+        output_x = output[:, :, 0][output_not_padded].flatten()
         for log_scale in [False, True]:
             validation_histogram(
                 report=report,
-                ref_data=cluster_val[:, :, 0].flatten(),
-                gen_data=output[:, :, 0].flatten(),
-                scaler=None,
+                ref_data=cluster_x,
+                gen_data=output_x,
                 xlabel="$x$ coordinate",
                 ref_label="Training data",
                 gen_label="Calotron output",
@@ -487,12 +500,13 @@ for iTrial in range(int(args.num_jobs)):
             )
 
         #### X histogram (matched clusters)
+        cluster_x_matched = cluster_val[:, :, 0][cluster_not_padded & cluster_not_padded].flatten()
+        output_x_matched = output[:, :, 0][output_not_padded & output_not_padded].flatten()
         for log_scale in [False, True]:
             validation_histogram(
                 report=report,
-                ref_data=cluster_val[:, :, 0].flatten()[matches.flatten()],
-                gen_data=output[:, :, 0].flatten()[matches.flatten()],
-                scaler=None,
+                ref_data=cluster_x_matched,
+                gen_data=output_x_matched,
                 xlabel="$x$ coordinate of matched clusters",
                 ref_label="Training data",
                 gen_label="Calotron output",
@@ -503,12 +517,13 @@ for iTrial in range(int(args.num_jobs)):
             )
 
         #### Y histogram
+        cluster_y = cluster_val[:, :, 1][cluster_not_padded].flatten()
+        output_y = output[:, :, 1][output_not_padded].flatten()
         for log_scale in [False, True]:
             validation_histogram(
                 report=report,
-                ref_data=cluster_val[:, :, 1].flatten(),
-                gen_data=output[:, :, 1].flatten(),
-                scaler=None,
+                ref_data=cluster_y,
+                gen_data=output_y,
                 xlabel="$y$ coordinate",
                 ref_label="Training data",
                 gen_label="Calotron output",
@@ -519,12 +534,13 @@ for iTrial in range(int(args.num_jobs)):
             )
 
         #### Y histogram (matched clusters)
+        cluster_y_matched = cluster_val[:, :, 1][cluster_not_padded & cluster_not_padded].flatten()
+        output_y_matched = output[:, :, 1][output_not_padded & output_not_padded].flatten()
         for log_scale in [False, True]:
             validation_histogram(
                 report=report,
-                ref_data=cluster_val[:, :, 1].flatten()[matches.flatten()],
-                gen_data=output[:, :, 1].flatten()[matches.flatten()],
-                scaler=None,
+                ref_data=cluster_y_matched,
+                gen_data=output_y_matched,
                 xlabel="$y$ coordinate of matched clusters",
                 ref_label="Training data",
                 gen_label="Calotron output",
@@ -541,7 +557,6 @@ for iTrial in range(int(args.num_jobs)):
             gen_xy=(output[:, :, 0].flatten(), output[:, :, 1].flatten()),
             ref_energy=cluster_val[:, :, 2].flatten(),
             gen_energy=output[:, :, 2].flatten(),
-            scaler=None,
             save_figure=args.saving,
             export_fname=f"{export_img_dirname}/calo-deposits.png",
         )
@@ -563,19 +578,18 @@ for iTrial in range(int(args.num_jobs)):
                 photon_energy=photon_val[evt, :, 2].flatten(),
                 cluster_energy=cluster_val[evt, :, 2].flatten(),
                 output_energy=output[evt, :, 2].flatten(),
-                photon_scaler=None,
-                cluster_scaler=None,
                 save_figure=args.saving,
                 export_fname=f"{export_img_dirname}/evt-example-{i}.png",
             )
 
         #### Energy histogram
+        cluster_energy = cluster_val[:, :, 2][cluster_not_padded].flatten()
+        output_energy = output[:, :, 2][output_not_padded].flatten()
         for log_scale in [False, True]:
             validation_histogram(
                 report=report,
-                ref_data=cluster_val[:, :, 2].flatten(),
-                gen_data=output[:, :, 2].flatten(),
-                scaler=None,
+                ref_data=cluster_energy,
+                gen_data=output_energy,
                 xlabel="Preprocessed energy [a.u]",
                 ref_label="Training data",
                 gen_label="Calotron output",
@@ -586,12 +600,13 @@ for iTrial in range(int(args.num_jobs)):
             )
 
         #### Energy histogram (matched clusters)
+        cluster_energy_matched = cluster_val[:, :, 2][cluster_not_padded & cluster_not_padded].flatten()
+        output_energy_matched = output[:, :, 2][output_not_padded & output_not_padded].flatten()
         for log_scale in [False, True]:
             validation_histogram(
                 report=report,
-                ref_data=cluster_val[:, :, 2].flatten()[matches.flatten()],
-                gen_data=output[:, :, 2].flatten()[matches.flatten()],
-                scaler=None,
+                ref_data=cluster_energy_matched,
+                gen_data=output_energy_matched,
                 xlabel="Preprocessed energy of matched clusters [a.u]",
                 ref_label="Training data",
                 gen_label="Calotron output",
@@ -606,7 +621,6 @@ for iTrial in range(int(args.num_jobs)):
             report=report,
             ref_energy=cluster_val[:64, :, 2],
             gen_energy=output[:64, :, 2],
-            scaler=None,
             save_figure=args.saving,
             export_fname=f"{export_img_dirname}/energy-seq.png",
         )
@@ -619,8 +633,6 @@ for iTrial in range(int(args.num_jobs)):
             ).flatten(),
             cluster_energy=cluster_val[:, :, 2].flatten(),
             output_energy=output[:, :, 2].flatten(),
-            photon_scaler=None,
-            cluster_scaler=None,
             save_figure=args.saving,
             export_fname=f"{export_img_dirname}/gamma2calo-corr.png",
         )
@@ -645,13 +657,6 @@ for iTrial in range(int(args.num_jobs)):
         )
         scores.append(x_emd_score)
 
-        x_match_emd_score = EMD(
-            x_true=cluster_val[:, :, 0].flatten()[matches.flatten()],
-            x_pred=output[:, :, 0].flatten()[matches.flatten()],
-            bins=np.linspace(-1.0, 1.0, 101),
-        )
-        scores.append(x_match_emd_score)
-
         y_emd_score = EMD(
             x_true=cluster_val[:, :, 1].flatten(),
             x_pred=output[:, :, 1].flatten(),
@@ -659,26 +664,12 @@ for iTrial in range(int(args.num_jobs)):
         )
         scores.append(y_emd_score)
 
-        y_match_emd_score = EMD(
-            x_true=cluster_val[:, :, 1].flatten()[matches.flatten()],
-            x_pred=output[:, :, 1].flatten()[matches.flatten()],
-            bins=np.linspace(-1.0, 1.0, 101),
-        )
-        scores.append(y_match_emd_score)
-
         energy_emd_score = EMD(
             x_true=cluster_val[:, :, 2].flatten(),
             x_pred=output[:, :, 2].flatten(),
             bins=np.linspace(0.0, 1.0, 101),
         )
         scores.append(energy_emd_score)
-
-        energy_match_emd_score = EMD(
-            x_true=cluster_val[:, :, 2].flatten()[matches.flatten()],
-            x_pred=output[:, :, 2].flatten()[matches.flatten()],
-            bins=np.linspace(0.0, 1.0, 101),
-        )
-        scores.append(energy_match_emd_score)
 
         final_score = np.mean(scores)
         trial.loss = final_score

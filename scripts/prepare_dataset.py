@@ -12,15 +12,14 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.utils import shuffle
 from tqdm import tqdm
 
+VERSION = "v1"
 ECAL_W = 8000
 ECAL_H = 6500
-PHOTON_ENERGY_MIN = 75
-CLUSTER_ENERGY_MIN = 500
 PADDING_VALUE = 0.0
-MAX_INPUT_PHOTONS = 128
-MAX_OUTPUT_CLUSTERS = 64
-MAX_INPUT_PHOTONS_DEMO = 32
-MAX_OUTPUT_CLUSTERS_DEMO = 16
+MAX_INPUT_PHOTONS = 80
+MAX_OUTPUT_CLUSTERS = 80
+MAX_INPUT_PHOTONS_DEMO = 40
+MAX_OUTPUT_CLUSTERS_DEMO = 20
 
 # +------------------+
 # |   Parser setup   |
@@ -74,8 +73,16 @@ cluster_list = list()
 
 for fname in data_fnames:
     with uproot.open(fname) as file:
-        photon_list.append(file["CaloTupler/calo_true"].arrays(library="pd"))
-        cluster_list.append(file["CaloTupler/neutral_protos"].arrays(library="pd"))
+        photon_list.append(
+            file["CaloTupler/calo_true"].arrays(library="pd").query(
+                "pz > 750 and abs(ovx) < 50 and abs(ovy) < 50 and abs(ovz) < 150"
+            )
+        )
+        cluster_list.append(
+            file["CaloTupler/neutral_protos"].arrays(library="pd").query(
+                "E > 1500"
+            )
+        )
 
 print(f"[INFO] Data correctly loaded in {time()-start:.2f} s")
 
@@ -93,12 +100,15 @@ print(
 # |   Photon DataFrame   |
 # +----------------------+
 
+photon_df["x"] = photon_df["ecal_x"]
+photon_df["y"] = photon_df["ecal_y"]
 photon_df["p"] = np.linalg.norm(photon_df[["px", "py", "pz"]], axis=1)
-photon_df["log_p"] = np.log(np.maximum(photon_df.p, PHOTON_ENERGY_MIN))
+photon_df["E"] = photon_df["p"]
+photon_df["logE"] = np.log(photon_df.E)
 photon_df["tx"] = photon_df.px / photon_df.pz
 photon_df["ty"] = photon_df.py / photon_df.pz
 
-true_vars = ["ecal_x", "ecal_y", "log_p", "tx", "ty"]
+true_vars = ["x", "y", "logE", "tx", "ty", "ovx", "ovy", "ovz"]
 
 if args.verbose:
     print(photon_df[true_vars].describe())
@@ -109,12 +119,15 @@ if args.verbose:
 
 p_photon_df = photon_df.copy()
 
-p_scaler = MinMaxScaler()
+photon_e_scaler = MinMaxScaler()
 
 start = time()
-p_photon_df["ecal_x"] = p_photon_df.ecal_x / ECAL_W * 2
-p_photon_df["ecal_y"] = p_photon_df.ecal_y / ECAL_H * 2
-p_photon_df["log_p"] = p_scaler.fit_transform(np.c_[p_photon_df.log_p])
+p_photon_df["x"] = p_photon_df.x / ECAL_W * 2
+p_photon_df["y"] = p_photon_df.y / ECAL_H * 2
+p_photon_df["logE"] = photon_e_scaler.fit_transform(np.c_[p_photon_df.logE])
+p_photon_df["ovx"] = p_photon_df.ovx / 50
+p_photon_df["ovy"] = p_photon_df.ovy / 50
+p_photon_df["ovz"] = p_photon_df.ovz / 150
 print(f"[INFO] Generated photons preprocessing completed in {time()-start:.2f} s")
 
 if args.verbose:
@@ -124,10 +137,10 @@ if args.verbose:
 # |   Cluster DataFrame   |
 # +-----------------------+
 
-cluster_df["log_E"] = np.log(np.maximum(cluster_df.E, CLUSTER_ENERGY_MIN))
+cluster_df["logE"] = np.log(cluster_df.E)
 cluster_df["NotPadding"] = 1.0
 
-reco_vars = ["x", "y", "log_E"]
+reco_vars = ["x", "y", "logE"]
 
 if not args.demo:
     bool_vars = ["PhotonFromMergedPi0", "Pi0Merged", "Photon", "NotPadding"]
@@ -143,15 +156,15 @@ if args.verbose:
 
 p_cluster_df = cluster_df.copy()
 
-e_scaler = MinMaxScaler()
-pid_scaler = StandardScaler()
+cluster_e_scaler = MinMaxScaler()
+cluster_pid_scaler = StandardScaler()
 
 start = time()
 p_cluster_df["x"] = p_cluster_df.x / ECAL_W * 2
 p_cluster_df["y"] = p_cluster_df.y / ECAL_H * 2
-p_cluster_df["log_E"] = e_scaler.fit_transform(np.c_[p_cluster_df.log_E])
+p_cluster_df["logE"] = cluster_e_scaler.fit_transform(np.c_[p_cluster_df.logE])
 if not args.demo:
-    p_cluster_df[pid_vars] = pid_scaler.fit_transform(cluster_df[pid_vars].values)
+    p_cluster_df[pid_vars] = cluster_pid_scaler.fit_transform(cluster_df[pid_vars].values)
 print(
     f"[INFO] Reconstructed calo-clusters preprocessing completed in {time()-start:.2f} s"
 )
@@ -225,7 +238,7 @@ plt.close()
 plt.figure(figsize=(8, 5), dpi=300)
 plt.xlabel("Event multipilcity", fontsize=12)
 plt.ylabel("Number of events", fontsize=12)
-bins = np.linspace(0, 400, 51)
+bins = np.linspace(0, 150, 51)
 plt.hist(
     np.array([len(photon) for photon in true_photons]),
     bins=bins,
@@ -315,6 +328,7 @@ plt.title("Generated photons", fontsize=14)
 plt.xlabel("Photon energy", fontsize=12)
 plt.ylabel("Events", fontsize=12)
 plt.imshow(pad_photons[:64, :, 2], aspect="auto", cmap="gist_heat")
+plt.colorbar()
 
 plt.subplot(1, 2, 2)
 plt.title("Reconstructed calo-clusters", fontsize=14)
@@ -331,8 +345,10 @@ plt.close()
 # |   Training data export   |
 # +--------------------------+
 
-export_data_fname = "calo-train-data-demo" if args.demo else "calo-train-data"
-npz_fname = f"{export_data_dir}/{export_data_fname}.npz"
+export_data_fname = "trainset"
+if args.demo:
+    export_data_fname += "-demo"
+npz_fname = f"{export_data_dir}/{export_data_fname}-{VERSION}.npz"
 np.savez(npz_fname, photon=pad_photons, cluster=pad_clusters)
 print(
     f"[INFO] Training data of {len(pad_photons)} instances correctly saved to {npz_fname}"
@@ -344,16 +360,16 @@ print(
 
 export_scaler_fname = "photon-energy-scaler"
 pkl_fname = f"{models_dir}/{export_scaler_fname}.pkl"
-pickle.dump(p_scaler, open(pkl_fname, "wb"))
+pickle.dump(photon_e_scaler, open(pkl_fname, "wb"))
 print(f"[INFO] Photon energy scaler correctly saved to {pkl_fname}")
 
 export_scaler_fname = "cluster-energy-scaler"
 pkl_fname = f"{models_dir}/{export_scaler_fname}.pkl"
-pickle.dump(e_scaler, open(pkl_fname, "wb"))
+pickle.dump(cluster_e_scaler, open(pkl_fname, "wb"))
 print(f"[INFO] Cluster energy scaler correctly saved to {pkl_fname}")
 
 if not args.demo:
     export_scaler_fname = "cluster-pid-scaler"
     pkl_fname = f"{models_dir}/{export_scaler_fname}.pkl"
-    pickle.dump(pid_scaler, open(pkl_fname, "wb"))
+    pickle.dump(cluster_pid_scaler, open(pkl_fname, "wb"))
     print(f"[INFO] Cluster PID scaler correctly saved to {pkl_fname}")

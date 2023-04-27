@@ -28,12 +28,13 @@ from calotron.models.transformers import MaskedTransformer
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
+VERSION = "v0"
 DTYPE = np.float32
 ADV_METRIC = "wass"
 TRAIN_RATIO = 0.7
 BATCHSIZE = 256
-EPOCHS = 250
-ALPHA = 0.1
+EPOCHS = 400
+ALPHA = 0.7
 
 # +------------------+
 # |   Parser setup   |
@@ -65,7 +66,7 @@ reports_dir = config_dir["reports_dir"]
 # |   Data loading   |
 # +------------------+
 
-npzfile = np.load(f"{data_dir}/calo-train-data-demo.npz")
+npzfile = np.load(f"{data_dir}/trainset-demo-{VERSION}.npz")
 photon = npzfile["photon"].astype(DTYPE)
 cluster = npzfile["cluster"].astype(DTYPE)
 
@@ -152,10 +153,10 @@ model.summary()
 # +----------------------+
 
 hp.get("t_optimizer", "RMSprop")
-t_opt = tf.keras.optimizers.RMSprop(hp.get("t_lr0", 1e-4))
+t_opt = tf.keras.optimizers.RMSprop(hp.get("t_lr0", 7e-4))
 
 hp.get("d_optimizer", "RMSprop")
-d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", 1e-4))
+d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", 3e-5))
 
 # +----------------------------+
 # |   Training configuration   |
@@ -205,7 +206,7 @@ model.compile(
 t_sched = ExponentialDecay(
     model.transformer_optimizer,
     decay_rate=hp.get("t_decay_rate", 0.10),
-    decay_steps=hp.get("t_decay_steps", 100_000),
+    decay_steps=hp.get("t_decay_steps", 20_000),
     min_learning_rate=hp.get("t_min_learning_rate", 1e-6),
 )
 hp.get("t_sched", "ExponentialDecay")
@@ -213,7 +214,7 @@ hp.get("t_sched", "ExponentialDecay")
 d_sched = ExponentialDecay(
     model.discriminator_optimizer,
     decay_rate=hp.get("d_decay_rate", 0.10),
-    decay_steps=hp.get("d_decay_steps", 25_000),
+    decay_steps=hp.get("d_decay_steps", 130_000),
     min_learning_rate=hp.get("d_min_learning_rate", 1e-8),
 )
 hp.get("d_sched", "ExponentialDecay")
@@ -279,6 +280,13 @@ if args.saving:
     hp.dump(f"{export_model_fname}/hyperparams.yml")  # export also list of hyperparams
     print(f"[INFO] Trained model correctly exported to {export_model_fname}")
     os.makedirs(export_img_dirname)  # need to save images
+
+np.savez(
+    f"{data_dir}/calotron-export-{VERSION}.npz",
+    photon=photon_val,
+    cluster=cluster_val,
+    output=output,
+)
 
 # +---------------------+
 # |   Training report   |
@@ -366,7 +374,7 @@ metric_curves(
     validation_set=(TRAIN_RATIO != 1.0),
     colors=["#d01c8b", "#4dac26"],
     labels=["training set", "validation set"],
-    legend_loc="upper right",
+    legend_loc=None,
     save_figure=args.saving,
     export_fname=f"{export_img_dirname}/transf-loss.png",
 )
@@ -382,7 +390,7 @@ metric_curves(
     validation_set=(TRAIN_RATIO != 1.0),
     colors=["#d01c8b", "#4dac26"],
     labels=["training set", "validation set"],
-    legend_loc="upper right",
+    legend_loc=None,
     save_figure=args.saving,
     export_fname=f"{export_img_dirname}/disc-loss.png",
 )
@@ -456,15 +464,20 @@ report.add_markdown('<h2 align="center">Validation plots</h2>')
 photon_xy = np.tile(photon_val[:, None, :, :2], (1, cluster_val.shape[1], 1, 1))
 cluster_xy = np.tile(cluster_val[:, :, None, :2], (1, 1, photon_val.shape[1], 1))
 pairwise_distance = np.linalg.norm(cluster_xy - photon_xy, axis=-1)
-matches = pairwise_distance.min(axis=-1) <= loss.max_match_distance
+cluster_matched = pairwise_distance.min(axis=-1) <= loss.max_match_distance
+
+photon_not_padded = (photon_val[:, :, 2] > 0.0)
+cluster_not_padded = (cluster_val[:, :, 2] > 0.0)
+output_not_padded = (output[:, :, 2] > 1e-8)
 
 #### X histogram
+cluster_x = cluster_val[:, :, 0][cluster_not_padded].flatten()
+output_x = output[:, :, 0][output_not_padded].flatten()
 for log_scale in [False, True]:
     validation_histogram(
         report=report,
-        ref_data=cluster_val[:, :, 0].flatten(),
-        gen_data=output[:, :, 0].flatten(),
-        scaler=None,
+        ref_data=cluster_x,
+        gen_data=output_x,
         xlabel="$x$ coordinate",
         ref_label="Training data",
         gen_label="Calotron output",
@@ -475,12 +488,13 @@ for log_scale in [False, True]:
     )
 
 #### X histogram (matched clusters)
+cluster_x_matched = cluster_val[:, :, 0][cluster_not_padded & cluster_not_padded].flatten()
+output_x_matched = output[:, :, 0][output_not_padded & output_not_padded].flatten()
 for log_scale in [False, True]:
     validation_histogram(
         report=report,
-        ref_data=cluster_val[:, :, 0].flatten()[matches.flatten()],
-        gen_data=output[:, :, 0].flatten()[matches.flatten()],
-        scaler=None,
+        ref_data=cluster_x_matched,
+        gen_data=output_x_matched,
         xlabel="$x$ coordinate of matched clusters",
         ref_label="Training data",
         gen_label="Calotron output",
@@ -491,12 +505,13 @@ for log_scale in [False, True]:
     )
 
 #### Y histogram
+cluster_y = cluster_val[:, :, 1][cluster_not_padded].flatten()
+output_y = output[:, :, 1][output_not_padded].flatten()
 for log_scale in [False, True]:
     validation_histogram(
         report=report,
-        ref_data=cluster_val[:, :, 1].flatten(),
-        gen_data=output[:, :, 1].flatten(),
-        scaler=None,
+        ref_data=cluster_y,
+        gen_data=output_y,
         xlabel="$y$ coordinate",
         ref_label="Training data",
         gen_label="Calotron output",
@@ -507,12 +522,13 @@ for log_scale in [False, True]:
     )
 
 #### Y histogram (matched clusters)
+cluster_y_matched = cluster_val[:, :, 1][cluster_not_padded & cluster_not_padded].flatten()
+output_y_matched = output[:, :, 1][output_not_padded & output_not_padded].flatten()
 for log_scale in [False, True]:
     validation_histogram(
         report=report,
-        ref_data=cluster_val[:, :, 1].flatten()[matches.flatten()],
-        gen_data=output[:, :, 1].flatten()[matches.flatten()],
-        scaler=None,
+        ref_data=cluster_y_matched,
+        gen_data=output_y_matched,
         xlabel="$y$ coordinate of matched clusters",
         ref_label="Training data",
         gen_label="Calotron output",
@@ -529,7 +545,6 @@ calorimeter_deposits(
     gen_xy=(output[:, :, 0].flatten(), output[:, :, 1].flatten()),
     ref_energy=cluster_val[:, :, 2].flatten(),
     gen_energy=output[:, :, 2].flatten(),
-    scaler=None,
     save_figure=args.saving,
     export_fname=f"{export_img_dirname}/calo-deposits.png",
 )
@@ -545,19 +560,18 @@ for i in range(4):
         photon_energy=photon_val[evt, :, 2].flatten(),
         cluster_energy=cluster_val[evt, :, 2].flatten(),
         output_energy=output[evt, :, 2].flatten(),
-        photon_scaler=None,
-        cluster_scaler=None,
         save_figure=args.saving,
         export_fname=f"{export_img_dirname}/evt-example-{i}.png",
     )
 
 #### Energy histogram
+cluster_energy = cluster_val[:, :, 2][cluster_not_padded].flatten()
+output_energy = output[:, :, 2][output_not_padded].flatten()
 for log_scale in [False, True]:
     validation_histogram(
         report=report,
-        ref_data=cluster_val[:, :, 2].flatten(),
-        gen_data=output[:, :, 2].flatten(),
-        scaler=None,
+        ref_data=cluster_energy,
+        gen_data=output_energy,
         xlabel="Preprocessed energy [a.u]",
         ref_label="Training data",
         gen_label="Calotron output",
@@ -568,12 +582,13 @@ for log_scale in [False, True]:
     )
 
 #### Energy histogram (matched clusters)
+cluster_energy_matched = cluster_val[:, :, 2][cluster_not_padded & cluster_not_padded].flatten()
+output_energy_matched = output[:, :, 2][output_not_padded & output_not_padded].flatten()
 for log_scale in [False, True]:
     validation_histogram(
         report=report,
-        ref_data=cluster_val[:, :, 2].flatten()[matches.flatten()],
-        gen_data=output[:, :, 2].flatten()[matches.flatten()],
-        scaler=None,
+        ref_data=cluster_energy_matched,
+        gen_data=output_energy_matched,
         xlabel="Preprocessed energy of matched clusters [a.u]",
         ref_label="Training data",
         gen_label="Calotron output",
@@ -588,7 +603,6 @@ energy_sequences(
     report=report,
     ref_energy=cluster_val[:64, :, 2],
     gen_energy=output[:64, :, 2],
-    scaler=None,
     save_figure=args.saving,
     export_fname=f"{export_img_dirname}/energy-seq.png",
 )
@@ -599,8 +613,6 @@ photon2cluster_corr(
     photon_energy=(0.5 * (photon_val[:, 0::2, 2] + photon_val[:, 1::2, 2])).flatten(),
     cluster_energy=cluster_val[:, :, 2].flatten(),
     output_energy=output[:, :, 2].flatten(),
-    photon_scaler=None,
-    cluster_scaler=None,
     save_figure=args.saving,
     export_fname=f"{export_img_dirname}/gamma2calo-corr.png",
 )

@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 
 
@@ -149,7 +150,6 @@ def validation_histogram(
     report,
     ref_data,
     gen_data,
-    scaler=None,
     xlabel=None,
     ref_label=None,
     gen_label=None,
@@ -158,10 +158,6 @@ def validation_histogram(
     save_figure=False,
     export_fname="./images/val-hist.png",
 ) -> None:
-    if scaler is not None:
-        ref_data = scaler.inverse_transform(np.c_[ref_data]).flatten()
-        gen_data = scaler.inverse_transform(np.c_[gen_data]).flatten()
-
     min_ = ref_data.min()
     max_ = ref_data.max()
     bins = np.linspace(min_, max_, 101)
@@ -188,16 +184,11 @@ def calorimeter_deposits(
     gen_xy,
     ref_energy=None,
     gen_energy=None,
-    scaler=None,
     save_figure=False,
     export_fname="./images/calo-deposits.png",
 ) -> None:
     x_ref, y_ref = ref_xy
     x_gen, y_gen = gen_xy
-
-    if scaler is not None:
-        ref_energy = scaler.inverse_transform(np.c_[ref_energy]).flatten()
-        gen_energy = scaler.inverse_transform(np.c_[gen_energy]).flatten()
 
     x_bins = np.linspace(x_ref.min(), x_ref.max(), 101)
     y_bins = np.linspace(y_ref.min(), y_ref.max(), 101)
@@ -243,8 +234,6 @@ def event_example(
     photon_energy=None,
     cluster_energy=None,
     output_energy=None,
-    photon_scaler=None,
-    cluster_scaler=None,
     save_figure=False,
     export_fname="./images/evt-example.png",
 ) -> None:
@@ -257,17 +246,6 @@ def event_example(
         & (cluster_energy is not None)
         & (output_energy is not None)
     ):
-        if photon_scaler is not None:
-            photon_energy = photon_scaler.inverse_transform(
-                np.c_[photon_energy]
-            ).flatten()
-        if cluster_scaler is not None:
-            cluster_energy = cluster_scaler.inverse_transform(
-                np.c_[cluster_energy]
-            ).flatten()
-            output_energy = cluster_scaler.inverse_transform(
-                np.c_[output_energy]
-            ).flatten()
         photon_size = 50.0 * photon_energy / cluster_energy.max()
         cluster_size = 50.0 * cluster_energy / cluster_energy.max()
         output_size = 50.0 * output_energy / cluster_energy.max()
@@ -318,33 +296,23 @@ def energy_sequences(
     report,
     ref_energy,
     gen_energy,
-    scaler=None,
     save_figure=False,
     export_fname="./images/energy-seq.png",
 ) -> None:
-    if scaler is not None:
-        batch_size, length = ref_energy.shape
-        ref_energy = scaler.inverse_transform(
-            ref_energy.reshape(batch_size * length, 1)
-        )
-        gen_energy = scaler.inverse_transform(
-            gen_energy.reshape(batch_size * length, 1)
-        )
-        ref_energy = ref_energy.reshape(batch_size, length)
-        gen_energy = gen_energy.reshape(batch_size, length)
+    vmax = max(ref_energy.max(), gen_energy.max())
 
     plt.figure(figsize=(18, 10), dpi=300)
     plt.subplot(1, 2, 1)
     plt.title("Reconstructed clusters", fontsize=14)
     plt.xlabel("Preprocessed energy deposits [a.u.]", fontsize=12)
     plt.ylabel("Events", fontsize=12)
-    plt.imshow(ref_energy, aspect="auto", vmin=0.0, vmax=1.0, cmap="gist_heat")
+    plt.imshow(ref_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap="gist_heat")
     plt.colorbar()
     plt.subplot(1, 2, 2)
     plt.title("Calotron output", fontsize=14)
     plt.xlabel("Preprocessed energy deposits [a.u.]", fontsize=12)
     plt.ylabel("Events", fontsize=12)
-    plt.imshow(gen_energy, aspect="auto", vmin=0.0, vmax=1.0, cmap="gist_heat")
+    plt.imshow(gen_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap="gist_heat")
     plt.colorbar()
     if save_figure:
         plt.savefig(export_fname)
@@ -357,49 +325,25 @@ def photon2cluster_corr(
     photon_energy,
     cluster_energy,
     output_energy,
-    photon_scaler=None,
-    cluster_scaler=None,
     save_figure=False,
     export_fname="./images/gamma2calo-corr.png",
 ) -> None:
-    if photon_scaler is not None:
-        photon_energy = photon_scaler.inverse_transform(np.c_[photon_energy]).flatten()
-    if cluster_scaler is not None:
-        cluster_energy = cluster_scaler.inverse_transform(
-            np.c_[cluster_energy]
-        ).flatten()
-        output_energy = cluster_scaler.inverse_transform(np.c_[output_energy]).flatten()
-
     bins = np.linspace(0, 1, 76)
     energies = [cluster_energy, output_energy]
-    h_max = np.max(
-        [np.histogram2d(photon_energy, energy, bins=bins)[0] for energy in energies]
-    )
-
     titles = ["Photon-to-cluster correlations", "Photon-to-output correlations"]
     ylabels = [
         "Cluster preprocessed energy [a.u.]",
         "Output preprocessed energy [a.u.]",
     ]
 
-    plt.figure(figsize=(18, 5), dpi=300)
+    plt.figure(figsize=(14, 5), dpi=300)
     for i, (energy, title, ylabel) in enumerate(zip(energies, titles, ylabels)):
-        h, x_edges, y_edges = np.histogram2d(photon_energy, energy, bins=bins)
-        nonzero_x, nonzero_y = np.nonzero(h)
-        colors = np.ones_like(photon_energy) / h_max
-        for id_x, id_y in zip(nonzero_x, nonzero_y):
-            colors[
-                ((photon_energy >= x_edges[id_x]) & (photon_energy < x_edges[id_x + 1]))
-                & ((energy >= y_edges[id_y]) & (energy < y_edges[id_y + 1]))
-            ] *= h[id_x, id_y]
         plt.subplot(1, 2, i + 1)
         plt.title(title, fontsize=14)
         plt.xlabel("Photon preprocessed energy [a.u.]", fontsize=12)
         plt.ylabel(ylabel, fontsize=12)
-        plt.scatter(photon_energy, energy, s=1, c=colors, cmap="gist_heat")
-        plt.xlim(0.0, 1.0)
-        plt.ylim(0.0, 1.0)
-        plt.clim(vmin=0.0, vmax=1.0)
+        plt.hist2d(photon_energy, energy, bins=bins, norm=mpl.colors.LogNorm(), cmap="gist_heat")
+        # plt.clim(vmin=1e0, vmax=1e4)
         plt.colorbar()
     if save_figure:
         plt.savefig(export_fname)
@@ -416,7 +360,11 @@ def attention_plot(
 ) -> None:
     if len(attn_weights.shape) == 4:
         attn_weights = np.mean(attn_weights, axis=0)
-    plt.figure(figsize=(8, 4), dpi=300)
+    if attn_weights.shape[1] == attn_weights.shape[2]:
+        figsize = (7, 5)
+    else:
+        figsize = (8, 4)
+    plt.figure(figsize=figsize, dpi=300)
     plt.title(f"Last attention weights of head #{head_id+1}", fontsize=14)
     plt.xlabel("Generated photons", fontsize=12)
     plt.ylabel("Reconstructed clusters", fontsize=12)
