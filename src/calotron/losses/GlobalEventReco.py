@@ -27,10 +27,11 @@ class GlobalEventReco(BaseLoss):
     ) -> None:
         super().__init__(name)
 
-        # Adversarial strength
+        # Adversarial scale
         assert isinstance(alpha, (int, float))
         assert alpha >= 0.0
-        self._alpha = float(alpha)
+        self._init_alpha = float(alpha)
+        self._alpha = tf.Variable(float(alpha), name="alpha")
 
         # Adversarial metric
         assert isinstance(adversarial_metric, str)
@@ -109,7 +110,11 @@ class GlobalEventReco(BaseLoss):
         return adv_loss
 
     @property
-    def alpha(self) -> float:
+    def init_alpha(self) -> float:
+        return self._init_alpha
+
+    @property
+    def alpha(self) -> tf.Variable:
         return self._alpha
 
     @property

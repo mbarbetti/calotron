@@ -61,7 +61,8 @@ def test_loss_configuration(loss):
     from calotron.losses import GlobalEventReco
 
     assert isinstance(loss, GlobalEventReco)
-    assert isinstance(loss.alpha, float)
+    assert isinstance(loss.init_alpha, float)
+    assert isinstance(loss.alpha, tf.Variable)
     assert isinstance(loss.adversarial_metric, str)
     assert isinstance(loss.bce_options, dict)
     assert isinstance(loss.wass_options, dict)

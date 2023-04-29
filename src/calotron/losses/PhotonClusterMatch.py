@@ -30,10 +30,11 @@ class PhotonClusterMatch(BaseLoss):
     ) -> None:
         super().__init__(name)
 
-        # Adversarial strength
+        # Adversarial scale
         assert isinstance(alpha, (int, float))
         assert alpha >= 0.0
-        self._alpha = float(alpha)
+        self._init_alpha = float(alpha)
+        self._alpha = tf.Variable(float(alpha), name="alpha")
 
         # Max distance for photon-cluster matching
         assert isinstance(max_match_distance, (int, float))
@@ -169,7 +170,11 @@ class PhotonClusterMatch(BaseLoss):
         return clf_loss
 
     @property
-    def alpha(self) -> float:
+    def init_alpha(self) -> float:
+        return self._init_alpha
+
+    @property
+    def alpha(self) -> tf.Variable:
         return self._alpha
 
     @property

@@ -68,7 +68,8 @@ def test_loss_configuration(loss):
     from calotron.losses import PhotonClusterMatch
 
     assert isinstance(loss, PhotonClusterMatch)
-    assert isinstance(loss.alpha, float)
+    assert isinstance(loss.init_alpha, float)
+    assert isinstance(loss.alpha, tf.Variable)
     assert isinstance(loss.max_match_distance, float)
     assert isinstance(loss.adversarial_metric, str)
     assert isinstance(loss.bce_options, dict)
