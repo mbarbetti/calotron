@@ -35,7 +35,7 @@ STUDY_NAME = "Calotron::AdvDampTerm::v1"
 DTYPE = np.float32
 TRAIN_RATIO = 0.7
 BATCHSIZE = 256
-EPOCHS = 400
+EPOCHS = 350
 
 # +------------------+
 # |   Parser setup   |
