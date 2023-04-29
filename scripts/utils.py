@@ -35,7 +35,7 @@ def learning_curves(
             else:
                 scales[i] = np.around(1 / scales[i])
         for i in range(len(labels)):
-            labels[i] += f" [x {scales[i]:.1f}]"
+            labels[i] += f" [x {scales[i]:.0e}]"
     else:
         scales = [1.0 for _ in keys]
 
@@ -112,6 +112,7 @@ def metric_curves(
     colors=None,
     labels=None,
     legend_loc="upper right",
+    yscale="linear",
     save_figure=False,
     export_fname="./images/metric-curves.png",
 ) -> None:
@@ -140,6 +141,7 @@ def metric_curves(
         plt.plot(num_epochs, metric, lw=1.5, color=c, label=l, zorder=zorder)
         zorder -= 1
     plt.legend(loc=legend_loc, fontsize=10)
+    plt.yscale(yscale)
     if save_figure:
         plt.savefig(export_fname)
     report.add_figure(options="width=45%")
@@ -148,8 +150,10 @@ def metric_curves(
 
 def validation_histogram(
     report,
-    ref_data,
-    gen_data,
+    data_ref,
+    data_gen,
+    weights_ref=None,
+    weights_gen=None,
     xlabel=None,
     ref_label=None,
     gen_label=None,
@@ -158,16 +162,22 @@ def validation_histogram(
     save_figure=False,
     export_fname="./images/val-hist.png",
 ) -> None:
-    min_ = ref_data.min()
-    max_ = ref_data.max()
+    min_ = data_ref.min()
+    max_ = data_ref.max()
     bins = np.linspace(min_, max_, 101)
 
     plt.figure(figsize=(8, 5), dpi=300)
     plt.xlabel(xlabel, fontsize=12)
     plt.ylabel("Candidates", fontsize=12)
-    plt.hist(ref_data, bins=bins, color="#3288bd", label=ref_label)
+    plt.hist(data_ref, bins=bins, weights=weights_ref, color="#3288bd", label=ref_label)
     plt.hist(
-        gen_data, bins=bins, histtype="step", color="#fc8d59", lw=2, label=gen_label
+        data_gen,
+        bins=bins,
+        weights=weights_gen,
+        histtype="step",
+        color="#fc8d59",
+        lw=2,
+        label=gen_label,
     )
     if log_scale:
         plt.yscale("log")

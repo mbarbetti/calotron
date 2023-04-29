@@ -21,6 +21,7 @@ from utils import (
     validation_histogram,
 )
 
+from calotron.callbacks import AdvDamping
 from calotron.callbacks.schedulers import ExponentialDecay
 from calotron.losses import PhotonClusterMatch
 from calotron.models import Calotron
@@ -30,11 +31,11 @@ from calotron.optimization.scores import EMDistance
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
-STUDY_NAME = "Calotron::AdvTerm::v1"
+STUDY_NAME = "Calotron::AdvDampTerm::v1"
 DTYPE = np.float32
 TRAIN_RATIO = 0.7
 BATCHSIZE = 256
-EPOCHS = 300
+EPOCHS = 400
 
 # +------------------+
 # |   Parser setup   |
@@ -91,9 +92,9 @@ client = hpc.Client(server=server, token=token)
 # +----------------------+
 
 properties = {
-    "alpha": hpc.suggestions.Float(0.0, 0.25),
-    "t_lr0": hpc.suggestions.Float(1e-5, 1e-3),
-    "d_lr0": hpc.suggestions.Float(1e-6, 1e-4),
+    "alpha": hpc.suggestions.Float(0.0, 1.0),
+    "alpha_dr": hpc.suggestions.Float(0.0, 1.0),
+    "alpha_ds": hpc.suggestions.Int(5_000, 100_000, step=5_000),
     "t_ds": hpc.suggestions.Int(10_000, 200_000, step=10_000),
     "d_ds": hpc.suggestions.Int(10_000, 200_000, step=10_000),
 }
@@ -179,9 +180,7 @@ with study.trial() as trial:
         attn_mask_init_nonzero_size=hp.get("t_attn_mask_init_nonzero_size", 8),
         enable_residual_smoothing=hp.get("t_enable_residual_smoothing", True),
         enable_attention_mask=hp.get("t_enable_attention_mask", False),
-        output_activations=hp.get(
-            "t_output_activations", ["tanh", "tanh", "sigmoid"]
-        ),
+        output_activations=hp.get("t_output_activations", ["tanh", "tanh", "sigmoid"]),
         start_token_initializer=hp.get("t_start_toke_initializer", "ones"),
         dtype=DTYPE,
     )
@@ -208,10 +207,10 @@ with study.trial() as trial:
     # +----------------------+
 
     hp.get("t_optimizer", "RMSprop")
-    t_opt = tf.keras.optimizers.RMSprop(hp.get("t_lr0", trial.t_lr0))
+    t_opt = tf.keras.optimizers.RMSprop(hp.get("t_lr0", 1e-4))
 
     hp.get("d_optimizer", "RMSprop")
-    d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", trial.d_lr0))
+    d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", 1e-4))
 
     # +----------------------------+
     # |   Training configuration   |
@@ -221,9 +220,7 @@ with study.trial() as trial:
     loss = PhotonClusterMatch(
         alpha=hp.get("loss_alpha", trial.alpha),
         max_match_distance=hp.get("loss_max_match_distance", 1e-3),
-        adversarial_metric=hp.get(
-            "loss_adversarial_metric", "wasserstein-distance"
-        ),
+        adversarial_metric=hp.get("loss_adversarial_metric", "wasserstein-distance"),
         wass_options=hp.get(
             "loss_wass_options",
             {
@@ -249,6 +246,8 @@ with study.trial() as trial:
     # |   Callbacks definition   |
     # +--------------------------+
 
+    callbacks = list()
+
     t_sched = ExponentialDecay(
         model.transformer_optimizer,
         decay_rate=hp.get("t_decay_rate", 0.10),
@@ -256,6 +255,7 @@ with study.trial() as trial:
         min_learning_rate=hp.get("t_min_learning_rate", 1e-8),
     )
     hp.get("t_sched", "ExponentialDecay")
+    callbacks.append(t_sched)
 
     d_sched = ExponentialDecay(
         model.discriminator_optimizer,
@@ -264,6 +264,17 @@ with study.trial() as trial:
         min_learning_rate=hp.get("d_min_learning_rate", 1e-8),
     )
     hp.get("d_sched", "ExponentialDecay")
+    callbacks.append(d_sched)
+
+    alpha_sched = AdvDamping(
+        loss.alpha,
+        decay_rate=hp.get("alpha_decay_rate", trial.alpha_dr),
+        decay_steps=hp.get("alpha_decay_steps", trial.alpha_ds),
+        min_adv_scale=hp.get("alpha_min_value", 0.05),
+        verbose=True,
+    )
+    hp.get("alpha_sched", "AdvDamping")
+    callbacks.append(alpha_sched)
 
     # +------------------------+
     # |   Training procedure   |
@@ -274,7 +285,7 @@ with study.trial() as trial:
         train_ds,
         epochs=hp.get("epochs", EPOCHS),
         validation_data=val_ds,
-        callbacks=[t_sched, d_sched],
+        callbacks=callbacks,
     )
     stop = datetime.now()
 
@@ -412,6 +423,7 @@ with study.trial() as trial:
         colors=["#d01c8b", "#4dac26"],
         labels=["training set", "validation set"],
         legend_loc=None,
+        yscale="log",
         save_figure=args.saving,
         export_fname=f"{export_img_dirname}/transf-loss.png",
     )
@@ -428,6 +440,7 @@ with study.trial() as trial:
         colors=["#d01c8b", "#4dac26"],
         labels=["training set", "validation set"],
         legend_loc=None,
+        yscale="linear",
         save_figure=args.saving,
         export_fname=f"{export_img_dirname}/disc-loss.png",
     )
@@ -444,6 +457,7 @@ with study.trial() as trial:
         colors=["#d01c8b", "#4dac26"],
         labels=["training set", "validation set"],
         legend_loc=None,
+        yscale="linear",
         save_figure=args.saving,
         export_fname=f"{export_img_dirname}/wass-curves.png",
     )
@@ -466,25 +480,35 @@ with study.trial() as trial:
     report.add_markdown('<h2 align="center">Validation plots</h2>')
 
     photon_xy = np.tile(photon_val[:, None, :, :2], (1, cluster_val.shape[1], 1, 1))
-    cluster_xy = np.tile(
-        cluster_val[:, :, None, :2], (1, 1, photon_val.shape[1], 1)
-    )
+    cluster_xy = np.tile(cluster_val[:, :, None, :2], (1, 1, photon_val.shape[1], 1))
     pairwise_distance = np.linalg.norm(cluster_xy - photon_xy, axis=-1)
     cluster_matched = pairwise_distance.min(axis=-1) <= loss.max_match_distance
 
-    photon_not_padded = photon_val[:, :, 2] > 0.0
-    cluster_not_padded = cluster_val[:, :, 2] > 0.0
-    output_not_padded = output[:, :, 2] > 1e-8
+    cluster_x = cluster_val[:, :, 0].flatten()
+    cluster_y = cluster_val[:, :, 1].flatten()
+    cluster_energy = cluster_val[:, :, 2].flatten()
+
+    cluster_x_matched = cluster_val[:, :, 0][cluster_matched].flatten()
+    cluster_y_matched = cluster_val[:, :, 1][cluster_matched].flatten()
+    cluster_energy_matched = cluster_val[:, :, 2][cluster_matched].flatten()
+
+    output_x = output[:, :, 0].flatten()
+    output_y = output[:, :, 1].flatten()
+    output_energy = output[:, :, 2].flatten()
+
+    output_x_matched = output[:, :, 0][cluster_matched].flatten()
+    output_y_matched = output[:, :, 1][cluster_matched].flatten()
+    output_energy_matched = output[:, :, 2][cluster_matched].flatten()
 
     #### X histogram
-    cluster_x = cluster_val[:, :, 0][cluster_not_padded].flatten()
-    output_x = output[:, :, 0][output_not_padded].flatten()
     for log_scale in [False, True]:
         validation_histogram(
             report=report,
-            ref_data=cluster_x,
-            gen_data=output_x,
-            xlabel="$x$ coordinate",
+            data_ref=cluster_x,
+            data_gen=output_x,
+            weights_ref=cluster_energy,
+            weights_gen=output_energy,
+            xlabel="Weighted $x$-coordinate",
             ref_label="Training data",
             gen_label="Calotron output",
             log_scale=log_scale,
@@ -494,18 +518,14 @@ with study.trial() as trial:
         )
 
     #### X histogram (matched clusters)
-    cluster_x_matched = cluster_val[:, :, 0][
-        cluster_not_padded & cluster_not_padded
-    ].flatten()
-    output_x_matched = output[:, :, 0][
-        output_not_padded & output_not_padded
-    ].flatten()
     for log_scale in [False, True]:
         validation_histogram(
             report=report,
-            ref_data=cluster_x_matched,
-            gen_data=output_x_matched,
-            xlabel="$x$ coordinate of matched clusters",
+            data_ref=cluster_x_matched,
+            data_gen=output_x_matched,
+            weights_ref=cluster_energy_matched,
+            weights_gen=output_energy_matched,
+            xlabel="Weighted $x$-coordinate of matched clusters",
             ref_label="Training data",
             gen_label="Calotron output",
             log_scale=log_scale,
@@ -515,14 +535,14 @@ with study.trial() as trial:
         )
 
     #### Y histogram
-    cluster_y = cluster_val[:, :, 1][cluster_not_padded].flatten()
-    output_y = output[:, :, 1][output_not_padded].flatten()
     for log_scale in [False, True]:
         validation_histogram(
             report=report,
-            ref_data=cluster_y,
-            gen_data=output_y,
-            xlabel="$y$ coordinate",
+            data_ref=cluster_y,
+            data_gen=output_y,
+            weights_ref=cluster_energy,
+            weights_gen=output_energy,
+            xlabel="Weighted $y$-coordinate",
             ref_label="Training data",
             gen_label="Calotron output",
             log_scale=log_scale,
@@ -532,18 +552,14 @@ with study.trial() as trial:
         )
 
     #### Y histogram (matched clusters)
-    cluster_y_matched = cluster_val[:, :, 1][
-        cluster_not_padded & cluster_not_padded
-    ].flatten()
-    output_y_matched = output[:, :, 1][
-        output_not_padded & output_not_padded
-    ].flatten()
     for log_scale in [False, True]:
         validation_histogram(
             report=report,
-            ref_data=cluster_y_matched,
-            gen_data=output_y_matched,
-            xlabel="$y$ coordinate of matched clusters",
+            data_ref=cluster_y_matched,
+            data_gen=output_y_matched,
+            weights_ref=cluster_energy_matched,
+            weights_gen=output_energy_matched,
+            xlabel="Weighted $y$-coordinate of matched clusters",
             ref_label="Training data",
             gen_label="Calotron output",
             log_scale=log_scale,
@@ -585,14 +601,14 @@ with study.trial() as trial:
         )
 
     #### Energy histogram
-    cluster_energy = cluster_val[:, :, 2][cluster_not_padded].flatten()
-    output_energy = output[:, :, 2][output_not_padded].flatten()
     for log_scale in [False, True]:
         validation_histogram(
             report=report,
-            ref_data=cluster_energy,
-            gen_data=output_energy,
-            xlabel="Preprocessed energy [a.u]",
+            data_ref=cluster_energy,
+            data_gen=output_energy,
+            weights_ref=cluster_energy,
+            weights_gen=output_energy,
+            xlabel="Weighted preprocessed energy",
             ref_label="Training data",
             gen_label="Calotron output",
             log_scale=log_scale,
@@ -602,18 +618,14 @@ with study.trial() as trial:
         )
 
     #### Energy histogram (matched clusters)
-    cluster_energy_matched = cluster_val[:, :, 2][
-        cluster_not_padded & cluster_not_padded
-    ].flatten()
-    output_energy_matched = output[:, :, 2][
-        output_not_padded & output_not_padded
-    ].flatten()
     for log_scale in [False, True]:
         validation_histogram(
             report=report,
-            ref_data=cluster_energy_matched,
-            gen_data=output_energy_matched,
-            xlabel="Preprocessed energy of matched clusters [a.u]",
+            data_ref=cluster_energy_matched,
+            data_gen=output_energy_matched,
+            weights_ref=cluster_energy_matched,
+            weights_gen=output_energy_matched,
+            xlabel="Weighted preprocessed energy of matched clusters",
             ref_label="Training data",
             gen_label="Calotron output",
             log_scale=log_scale,
@@ -659,23 +671,27 @@ with study.trial() as trial:
         x_true=cluster_val[:, :, 0].flatten(),
         x_pred=output[:, :, 0].flatten(),
         bins=np.linspace(-1.0, 1.0, 101),
+        weights_true=cluster_val[:, :, 2].flatten(),
+        weights_pred=output[:, :, 2].flatten(),
     )
 
     emd_y = EMD(
         x_true=cluster_val[:, :, 1].flatten(),
         x_pred=output[:, :, 1].flatten(),
         bins=np.linspace(-1.0, 1.0, 101),
+        weights_true=cluster_val[:, :, 2].flatten(),
+        weights_pred=output[:, :, 2].flatten(),
     )
 
     emd_energy = EMD(
         x_true=cluster_val[:, :, 2].flatten(),
         x_pred=output[:, :, 2].flatten(),
         bins=np.linspace(0.0, 1.0, 101),
+        weights_true=cluster_val[:, :, 2].flatten(),
+        weights_pred=output[:, :, 2].flatten(),
     )
 
     final_score = 0.5 * (emd_x + emd_y) + emd_energy
     trial.loss = final_score
 
-    print(
-        f"[INFO] The trained model of Trial n. {trial.id} scored {final_score:.2f}"
-    )
+    print(f"[INFO] The trained model of Trial n. {trial.id} scored {final_score:.2f}")
