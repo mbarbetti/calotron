@@ -21,7 +21,7 @@ from utils import (
     validation_histogram,
 )
 
-from calotron.callbacks.schedulers import LearnRateExpDecay
+from calotron.callbacks.schedulers import LearnRateExpDecay, AdvExpDamping
 from calotron.losses import PhotonClusterMatch
 from calotron.models import Calotron
 from calotron.models.discriminators import Discriminator
@@ -30,7 +30,7 @@ from calotron.optimization.scores import EMDistance
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
-STUDY_NAME = "Calotron::AdvTerm::v2"
+STUDY_NAME = "Calotron::AdvDampTerm::v2"
 DTYPE = np.float32
 TRAIN_RATIO = 0.7
 BATCHSIZE = 256
@@ -92,8 +92,8 @@ client = hpc.Client(server=server, token=token)
 
 properties = {
     "alpha": hpc.suggestions.Float(0.0, 1.0),
-    "t_lr0": hpc.suggestions.Float(5e-5, 5e-4),
-    "d_lr0": hpc.suggestions.Float(1e-5, 1e-4),
+    "alpha_dr": hpc.suggestions.Float(0.0, 1.0),
+    "alpha_ds": hpc.suggestions.Int(5_000, 100_000, step=5_000),
     "t_ds": hpc.suggestions.Int(10_000, 200_000, step=10_000),
     "d_ds": hpc.suggestions.Int(10_000, 200_000, step=10_000),
 }
@@ -206,10 +206,10 @@ with study.trial() as trial:
     # +----------------------+
 
     hp.get("t_optimizer", "RMSprop")
-    t_opt = tf.keras.optimizers.RMSprop(hp.get("t_lr0", trial.t_lr0))
+    t_opt = tf.keras.optimizers.RMSprop(hp.get("t_lr0", 1e-4))
 
     hp.get("d_optimizer", "RMSprop")
-    d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", trial.d_lr0))
+    d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", 1e-4))
 
     # +----------------------------+
     # |   Training configuration   |
@@ -264,6 +264,16 @@ with study.trial() as trial:
     )
     hp.get("d_sched", "LearnRateExpDecay")
     callbacks.append(d_sched)
+
+    alpha_sched = AdvExpDamping(
+        loss.alpha,
+        decay_rate=hp.get("alpha_decay_rate", 0.5),
+        decay_steps=hp.get("alpha_decay_steps", trial.alpha_ds),
+        min_adv_scale=hp.get("alpha_min_value", 0.05),
+        verbose=True,
+    )
+    hp.get("alpha_sched", "AdvExpDamping")
+    callbacks.append(alpha_sched)
 
     # +------------------------+
     # |   Training procedure   |
