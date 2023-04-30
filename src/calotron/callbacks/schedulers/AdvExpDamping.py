@@ -1,8 +1,8 @@
 import tensorflow as tf
-from tensorflow.keras.callbacks import Callback
+from calotron.callbacks.schedulers.AdvBaseDamping import AdvBaseDamping
 
 
-class AdvDamping(Callback):
+class AdvExpDamping(AdvBaseDamping):
     def __init__(
         self,
         adv_scale,
@@ -12,11 +12,7 @@ class AdvDamping(Callback):
         min_adv_scale=None,
         verbose=False,
     ) -> None:
-        super().__init__()
-
-        # Adversarial scale
-        assert isinstance(adv_scale, tf.Variable)
-        self._adv_scale = adv_scale
+        super().__init__(adv_scale, verbose)
 
         # Decay rate
         assert isinstance(decay_rate, (int, float))
@@ -40,21 +36,10 @@ class AdvDamping(Callback):
         else:
             self._min_adv_scale = None
 
-        # Verbose
-        assert isinstance(verbose, bool)
-        self._verbose = verbose
-
     def on_train_begin(self, logs=None) -> None:
-        self._step = -1
-        self._dtype = self._adv_scale.dtype
-        self._init_adv_scale = tf.identity(self._adv_scale)
+        super().on_train_begin(logs=logs)
         self._tf_decay_rate = tf.cast(self._decay_rate, self._dtype)
         self._tf_decay_steps = tf.cast(self._decay_steps, self._dtype)
-
-    def on_batch_begin(self, batch, logs=None) -> None:
-        self._step += 1
-        step = tf.cast(self._step, self._dtype)
-        self._adv_scale.assign(self._scheduled_scale(self._init_adv_scale, step))
 
     def _scheduled_scale(self, init_scale, step) -> tf.Tensor:
         p = tf.divide(step, self._tf_decay_steps)
@@ -65,22 +50,6 @@ class AdvDamping(Callback):
             return tf.maximum(sched_scale, self._min_adv_scale)
         else:
             return sched_scale
-
-    def on_batch_end(self, batch, logs=None) -> None:
-        logs = logs or {}
-        if self._verbose:
-            key, _ = self._adv_scale.name.split(":")
-            logs[key] = self._adv_scale.numpy()
-
-    def on_epoch_end(self, epoch, logs=None) -> None:
-        logs = logs or {}
-        if self._verbose:
-            key, _ = self._adv_scale.name.split(":")
-            logs[key] = self._adv_scale.numpy()
-
-    @property
-    def adv_scale(self) -> tf.Variable:
-        return self._adv_scale
 
     @property
     def decay_rate(self) -> float:

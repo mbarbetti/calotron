@@ -1,9 +1,9 @@
 import tensorflow as tf
 
-from calotron.callbacks.schedulers.BaseScheduler import BaseScheduler
+from calotron.callbacks.schedulers.LearnRateBaseScheduler import LearnRateBaseScheduler
 
 
-class InverseTimeDecay(BaseScheduler):
+class LearnRateExpDecay(LearnRateBaseScheduler):
     def __init__(
         self,
         optimizer,
@@ -46,7 +46,7 @@ class InverseTimeDecay(BaseScheduler):
         p = tf.divide(step, self._tf_decay_steps)
         if self._staircase:
             p = tf.floor(p)
-        sched_lr = tf.divide(init_lr, 1 + tf.multiply(self._tf_decay_rate, p))
+        sched_lr = tf.multiply(init_lr, tf.pow(self._tf_decay_rate, p))
         if self._min_learning_rate is not None:
             return tf.maximum(sched_lr, self._min_learning_rate)
         else:

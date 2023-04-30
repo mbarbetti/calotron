@@ -1,10 +1,10 @@
 import numpy as np
 import tensorflow as tf
 
-from calotron.callbacks.schedulers.BaseScheduler import BaseScheduler
+from calotron.callbacks.schedulers.LearnRateBaseScheduler import LearnRateBaseScheduler
 
 
-class PiecewiseConstantDecay(BaseScheduler):
+class LearnRatePiecewiseConstDecay(LearnRateBaseScheduler):
     def __init__(self, optimizer, boundaries, values, verbose=False) -> None:
         super().__init__(optimizer, verbose)
 

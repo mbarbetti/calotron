@@ -1,9 +1,9 @@
 import tensorflow as tf
 
-from calotron.callbacks.schedulers.BaseScheduler import BaseScheduler
+from calotron.callbacks.schedulers.LearnRateBaseScheduler import LearnRateBaseScheduler
 
 
-class PolynomialDecay(BaseScheduler):
+class LearnRatePolynomialDecay(LearnRateBaseScheduler):
     def __init__(
         self,
         optimizer,

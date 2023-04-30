@@ -5,7 +5,7 @@ from tensorflow.keras.optimizers import Optimizer
 K = tf.keras.backend
 
 
-class BaseScheduler(Callback):
+class LearnRateBaseScheduler(Callback):
     def __init__(self, optimizer, verbose=False) -> None:
         super().__init__()
 

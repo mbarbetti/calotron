@@ -22,15 +22,15 @@ mse = tf.keras.losses.MeanSquaredError()
 
 
 @pytest.fixture
-def scheduler(cycle=False):
-    from calotron.callbacks.schedulers import PolynomialDecay
+def scheduler(staircase=False):
+    from calotron.callbacks.schedulers import LearnRateExpDecay
 
-    sched = PolynomialDecay(
+    sched = LearnRateExpDecay(
         optimizer=adam,
+        decay_rate=0.9,
         decay_steps=1000,
-        end_learning_rate=0.0001,
-        power=1.0,
-        cycle=cycle,
+        staircase=staircase,
+        min_learning_rate=0.001,
         verbose=False,
     )
     return sched
@@ -40,29 +40,33 @@ def scheduler(cycle=False):
 
 
 def test_sched_configuration(scheduler):
-    from calotron.callbacks.schedulers import PolynomialDecay
+    from calotron.callbacks.schedulers import LearnRateExpDecay
 
-    assert isinstance(scheduler, PolynomialDecay)
+    assert isinstance(scheduler, LearnRateExpDecay)
     assert isinstance(scheduler.optimizer, tf.keras.optimizers.Optimizer)
+    assert isinstance(scheduler.decay_rate, float)
     assert isinstance(scheduler.decay_steps, int)
-    assert isinstance(scheduler.end_learning_rate, float)
-    assert isinstance(scheduler.power, float)
-    assert isinstance(scheduler.cycle, bool)
+    assert isinstance(scheduler.staircase, bool)
+    assert isinstance(scheduler.min_learning_rate, float)
 
 
-@pytest.mark.parametrize("cycle", [False, True])
-def test_sched_use(cycle):
-    from calotron.callbacks.schedulers import PolynomialDecay
+@pytest.mark.parametrize("staircase", [False, True])
+@pytest.mark.parametrize("min_learning_rate", [None, 0.0005])
+def test_sched_use(staircase, min_learning_rate):
+    from calotron.callbacks.schedulers import LearnRateExpDecay
 
-    sched = PolynomialDecay(
+    sched = LearnRateExpDecay(
         optimizer=adam,
+        decay_rate=0.1,
         decay_steps=100,
-        end_learning_rate=0.0001,
-        power=1.0,
-        cycle=cycle,
+        staircase=staircase,
+        min_learning_rate=min_learning_rate,
         verbose=True,
     )
     model.compile(optimizer=adam, loss=mse)
     history = model.fit(X, Y, batch_size=500, epochs=5, callbacks=[sched])
     last_lr = float(f"{history.history['lr'][-1]:.4f}")
-    assert last_lr == 0.0001
+    if min_learning_rate is not None:
+        assert last_lr == 0.0005
+    else:
+        assert last_lr == 0.0001

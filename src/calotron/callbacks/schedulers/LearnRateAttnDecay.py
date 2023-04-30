@@ -1,9 +1,9 @@
 import tensorflow as tf
 
-from calotron.callbacks.schedulers.BaseScheduler import BaseScheduler
+from calotron.callbacks.schedulers.LearnRateBaseScheduler import LearnRateBaseScheduler
 
 
-class AttentionDecay(BaseScheduler):
+class LearnRateAttnDecay(LearnRateBaseScheduler):
     def __init__(self, optimizer, d_model, warmup_steps=4000, verbose=False) -> None:
         super().__init__(optimizer, verbose)
 

@@ -23,9 +23,9 @@ mse = tf.keras.losses.MeanSquaredError()
 
 @pytest.fixture
 def scheduler():
-    from calotron.callbacks.schedulers.BaseScheduler import BaseScheduler
+    from calotron.callbacks.schedulers import LearnRateAttnDecay
 
-    sched = BaseScheduler(optimizer=adam, verbose=True)
+    sched = LearnRateAttnDecay(optimizer=adam, d_model=100, warmup_steps=4000, verbose=True)
     return sched
 
 
@@ -33,14 +33,16 @@ def scheduler():
 
 
 def test_sched_configuration(scheduler):
-    from calotron.callbacks.schedulers.BaseScheduler import BaseScheduler
+    from calotron.callbacks.schedulers import LearnRateAttnDecay
 
-    assert isinstance(scheduler, BaseScheduler)
+    assert isinstance(scheduler, LearnRateAttnDecay)
     assert isinstance(scheduler.optimizer, tf.keras.optimizers.Optimizer)
+    assert isinstance(scheduler.d_model, int)
+    assert isinstance(scheduler.warmup_steps, int)
 
 
 def test_sched_use(scheduler):
     model.compile(optimizer=adam, loss=mse)
-    history = model.fit(X, Y, batch_size=512, epochs=10, callbacks=[scheduler])
-    last_lr = float(f"{history.history['lr'][-1]:.3f}")
-    assert last_lr == 0.001
+    history = model.fit(X, Y, batch_size=50, epochs=5, callbacks=[scheduler])
+    last_lr = float(f"{history.history['lr'][-1]:.4f}")
+    assert last_lr == 0.0004
