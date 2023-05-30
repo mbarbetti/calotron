@@ -25,7 +25,9 @@ mse = tf.keras.losses.MeanSquaredError()
 def scheduler():
     from calotron.callbacks.schedulers import LearnRateAttnDecay
 
-    sched = LearnRateAttnDecay(optimizer=adam, d_model=100, warmup_steps=4000, verbose=True)
+    sched = LearnRateAttnDecay(
+        optimizer=adam, d_model=100, warmup_steps=4000, verbose=True
+    )
     return sched
 
 

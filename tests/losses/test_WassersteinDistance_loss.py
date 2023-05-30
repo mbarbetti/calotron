@@ -69,13 +69,14 @@ def test_loss_configuration(loss):
     assert isinstance(loss.name, str)
 
 
-def test_loss_use_no_weights(loss):
+@pytest.mark.parametrize("sample_weight", [weight, None])
+def test_loss_use(loss, sample_weight):
     out = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
         target=target,
-        sample_weight=None,
+        sample_weight=sample_weight,
         training=False,
     )
     assert out.numpy()
@@ -84,28 +85,7 @@ def test_loss_use_no_weights(loss):
         discriminator=disc,
         source=source,
         target=target,
-        sample_weight=None,
-        training=False,
-    )
-    assert out.numpy()
-
-
-def test_loss_use_with_weights(loss):
-    out = loss.transformer_loss(
-        transformer=transf,
-        discriminator=disc,
-        source=source,
-        target=target,
-        sample_weight=weight,
-        training=False,
-    )
-    assert out.numpy()
-    out = loss.discriminator_loss(
-        transformer=transf,
-        discriminator=disc,
-        source=source,
-        target=target,
-        sample_weight=weight,
+        sample_weight=sample_weight,
         training=False,
     )
     assert out.numpy()

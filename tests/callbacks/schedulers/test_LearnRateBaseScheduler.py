@@ -23,7 +23,9 @@ mse = tf.keras.losses.MeanSquaredError()
 
 @pytest.fixture
 def scheduler():
-    from calotron.callbacks.schedulers.LearnRateBaseScheduler import LearnRateBaseScheduler
+    from calotron.callbacks.schedulers.LearnRateBaseScheduler import (
+        LearnRateBaseScheduler,
+    )
 
     sched = LearnRateBaseScheduler(optimizer=adam, verbose=True)
     return sched
@@ -33,7 +35,9 @@ def scheduler():
 
 
 def test_sched_configuration(scheduler):
-    from calotron.callbacks.schedulers.LearnRateBaseScheduler import LearnRateBaseScheduler
+    from calotron.callbacks.schedulers.LearnRateBaseScheduler import (
+        LearnRateBaseScheduler,
+    )
 
     assert isinstance(scheduler, LearnRateBaseScheduler)
     assert isinstance(scheduler.optimizer, tf.keras.optimizers.Optimizer)

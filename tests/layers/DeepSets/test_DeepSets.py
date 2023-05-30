@@ -23,7 +23,8 @@ def test_layer_configuration(layer):
     assert isinstance(layer.dropout_rate, float)
 
 
-def test_layer_use(layer):
-    input = tf.keras.Input(shape=[8, 4])
-    output = layer(input)
+@pytest.mark.parametrize("filter", [tf.keras.Input(shape=(8,)), None])
+def test_layer_use(layer, filter):
+    input = tf.keras.Input(shape=(8, 4))
+    output = layer(input, filter=filter)
     assert output.shape[1] == layer.latent_dim

@@ -20,7 +20,7 @@ def test_layer_configuration(layer):
 
 
 def test_layer_use(layer):
-    source = tf.keras.Input(shape=[16, 5])
-    target = tf.keras.Input(shape=[32, 10])
+    source = tf.keras.Input(shape=(16, 5))
+    target = tf.keras.Input(shape=(32, 10))
     output = layer(target, source)
     assert output.shape == target.shape

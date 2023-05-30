@@ -26,7 +26,7 @@ def test_layer_use(activations):
     from calotron.layers import MultiActivations
 
     layer = MultiActivations(activations=activations, output_depth=3)
-    input = tf.keras.Input(shape=[16, 3])
+    input = tf.keras.Input(shape=(16, 3))
     output = layer(input)
     test_shape = list(input.shape)
     test_shape[-1] = layer.output_depth

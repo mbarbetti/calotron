@@ -64,7 +64,8 @@ def test_loss_configuration(loss):
 
 
 @pytest.mark.parametrize("from_logits", [False, True])
-def test_loss_use_no_weights(from_logits):
+@pytest.mark.parametrize("sample_weight", [weight, None])
+def test_loss_use(from_logits, sample_weight):
     from calotron.losses import BinaryCrossentropy
 
     loss = BinaryCrossentropy(
@@ -82,7 +83,7 @@ def test_loss_use_no_weights(from_logits):
         discriminator=disc,
         source=source,
         target=target,
-        sample_weight=None,
+        sample_weight=sample_weight,
         training=False,
     )
     assert out.numpy()
@@ -91,41 +92,7 @@ def test_loss_use_no_weights(from_logits):
         discriminator=disc,
         source=source,
         target=target,
-        sample_weight=None,
-        training=False,
-    )
-    assert out.numpy()
-
-
-@pytest.mark.parametrize("from_logits", [False, True])
-def test_loss_use_with_weights(from_logits):
-    from calotron.losses import BinaryCrossentropy
-
-    loss = BinaryCrossentropy(
-        warmup_energy=0.0,
-        injected_noise_stddev=0.01,
-        from_logits=from_logits,
-        label_smoothing=0.1,
-    )
-    if from_logits:
-        disc._seq += [tf.keras.layers.Dense(1, activation="tanh")]
-    else:
-        disc._seq += [tf.keras.layers.Dense(1, activation="sigmoid")]
-    out = loss.transformer_loss(
-        transformer=transf,
-        discriminator=disc,
-        source=source,
-        target=target,
-        sample_weight=weight,
-        training=False,
-    )
-    assert out.numpy()
-    out = loss.discriminator_loss(
-        transformer=transf,
-        discriminator=disc,
-        source=source,
-        target=target,
-        sample_weight=weight,
+        sample_weight=sample_weight,
         training=False,
     )
     assert out.numpy()

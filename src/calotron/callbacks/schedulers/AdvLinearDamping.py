@@ -1,15 +1,10 @@
 import tensorflow as tf
+
 from calotron.callbacks.schedulers.AdvBaseDamping import AdvBaseDamping
 
 
 class AdvLinearDamping(AdvBaseDamping):
-    def __init__(
-        self,
-        adv_scale,
-        steps_to_min,
-        min_adv_scale,
-        verbose=False,
-    ) -> None:
+    def __init__(self, adv_scale, steps_to_min, min_adv_scale, verbose=False) -> None:
         super().__init__(adv_scale, verbose)
 
         # Steps to min

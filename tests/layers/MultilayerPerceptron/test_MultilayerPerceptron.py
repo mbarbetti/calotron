@@ -23,7 +23,7 @@ def test_layer_configuration(layer):
 
 
 def test_layer_use(layer):
-    input = tf.keras.Input(shape=[16, 32])
+    input = tf.keras.Input(shape=(16, 32))
     output = layer(input)
     test_shape = list(input.shape)
     test_shape[-1] = layer.output_units

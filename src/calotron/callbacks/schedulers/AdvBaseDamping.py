@@ -3,11 +3,7 @@ from tensorflow.keras.callbacks import Callback
 
 
 class AdvBaseDamping(Callback):
-    def __init__(
-        self,
-        adv_scale,
-        verbose=False,
-    ) -> None:
+    def __init__(self, adv_scale, verbose=False) -> None:
         super().__init__()
 
         # Adversarial scale
@@ -22,7 +18,6 @@ class AdvBaseDamping(Callback):
         self._init_adv_scale = tf.identity(self._adv_scale)
         self._dtype = self._init_adv_scale.dtype
         self._step = -1
-
 
     def on_batch_begin(self, batch, logs=None) -> None:
         self._step += 1
