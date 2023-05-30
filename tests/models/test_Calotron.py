@@ -60,7 +60,7 @@ def test_model_configuration(model):
 
 def test_model_use(model):
     outputs = model((source, target))
-    t_output, d_output_true, d_output_pred= outputs
+    t_output, d_output_true, d_output_pred = outputs
     model.summary()
 
     test_t_shape = list(target.shape)
@@ -78,9 +78,7 @@ def test_model_compilation(model, metrics):
     from calotron.losses import MeanSquaredError
 
     loss = MeanSquaredError(
-        warmup_energy=0.0,
-        alpha=0.1,
-        adversarial_metric="binary-crossentropy",
+        warmup_energy=0.0, alpha=0.1, adversarial_metric="binary-crossentropy"
     )
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
@@ -117,9 +115,7 @@ def test_model_train(model, adversarial_metrics, sample_weight):
     from calotron.losses import MeanSquaredError
 
     loss = MeanSquaredError(
-        warmup_energy=0.0,
-        alpha=0.1,
-        adversarial_metric=adversarial_metrics,
+        warmup_energy=0.0, alpha=0.1, adversarial_metric=adversarial_metrics
     )
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
@@ -139,9 +135,7 @@ def test_model_eval(model, sample_weight):
     from calotron.losses import MeanSquaredError
 
     loss = MeanSquaredError(
-        warmup_energy=0.0,
-        alpha=0.1,
-        adversarial_metric="binary-crossentropy",
+        warmup_energy=0.0, alpha=0.1, adversarial_metric="binary-crossentropy"
     )
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)

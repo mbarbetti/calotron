@@ -48,12 +48,7 @@ class PairwiseDiscriminator(Discriminator):
             filter_2 = tf.tile(filter[:, None, :, None], (1, tf.shape(filter)[1], 1, 1))
             filter_pairs = tf.concat([filter_1, filter_2], axis=-1)
             filter_pairs = tf.reshape(
-                filter_pairs,
-                shape=(
-                    tf.shape(filter)[0],
-                    tf.shape(filter)[1] ** 2,
-                    2,
-                ),
+                filter_pairs, shape=(tf.shape(filter)[0], tf.shape(filter)[1] ** 2, 2)
             )
             filter_pairs = filter_pairs[:, :, 0] * filter_pairs[:, :, 1]
         else:
