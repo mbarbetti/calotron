@@ -7,7 +7,7 @@ from calotron.models.transformers import Transformer
 CHUNK_SIZE = int(1e4)
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
-weight = tf.random.uniform(shape=(CHUNK_SIZE, target.shape[1], 1))
+weight = tf.random.uniform(shape=(CHUNK_SIZE, target.shape[1]))
 
 transf = Transformer(
     output_depth=target.shape[2],
@@ -41,10 +41,10 @@ def loss():
     from calotron.losses import BinaryCrossentropy
 
     loss_ = BinaryCrossentropy(
+        warmup_energy=0.0,
         injected_noise_stddev=0.01,
         from_logits=False,
         label_smoothing=0.1,
-        ignore_padding=False,
     )
     return loss_
 
@@ -56,10 +56,10 @@ def test_loss_configuration(loss):
     from calotron.losses import BinaryCrossentropy
 
     assert isinstance(loss, BinaryCrossentropy)
+    assert isinstance(loss.warmup_energy, float)
     assert isinstance(loss.injected_noise_stddev, float)
     assert isinstance(loss.from_logits, bool)
     assert isinstance(loss.label_smoothing, float)
-    assert isinstance(loss.ignore_padding, bool)
     assert isinstance(loss.name, str)
 
 
@@ -68,10 +68,10 @@ def test_loss_use_no_weights(from_logits):
     from calotron.losses import BinaryCrossentropy
 
     loss = BinaryCrossentropy(
+        warmup_energy=0.0,
         injected_noise_stddev=0.01,
         from_logits=from_logits,
         label_smoothing=0.1,
-        ignore_padding=False,
     )
     if from_logits:
         disc._seq += [tf.keras.layers.Dense(1, activation="tanh")]
@@ -102,10 +102,10 @@ def test_loss_use_with_weights(from_logits):
     from calotron.losses import BinaryCrossentropy
 
     loss = BinaryCrossentropy(
+        warmup_energy=0.0,
         injected_noise_stddev=0.01,
         from_logits=from_logits,
         label_smoothing=0.1,
-        ignore_padding=False,
     )
     if from_logits:
         disc._seq += [tf.keras.layers.Dense(1, activation="tanh")]

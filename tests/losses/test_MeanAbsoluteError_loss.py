@@ -7,7 +7,7 @@ from calotron.models.transformers import Transformer
 CHUNK_SIZE = int(1e4)
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
-weight = tf.random.uniform(shape=(CHUNK_SIZE, target.shape[1], 1))
+weight = tf.random.uniform(shape=(CHUNK_SIZE, target.shape[1]))
 
 transf = Transformer(
     output_depth=target.shape[2],
@@ -40,7 +40,17 @@ disc = Discriminator(
 def loss():
     from calotron.losses import MeanAbsoluteError
 
-    loss_ = MeanAbsoluteError(ignore_padding=False)
+    loss_ = MeanAbsoluteError(
+        warmup_energy=0.0,
+        alpha=0.1,
+        adversarial_metric="binary-crossentropy",
+        bce_options={
+            "injected_noise_stddev": 0.0,
+            "from_logits": False,
+            "label_smoothing": 0.0,
+        },
+        wass_options={"lipschitz_penalty": 100.0, "virtual_direction_upds": 1},
+    )
     return loss_
 
 
@@ -51,12 +61,29 @@ def test_loss_configuration(loss):
     from calotron.losses import MeanAbsoluteError
 
     assert isinstance(loss, MeanAbsoluteError)
-    assert isinstance(loss.ignore_padding, bool)
+    assert isinstance(loss.warmup_energy, float)
+    assert isinstance(loss.init_alpha, float)
+    assert isinstance(loss.alpha, tf.Variable)
+    assert isinstance(loss.adversarial_metric, str)
+    assert isinstance(loss.bce_options, dict)
+    assert isinstance(loss.wass_options, dict)
     assert isinstance(loss.name, str)
 
 
-def test_loss_use_no_weights(loss):
-    out1 = loss.transformer_loss(
+@pytest.mark.parametrize(
+    "adversarial_metric", ["binary-crossentropy", "wasserstein-distance"]
+)
+def test_loss_use_no_weights(adversarial_metric):
+    from calotron.losses import MeanAbsoluteError
+
+    loss = MeanAbsoluteError(
+        warmup_energy=0.0,
+        alpha=0.1,
+        adversarial_metric=adversarial_metric,
+        bce_options={"injected_noise_stddev": 0.1},
+        wass_options={"lipschitz_penalty": 100.0},
+    )
+    out = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
@@ -64,7 +91,8 @@ def test_loss_use_no_weights(loss):
         sample_weight=None,
         training=False,
     )
-    out2 = loss.discriminator_loss(
+    assert out.numpy()
+    out = loss.discriminator_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
@@ -72,11 +100,23 @@ def test_loss_use_no_weights(loss):
         sample_weight=None,
         training=False,
     )
-    assert out1.numpy() == -out2.numpy()
+    assert out.numpy()
 
 
-def test_loss_use_with_weights(loss):
-    out1 = loss.transformer_loss(
+@pytest.mark.parametrize(
+    "adversarial_metric", ["binary-crossentropy", "wasserstein-distance"]
+)
+def test_loss_use_with_weights(adversarial_metric):
+    from calotron.losses import MeanAbsoluteError
+
+    loss = MeanAbsoluteError(
+        warmup_energy=0.0,
+        alpha=0.1,
+        adversarial_metric=adversarial_metric,
+        bce_options={"injected_noise_stddev": 0.1},
+        wass_options={"lipschitz_penalty": 100.0},
+    )
+    out = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
@@ -84,7 +124,8 @@ def test_loss_use_with_weights(loss):
         sample_weight=weight,
         training=False,
     )
-    out2 = loss.discriminator_loss(
+    assert out.numpy()
+    out = loss.discriminator_loss(
         transformer=transf,
         discriminator=disc,
         source=source,
@@ -92,4 +133,4 @@ def test_loss_use_with_weights(loss):
         sample_weight=weight,
         training=False,
     )
-    assert out1.numpy() == -out2.numpy()
+    assert out.numpy()

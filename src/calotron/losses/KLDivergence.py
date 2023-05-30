@@ -5,14 +5,15 @@ from calotron.losses.BaseLoss import BaseLoss
 
 
 class KLDivergence(BaseLoss):
-    def __init__(self, ignore_padding=False, name="kl_loss") -> None:
+    def __init__(self, warmup_energy=0.0, name="kl_loss") -> None:
         super().__init__(name)
 
-        # Ignore padding
-        assert isinstance(ignore_padding, bool)
-        self._ignore_padding = ignore_padding
+        # Warmup energy
+        assert isinstance(warmup_energy, (int, float))
+        assert warmup_energy >= 0.0
+        self._warmup_energy = float(warmup_energy)
 
-        # K-L divergence
+        # TensorFlow KLDivergence
         self._loss = TF_KLDivergence()
 
     def transformer_loss(
@@ -25,25 +26,18 @@ class KLDivergence(BaseLoss):
         training=True,
     ) -> tf.Tensor:
         output = transformer((source, target), training=training)
-
-        if self._ignore_padding:
-            source_mask = tf.cast(
-                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            target_mask = tf.cast(
-                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            mask = (source_mask, target_mask)
+        energy_mask = tf.cast(
+            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        )
+        if sample_weight is None:
+            sample_weight = tf.identity(energy_mask)
         else:
-            mask = None
-        y_true = discriminator((source, target), mask=mask, training=False)
-        y_pred = discriminator((source, output), mask=mask, training=False)
+            sample_weight *= energy_mask
 
-        if sample_weight is not None:
-            evt_weights = tf.reduce_mean(sample_weight, axis=1)
-        else:
-            evt_weights = None
-        loss = self._loss(y_true, y_pred, sample_weight=evt_weights)
+        y_true = discriminator((source, target), filter=sample_weight, training=False)
+        y_pred = discriminator((source, output), filter=sample_weight, training=False)
+
+        loss = self._loss(y_true, y_pred)
         loss = tf.cast(loss, dtype=target.dtype)
         return loss  # divergence minimization
 
@@ -57,28 +51,25 @@ class KLDivergence(BaseLoss):
         training=True,
     ) -> tf.Tensor:
         output = transformer((source, target), training=False)
-
-        if self._ignore_padding:
-            source_mask = tf.cast(
-                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            target_mask = tf.cast(
-                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            mask = (source_mask, target_mask)
+        energy_mask = tf.cast(
+            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        )
+        if sample_weight is None:
+            sample_weight = tf.identity(energy_mask)
         else:
-            mask = None
-        y_true = discriminator((source, target), mask=mask, training=training)
-        y_pred = discriminator((source, output), mask=mask, training=training)
+            sample_weight *= energy_mask
 
-        if sample_weight is not None:
-            evt_weights = tf.reduce_mean(sample_weight, axis=1)
-        else:
-            evt_weights = None
-        loss = self._loss(y_true, y_pred, sample_weight=evt_weights)
+        y_true = discriminator(
+            (source, target), filter=sample_weight, training=training
+        )
+        y_pred = discriminator(
+            (source, output), filter=sample_weight, training=training
+        )
+
+        loss = self._loss(y_true, y_pred)
         loss = tf.cast(loss, dtype=target.dtype)
         return -loss  # divergence maximization
 
     @property
-    def ignore_padding(self) -> bool:
-        return self._ignore_padding
+    def warmup_energy(self) -> float:
+        return self._warmup_energy

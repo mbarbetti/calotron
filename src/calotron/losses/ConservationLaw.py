@@ -1,5 +1,4 @@
 import tensorflow as tf
-from tensorflow.keras.losses import MeanSquaredError as TF_MSE
 
 from calotron.losses.BaseLoss import BaseLoss
 from calotron.losses.BinaryCrossentropy import BinaryCrossentropy
@@ -8,7 +7,7 @@ from calotron.losses.WassersteinDistance import WassersteinDistance
 ADV_METRICS = ["binary-crossentropy", "wasserstein-distance"]
 
 
-class MeanSquaredError(BaseLoss):
+class ConservationLaw(BaseLoss):
     def __init__(
         self,
         warmup_energy=0.0,
@@ -20,7 +19,7 @@ class MeanSquaredError(BaseLoss):
             "label_smoothing": 0.0,
         },
         wass_options={"lipschitz_penalty": 100.0, "virtual_direction_upds": 1},
-        name="mse_loss",
+        name="conserv_law_loss",
     ) -> None:
         super().__init__(name)
 
@@ -55,10 +54,9 @@ class MeanSquaredError(BaseLoss):
             options.update(dict(warmup_energy=warmup_energy))
 
         # Losses definition
-        self._mse_loss = TF_MSE()
-        if adversarial_metric == "binary-crossentropy":
+        if self._adversarial_metric == "binary-crossentropy":
             self._adv_loss = BinaryCrossentropy(**self._bce_options)
-        elif adversarial_metric == "wasserstein-distance":
+        elif self._adversarial_metric == "wasserstein-distance":
             self._adv_loss = WassersteinDistance(**self._wass_options)
 
     def transformer_loss(
@@ -70,16 +68,50 @@ class MeanSquaredError(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        # MSE loss
+        tf.print("\n")
         output = transformer((source, target), training=training)
         energy_mask = tf.cast(
             target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
         )
+        tf.print(
+            "nonzero_ratio:",
+            tf.math.count_nonzero(energy_mask * sample_weight)
+            / tf.math.count_nonzero(sample_weight),
+        )
+
+        # L2 loss
+        l2_norm = tf.math.sqrt(tf.reduce_sum((target - output) ** 2, axis=-1))
         if sample_weight is None:
             sample_weight = tf.identity(energy_mask)
         else:
             sample_weight *= energy_mask
-        mse_loss = self._mse_loss(target, output, sample_weight=sample_weight)
+        evt_errors = tf.reduce_sum(l2_norm * sample_weight, axis=-1)
+        batch_rmse = tf.math.sqrt(tf.reduce_mean(evt_errors**2))
+        l2_loss = batch_rmse / tf.cast(tf.shape(target)[1], dtype=target.dtype)
+        l2_loss = tf.cast(l2_loss, dtype=target.dtype)
+        tf.print("L2:", l2_loss)
+
+        # Energy conservation
+        target_tot_energy = tf.reduce_sum(target[:, :, 2] * energy_mask, axis=-1)
+        output_tot_energy = tf.reduce_sum(output[:, :, 2] * energy_mask, axis=-1)
+        batch_rmse = tf.math.sqrt(
+            tf.reduce_mean((target_tot_energy - output_tot_energy) ** 2)
+        )
+        conserv_loss = batch_rmse / tf.cast(tf.shape(target)[1], dtype=target.dtype)
+        conserv_loss = tf.cast(conserv_loss, dtype=target.dtype)
+        tf.print("conserv:", conserv_loss)
+
+        # Monotonic function
+        output_energy = tf.math.maximum(output[:, :, 2], 1e-8)
+        non_monotonic_func = output_energy[:, 1:] / output_energy[:, :-1] > 1.0
+        count_non_monotonic = tf.cast(
+            tf.math.count_nonzero(non_monotonic_func, axis=-1), dtype=target.dtype
+        )
+        monotonic_loss = tf.reduce_mean(count_non_monotonic) / tf.cast(
+            tf.shape(target)[1], dtype=target.dtype
+        )
+        monotonic_loss = tf.cast(monotonic_loss, dtype=target.dtype)
+        tf.print("monotonic:", monotonic_loss)
 
         # Adversarial loss
         adv_loss = self._adv_loss.transformer_loss(
@@ -90,8 +122,10 @@ class MeanSquaredError(BaseLoss):
             sample_weight=sample_weight,
             training=training,
         )
+        tf.print("adv:", self._alpha * adv_loss)
 
-        tot_loss = mse_loss + self._alpha * adv_loss
+        tot_loss = l2_loss + conserv_loss + self._alpha * adv_loss
+        # tot_loss = l2_loss + conserv_loss + monotonic_loss + self._alpha * adv_loss
         return tot_loss
 
     def discriminator_loss(

@@ -7,13 +7,18 @@ from calotron.losses.BaseLoss import BaseLoss
 class BinaryCrossentropy(BaseLoss):
     def __init__(
         self,
+        warmup_energy=0.0,
         injected_noise_stddev=0.0,
         from_logits=False,
         label_smoothing=0.0,
-        ignore_padding=False,
         name="bce_loss",
     ) -> None:
         super().__init__(name)
+
+        # Warmup energy
+        assert isinstance(warmup_energy, (int, float))
+        assert warmup_energy >= 0.0
+        self._warmup_energy = float(warmup_energy)
 
         # Noise standard deviation
         assert isinstance(injected_noise_stddev, (int, float))
@@ -29,10 +34,6 @@ class BinaryCrossentropy(BaseLoss):
         assert label_smoothing >= 0.0 and label_smoothing <= 1.0
         self._label_smoothing = float(label_smoothing)
 
-        # Ignore padding
-        assert isinstance(ignore_padding, bool)
-        self._ignore_padding = ignore_padding
-
         # TensorFlow BinaryCrossentropy
         self._loss = TF_BCE(
             from_logits=self._from_logits, label_smoothing=self._label_smoothing
@@ -47,32 +48,26 @@ class BinaryCrossentropy(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        if sample_weight is not None:
-            evt_weights = tf.reduce_mean(sample_weight, axis=1)
+        output = transformer((source, target), training=training)
+        energy_mask = tf.cast(
+            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        )
+        if sample_weight is None:
+            sample_weight = tf.identity(energy_mask)
         else:
-            evt_weights = None
-
-        if self._ignore_padding:
-            source_mask = tf.cast(
-                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            target_mask = tf.cast(
-                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            mask = (source_mask, target_mask)
-        else:
-            mask = None
+            sample_weight *= energy_mask
 
         # Adversarial loss
-        output = transformer((source, target), training=training)
         if self._inj_noise_std > 0.0:
             rnd_pred = tf.random.normal(
                 tf.shape(output), stddev=self._inj_noise_std, dtype=output.dtype
             )
         else:
             rnd_pred = 0.0
-        y_pred = discriminator((source, output + rnd_pred), mask=mask, training=False)
-        adv_loss = self._loss(tf.ones_like(y_pred), y_pred, sample_weight=evt_weights)
+        y_pred = discriminator(
+            (source, output + rnd_pred), filter=sample_weight, training=False
+        )
+        adv_loss = self._loss(tf.ones_like(y_pred), y_pred)
         adv_loss = tf.cast(adv_loss, dtype=output.dtype)
         return adv_loss
 
@@ -85,21 +80,14 @@ class BinaryCrossentropy(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        if sample_weight is not None:
-            evt_weights = tf.reduce_mean(sample_weight, axis=1)
+        output = transformer((source, target), training=False)
+        energy_mask = tf.cast(
+            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        )
+        if sample_weight is None:
+            sample_weight = tf.identity(energy_mask)
         else:
-            evt_weights = None
-
-        if self._ignore_padding:
-            source_mask = tf.cast(
-                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            target_mask = tf.cast(
-                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            mask = (source_mask, target_mask)
-        else:
-            mask = None
+            sample_weight *= energy_mask
 
         # Real target loss
         if self._inj_noise_std > 0.0:
@@ -109,13 +97,12 @@ class BinaryCrossentropy(BaseLoss):
         else:
             rnd_true = 0.0
         y_true = discriminator(
-            (source, target + rnd_true), mask=mask, training=training
+            (source, target + rnd_true), filter=sample_weight, training=training
         )
-        real_loss = self._loss(tf.ones_like(y_true), y_true, sample_weight=evt_weights)
+        real_loss = self._loss(tf.ones_like(y_true), y_true)
         real_loss = tf.cast(real_loss, dtype=target.dtype)
 
         # Fake target loss
-        output = transformer((source, target), training=False)
         if self._inj_noise_std > 0.0:
             rnd_pred = tf.random.normal(
                 tf.shape(output), stddev=self._inj_noise_std, dtype=output.dtype
@@ -123,11 +110,15 @@ class BinaryCrossentropy(BaseLoss):
         else:
             rnd_pred = 0.0
         y_pred = discriminator(
-            (source, output + rnd_pred), mask=mask, training=training
+            (source, output + rnd_pred), filter=sample_weight, training=training
         )
-        fake_loss = self._loss(tf.zeros_like(y_pred), y_pred, sample_weight=evt_weights)
+        fake_loss = self._loss(tf.zeros_like(y_pred), y_pred)
         fake_loss = tf.cast(fake_loss, dtype=output.dtype)
         return (real_loss + fake_loss) / 2.0
+
+    @property
+    def warmup_energy(self) -> float:
+        return self._warmup_energy
 
     @property
     def injected_noise_stddev(self) -> float:
@@ -140,7 +131,3 @@ class BinaryCrossentropy(BaseLoss):
     @property
     def label_smoothing(self) -> float:
         return self._label_smoothing
-
-    @property
-    def ignore_padding(self) -> bool:
-        return self._ignore_padding

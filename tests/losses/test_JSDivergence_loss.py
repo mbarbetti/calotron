@@ -7,7 +7,7 @@ from calotron.models.transformers import Transformer
 CHUNK_SIZE = int(1e4)
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
-weight = tf.random.uniform(shape=(CHUNK_SIZE, target.shape[1], 1))
+weight = tf.random.uniform(shape=(CHUNK_SIZE, target.shape[1]))
 
 transf = Transformer(
     output_depth=target.shape[2],
@@ -40,7 +40,7 @@ disc = Discriminator(
 def loss():
     from calotron.losses import JSDivergence
 
-    loss_ = JSDivergence(ignore_padding=False)
+    loss_ = JSDivergence(warmup_energy=0.0)
     return loss_
 
 
@@ -51,7 +51,7 @@ def test_loss_configuration(loss):
     from calotron.losses import JSDivergence
 
     assert isinstance(loss, JSDivergence)
-    assert isinstance(loss.ignore_padding, bool)
+    assert isinstance(loss.warmup_energy, float)
     assert isinstance(loss.name, str)
 
 

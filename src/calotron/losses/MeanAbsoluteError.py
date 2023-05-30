@@ -2,18 +2,64 @@ import tensorflow as tf
 from tensorflow.keras.losses import MeanAbsoluteError as TF_MAE
 
 from calotron.losses.BaseLoss import BaseLoss
+from calotron.losses.BinaryCrossentropy import BinaryCrossentropy
+from calotron.losses.WassersteinDistance import WassersteinDistance
+
+ADV_METRICS = ["binary-crossentropy", "wasserstein-distance"]
 
 
 class MeanAbsoluteError(BaseLoss):
-    def __init__(self, ignore_padding=False, name="mae_loss") -> None:
+    def __init__(
+        self,
+        warmup_energy=0.0,
+        alpha=0.1,
+        adversarial_metric="binary-crossentropy",
+        bce_options={
+            "injected_noise_stddev": 0.0,
+            "from_logits": False,
+            "label_smoothing": 0.0,
+        },
+        wass_options={"lipschitz_penalty": 100.0, "virtual_direction_upds": 1},
+        name="mae_loss",
+    ) -> None:
         super().__init__(name)
 
-        # Ignore padding
-        assert isinstance(ignore_padding, bool)
-        self._ignore_padding = ignore_padding
+        # Warmup energy
+        assert isinstance(warmup_energy, (int, float))
+        assert warmup_energy >= 0.0
+        self._warmup_energy = float(warmup_energy)
 
-        # MAE
-        self._loss = TF_MAE()
+        # Adversarial scale
+        assert isinstance(alpha, (int, float))
+        assert alpha >= 0.0
+        self._init_alpha = float(alpha)
+        self._alpha = tf.Variable(float(alpha), name="alpha")
+
+        # Adversarial metric
+        assert isinstance(adversarial_metric, str)
+        if adversarial_metric not in ADV_METRICS:
+            raise ValueError(
+                "`adversarial_metric` should be selected "
+                f"in {ADV_METRICS}, instead "
+                f"'{adversarial_metric}' passed"
+            )
+        self._adversarial_metric = adversarial_metric
+
+        # Options
+        assert isinstance(bce_options, dict)
+        self._bce_options = bce_options
+        assert isinstance(wass_options, dict)
+        self._wass_options = wass_options
+
+        for options in [bce_options, wass_options]:
+            options.update(dict(warmup_energy=warmup_energy))
+
+        # Losses definition
+        self._mae_loss = TF_MAE()
+        if adversarial_metric == "binary-crossentropy":
+            self._adv_loss = BinaryCrossentropy(**self._bce_options)
+        elif adversarial_metric == "wasserstein-distance":
+            self._adv_loss = WassersteinDistance(**self._wass_options)
 
     def transformer_loss(
         self,
@@ -24,28 +70,29 @@ class MeanAbsoluteError(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
+        # MAE loss
         output = transformer((source, target), training=training)
-
-        if self._ignore_padding:
-            source_mask = tf.cast(
-                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            target_mask = tf.cast(
-                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            mask = (source_mask, target_mask)
+        energy_mask = tf.cast(
+            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        )
+        if sample_weight is None:
+            sample_weight = tf.identity(energy_mask)
         else:
-            mask = None
-        y_true = discriminator((source, target), mask=mask, training=False)
-        y_pred = discriminator((source, output), mask=mask, training=False)
+            sample_weight *= energy_mask
+        mae_loss = self._mae_loss(target, output, sample_weight=sample_weight)
 
-        if sample_weight is not None:
-            evt_weights = tf.reduce_mean(sample_weight, axis=1)
-        else:
-            evt_weights = None
-        loss = self._loss(y_true, y_pred, sample_weight=evt_weights)
-        loss = tf.cast(loss, dtype=target.dtype)
-        return loss  # error minimization
+        # Adversarial loss
+        adv_loss = self._adv_loss.transformer_loss(
+            transformer=transformer,
+            discriminator=discriminator,
+            source=source,
+            target=target,
+            sample_weight=sample_weight,
+            training=training,
+        )
+
+        tot_loss = mae_loss + self._alpha * adv_loss
+        return tot_loss
 
     def discriminator_loss(
         self,
@@ -56,29 +103,36 @@ class MeanAbsoluteError(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        output = transformer((source, target), training=False)
-
-        if self._ignore_padding:
-            source_mask = tf.cast(
-                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            target_mask = tf.cast(
-                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            mask = (source_mask, target_mask)
-        else:
-            mask = None
-        y_true = discriminator((source, target), mask=mask, training=training)
-        y_pred = discriminator((source, output), mask=mask, training=training)
-
-        if sample_weight is not None:
-            evt_weights = tf.reduce_mean(sample_weight, axis=1)
-        else:
-            evt_weights = None
-        loss = self._loss(y_true, y_pred, sample_weight=evt_weights)
-        loss = tf.cast(loss, dtype=target.dtype)
-        return -loss  # error maximization
+        adv_loss = self._adv_loss.discriminator_loss(
+            transformer=transformer,
+            discriminator=discriminator,
+            source=source,
+            target=target,
+            sample_weight=sample_weight,
+            training=training,
+        )
+        return adv_loss
 
     @property
-    def ignore_padding(self) -> bool:
-        return self._ignore_padding
+    def warmup_energy(self) -> float:
+        return self._warmup_energy
+
+    @property
+    def init_alpha(self) -> float:
+        return self._init_alpha
+
+    @property
+    def alpha(self) -> tf.Variable:
+        return self._alpha
+
+    @property
+    def adversarial_metric(self) -> str:
+        return self._adversarial_metric
+
+    @property
+    def bce_options(self) -> dict:
+        return self._bce_options
+
+    @property
+    def wass_options(self) -> dict:
+        return self._wass_options

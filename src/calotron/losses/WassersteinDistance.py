@@ -8,16 +8,21 @@ LIPSCHITZ_CONSTANT = 1.0
 class WassersteinDistance(BaseLoss):
     def __init__(
         self,
+        warmup_energy=0.0,
         lipschitz_penalty=100.0,
         virtual_direction_upds=1,
         fixed_xi=10.0,
         sampled_xi_min=0.0,
         sampled_xi_max=1.0,
         epsilon=1e-12,
-        ignore_padding=False,
         name="wass_dist_loss",
     ) -> None:
         super().__init__(name)
+
+        # Warmup energy
+        assert isinstance(warmup_energy, (int, float))
+        assert warmup_energy >= 0.0
+        self._warmup_energy = float(warmup_energy)
 
         # Adversarial Lipschitz penalty
         assert isinstance(lipschitz_penalty, (int, float))
@@ -46,10 +51,6 @@ class WassersteinDistance(BaseLoss):
         assert epsilon > 0.0
         self._epsilon = float(epsilon)
 
-        # Ignore padding
-        assert isinstance(ignore_padding, bool)
-        self._ignore_padding = ignore_padding
-
     def transformer_loss(
         self,
         transformer,
@@ -60,26 +61,18 @@ class WassersteinDistance(BaseLoss):
         training=True,
     ) -> tf.Tensor:
         output = transformer((source, target), training=training)
-
-        if self._ignore_padding:
-            source_mask = tf.cast(
-                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            target_mask = tf.cast(
-                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            mask = (source_mask, target_mask)
+        energy_mask = tf.cast(
+            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        )
+        if sample_weight is None:
+            sample_weight = tf.identity(energy_mask)
         else:
-            mask = None
-        y_true = discriminator((source, target), mask=mask, training=False)
-        y_pred = discriminator((source, output), mask=mask, training=False)
+            sample_weight *= energy_mask
 
-        if sample_weight is not None:
-            evt_weights = tf.reduce_mean(sample_weight, axis=1)
-            loss = tf.reduce_sum(evt_weights * (y_pred - y_true))
-            loss /= tf.reduce_sum(evt_weights)
-        else:
-            loss = tf.reduce_mean(y_pred - y_true)
+        y_true = discriminator((source, target), filter=sample_weight, training=False)
+        y_pred = discriminator((source, output), filter=sample_weight, training=False)
+
+        loss = tf.reduce_mean(y_pred - y_true)
         loss = tf.cast(loss, dtype=output.dtype)
         return loss
 
@@ -93,26 +86,22 @@ class WassersteinDistance(BaseLoss):
         training=True,
     ) -> tf.Tensor:
         output = transformer((source, target), training=False)
-
-        if self._ignore_padding:
-            source_mask = tf.cast(
-                (source[:, :, 0] != 0.0) & (source[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            target_mask = tf.cast(
-                (target[:, :, 0] != 0.0) & (target[:, :, 1] != 0.0), dtype=target.dtype
-            )
-            mask = (source_mask, target_mask)
+        energy_mask = tf.cast(
+            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        )
+        if sample_weight is None:
+            sample_weight = tf.identity(energy_mask)
         else:
-            mask = None
-        y_true = discriminator((source, target), mask=mask, training=training)
-        y_pred = discriminator((source, output), mask=mask, training=training)
+            sample_weight *= energy_mask
 
-        if sample_weight is not None:
-            evt_weights = tf.reduce_mean(sample_weight, axis=1)
-            loss = tf.reduce_sum(evt_weights * (y_true - y_pred))
-            loss /= tf.reduce_sum(evt_weights)
-        else:
-            loss = tf.reduce_mean(y_true - y_pred)
+        y_true = discriminator(
+            (source, target), filter=sample_weight, training=training
+        )
+        y_pred = discriminator(
+            (source, output), filter=sample_weight, training=training
+        )
+
+        loss = tf.reduce_mean(y_true - y_pred)
 
         # Initial virtual adversarial direction
         batch_size = tf.shape(target)[0]
@@ -139,8 +128,12 @@ class WassersteinDistance(BaseLoss):
                     clip_value_min=tf.reduce_min(output),
                     clip_value_max=tf.reduce_max(output),
                 )
-                y_true_hat = discriminator((source, target_hat), training=training)
-                y_pred_hat = discriminator((source, output_hat), training=training)
+                y_true_hat = discriminator(
+                    (source, target_hat), filter=sample_weight, training=training
+                )
+                y_pred_hat = discriminator(
+                    (source, output_hat), filter=sample_weight, training=training
+                )
                 y_diff = tf.abs(
                     tf.concat([y_true, y_pred], axis=0)
                     - tf.concat([y_true_hat, y_pred_hat], axis=0)
@@ -177,8 +170,12 @@ class WassersteinDistance(BaseLoss):
         )  # non-zero difference
         x_diff = tf.norm(x_diff, axis=[1, 2], keepdims=True)
 
-        y_true_hat = discriminator((source, target_hat), training=training)
-        y_pred_hat = discriminator((source, output_hat), training=training)
+        y_true_hat = discriminator(
+            (source, target_hat), filter=sample_weight, training=training
+        )
+        y_pred_hat = discriminator(
+            (source, output_hat), filter=sample_weight, training=training
+        )
         y_diff = tf.abs(
             tf.concat([y_true, y_pred], axis=0)
             - tf.concat([y_true_hat, y_pred_hat], axis=0)
@@ -190,6 +187,10 @@ class WassersteinDistance(BaseLoss):
         loss += self._lipschitz_penalty * alp_term**2  # adversarial Lipschitz penalty
         loss = tf.cast(loss, dtype=target.dtype)
         return loss
+
+    @property
+    def warmup_energy(self) -> float:
+        return self._warmup_energy
 
     @property
     def lipschitz_penalty(self) -> float:
@@ -214,7 +215,3 @@ class WassersteinDistance(BaseLoss):
     @property
     def epsilon(self) -> float:
         return self._epsilon
-
-    @property
-    def ignore_padding(self) -> bool:
-        return self._ignore_padding

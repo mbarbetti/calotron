@@ -29,7 +29,7 @@ transf = Transformer(
 disc = Discriminator(
     latent_dim=8,
     output_units=1,
-    output_activation="linear",
+    output_activation="sigmoid",
     deepsets_num_layers=2,
     deepsets_hidden_units=32,
     dropout_rate=0.1,
@@ -38,16 +38,18 @@ disc = Discriminator(
 
 @pytest.fixture
 def loss():
-    from calotron.losses import WassersteinDistance
+    from calotron.losses import ConservationLaw
 
-    loss_ = WassersteinDistance(
+    loss_ = ConservationLaw(
         warmup_energy=0.0,
-        lipschitz_penalty=100.0,
-        virtual_direction_upds=1,
-        fixed_xi=10.0,
-        sampled_xi_min=0.0,
-        sampled_xi_max=1.0,
-        epsilon=1e-12,
+        alpha=0.1,
+        adversarial_metric="binary-crossentropy",
+        bce_options={
+            "injected_noise_stddev": 0.0,
+            "from_logits": False,
+            "label_smoothing": 0.0,
+        },
+        wass_options={"lipschitz_penalty": 100.0, "virtual_direction_upds": 1},
     )
     return loss_
 
@@ -56,20 +58,31 @@ def loss():
 
 
 def test_loss_configuration(loss):
-    from calotron.losses import WassersteinDistance
+    from calotron.losses import ConservationLaw
 
-    assert isinstance(loss, WassersteinDistance)
+    assert isinstance(loss, ConservationLaw)
     assert isinstance(loss.warmup_energy, float)
-    assert isinstance(loss.lipschitz_penalty, float)
-    assert isinstance(loss.virtual_direction_upds, int)
-    assert isinstance(loss.fixed_xi, float)
-    assert isinstance(loss.sampled_xi_min, float)
-    assert isinstance(loss.sampled_xi_max, float)
-    assert isinstance(loss.epsilon, float)
+    assert isinstance(loss.init_alpha, float)
+    assert isinstance(loss.alpha, tf.Variable)
+    assert isinstance(loss.adversarial_metric, str)
+    assert isinstance(loss.bce_options, dict)
+    assert isinstance(loss.wass_options, dict)
     assert isinstance(loss.name, str)
 
 
-def test_loss_use_no_weights(loss):
+@pytest.mark.parametrize(
+    "adversarial_metric", ["binary-crossentropy", "wasserstein-distance"]
+)
+def test_loss_use_no_weights(adversarial_metric):
+    from calotron.losses import ConservationLaw
+
+    loss = ConservationLaw(
+        warmup_energy=0.0,
+        alpha=0.1,
+        adversarial_metric=adversarial_metric,
+        bce_options={"injected_noise_stddev": 0.1},
+        wass_options={"lipschitz_penalty": 100.0},
+    )
     out = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,
@@ -90,7 +103,19 @@ def test_loss_use_no_weights(loss):
     assert out.numpy()
 
 
-def test_loss_use_with_weights(loss):
+@pytest.mark.parametrize(
+    "adversarial_metric", ["binary-crossentropy", "wasserstein-distance"]
+)
+def test_loss_use_with_weights(adversarial_metric):
+    from calotron.losses import ConservationLaw
+
+    loss = ConservationLaw(
+        warmup_energy=0.0,
+        alpha=0.1,
+        adversarial_metric=adversarial_metric,
+        bce_options={"injected_noise_stddev": 0.1},
+        wass_options={"lipschitz_penalty": 100.0},
+    )
     out = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,
