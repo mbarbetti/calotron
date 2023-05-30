@@ -5,6 +5,7 @@ CHUNK_SIZE = int(1e4)
 
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
+weight = tf.random.uniform(shape=(CHUNK_SIZE, target.shape[1]))
 labels = tf.random.uniform(shape=(CHUNK_SIZE,), minval=0.0, maxval=1.0)
 labels = tf.cast(labels > 0.5, target.dtype)
 
@@ -39,7 +40,8 @@ def test_model_configuration(model):
 
 
 @pytest.mark.parametrize("activation", ["sigmoid", None])
-def test_model_use(activation):
+@pytest.mark.parametrize("filter", [weight, None])
+def test_model_use(activation, filter):
     from calotron.models.discriminators import PairwiseDiscriminator
 
     model = PairwiseDiscriminator(
@@ -50,7 +52,7 @@ def test_model_use(activation):
         deepsets_hidden_units=32,
         dropout_rate=0.1,
     )
-    output = model((source, target))
+    output = model((source, target), filter=filter)
     model.summary()
     test_shape = [target.shape[0]]
     test_shape.append(model.output_units)

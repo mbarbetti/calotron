@@ -90,13 +90,9 @@ class Discriminator(BaseDiscriminator):
             )
         ]
 
-    def call(self, inputs, mask=None) -> tf.Tensor:
+    def call(self, inputs, filter=None) -> tf.Tensor:
         _, target = inputs
-        if mask is not None:
-            _, target_mask = mask
-        else:
-            target_mask = None
-        output = self._deep_sets(target, mask=target_mask)
+        output = self._deep_sets(target, filter=filter)
         for layer in self._seq:
             output = layer(output)
         return output
