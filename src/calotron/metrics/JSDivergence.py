@@ -13,9 +13,8 @@ class JSDivergence(BaseMetric):
         dtype = self._kl_div(y_true, y_pred).dtype
         y_true = tf.cast(y_true, dtype)
         y_pred = tf.cast(y_pred, dtype)
+
         state = 0.5 * self._kl_div(
-            y_true, 0.5 * (y_true + y_pred), sample_weight=sample_weight
-        ) + 0.5 * self._kl_div(
-            y_pred, 0.5 * (y_true + y_pred), sample_weight=sample_weight
-        )
+            y_true, 0.5 * (y_true + y_pred)
+        ) + 0.5 * self._kl_div(y_pred, 0.5 * (y_true + y_pred))
         self._metric_values.assign(state)

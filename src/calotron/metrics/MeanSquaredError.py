@@ -10,5 +10,5 @@ class MeanSquaredError(BaseMetric):
         self._mse = TF_MSE(name=name, dtype=dtype)
 
     def update_state(self, y_true, y_pred, sample_weight=None) -> None:
-        state = self._mse(y_true, y_pred, sample_weight=sample_weight)
+        state = self._mse(y_true, y_pred)
         self._metric_values.assign(state)

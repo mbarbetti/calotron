@@ -64,12 +64,12 @@ class DeepSets(tf.keras.layers.Layer):
             )
         ]
 
-    def call(self, x, mask=None) -> tf.Tensor:
+    def call(self, x, filter=None) -> tf.Tensor:
         for layer in self._seq:
             x = layer(x)
-        if mask is not None:
-            mask = tf.tile(mask[:, :, None], (1, 1, tf.shape(x)[2]))
-            x = tf.math.multiply(x, mask)
+        if filter is not None:
+            filter = tf.tile(filter[:, :, None], (1, 1, tf.shape(x)[2]))
+            x = tf.math.multiply(x, filter)
         output = tf.reduce_sum(x, axis=1)
         return output
 

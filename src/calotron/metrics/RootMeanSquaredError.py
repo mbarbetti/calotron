@@ -10,5 +10,5 @@ class RootMeanSquaredError(BaseMetric):
         self._rmse = TF_RMSE(name=name, dtype=dtype)
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-        state = self._rmse(y_true, y_pred, sample_weight=sample_weight)
+        state = self._rmse(y_true, y_pred)
         self._metric_values.assign(state)
