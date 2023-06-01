@@ -34,7 +34,7 @@ class MultilayerPerceptron(tf.keras.layers.Layer):
                 tf.keras.layers.Dense(
                     units=self._hidden_units,
                     activation="relu",
-                    kernel_initializer="glorot_uniform",
+                    kernel_initializer="glorot_normal",
                     bias_initializer="zeros",
                     name=f"{prefix}_mlp_dense_in_{suffix}" if name else None,
                     dtype=self.dtype,
@@ -42,7 +42,7 @@ class MultilayerPerceptron(tf.keras.layers.Layer):
                 tf.keras.layers.Dense(
                     units=self._output_units,
                     activation="linear",
-                    kernel_initializer="he_normal",
+                    kernel_initializer="truncated_normal",
                     bias_initializer="zeros",
                     name=f"{prefix}_mlp_dense_out_{suffix}" if name else None,
                     dtype=self.dtype,
