@@ -122,7 +122,7 @@ class Huber(BaseLoss):
     @property
     def warmup_energy(self) -> float:
         return self._warmup_energy
-    
+
     @property
     def delta(self) -> float:
         return self._delta

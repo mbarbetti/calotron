@@ -1,10 +1,11 @@
+import copy
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import copy
 
 my_cmap = copy.copy(mpl.cm.get_cmap("gist_heat"))
-my_cmap.set_bad((0,0,0))
+my_cmap.set_bad((0, 0, 0))
 
 
 def learning_curves(
@@ -379,7 +380,9 @@ def photon2cluster_corr(
 
         pairwise_distance = np.linalg.norm(object_xy - photon_xy, axis=-1)
         match_photon_idx = np.argmin(pairwise_distance, axis=-1)
-        matched_photon = np.take_along_axis(photon, match_photon_idx[:, :, None], axis=1)
+        matched_photon = np.take_along_axis(
+            photon, match_photon_idx[:, :, None], axis=1
+        )
 
         photon_energy = matched_photon[:, :, 2].flatten()
         object_energy = object[:, :, 2].flatten()

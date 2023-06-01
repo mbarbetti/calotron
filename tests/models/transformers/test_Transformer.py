@@ -93,12 +93,14 @@ def test_model_use(enable_residual_smoothing, output_activations):
     assert output.shape == tuple(test_shape)
 
 
-@pytest.mark.parametrize("target", [
+@pytest.mark.parametrize(
+    "target",
+    [
         tf.random.normal(shape=(CHUNK_SIZE, 4, 3)),
         tf.random.normal(shape=(CHUNK_SIZE, 8, 3)),
         tf.random.normal(shape=(CHUNK_SIZE, 12, 3)),
         tf.random.normal(shape=(CHUNK_SIZE, 4, 6)),
-    ]
+    ],
 )
 def test_model_baseline(target):
     from calotron.models.transformers import Transformer

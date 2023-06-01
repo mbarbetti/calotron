@@ -144,7 +144,9 @@ with study.trial() as trial:
     cluster_train = cluster[:train_size]
     weight_train = weight[:train_size]
     train_ds = (
-        tf.data.Dataset.from_tensor_slices(((photon_train, cluster_train), cluster_train, weight_train))
+        tf.data.Dataset.from_tensor_slices(
+            ((photon_train, cluster_train), cluster_train, weight_train)
+        )
         .batch(hp.get("batch_size", BATCHSIZE), drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
@@ -155,7 +157,9 @@ with study.trial() as trial:
         cluster_val = cluster[train_size:]
         weight_val = weight[train_size:]
         val_ds = (
-            tf.data.Dataset.from_tensor_slices(((photon_val, cluster_val), cluster_val, weight_val))
+            tf.data.Dataset.from_tensor_slices(
+                ((photon_val, cluster_val), cluster_val, weight_val)
+            )
             .batch(BATCHSIZE, drop_remainder=True)
             .cache()
             .prefetch(tf.data.AUTOTUNE)
@@ -191,7 +195,9 @@ with study.trial() as trial:
         ),
         seq_ord_normalizations=hp.get("seq_ord_normalizations", seq_ord_normalizations),
         attn_mask_init_nonzero_size=hp.get("attn_mask_init_nonzero_size", 8),
-        enable_residual_smoothing=hp.get("enable_residual_smoothing", enable_residual_smoothing),
+        enable_residual_smoothing=hp.get(
+            "enable_residual_smoothing", enable_residual_smoothing
+        ),
         enable_source_baseline=hp.get("enable_source_baseline", True),
         enable_attention_mask=hp.get("enable_attention_mask", False),
         output_activations=hp.get("output_activations", None),
@@ -216,11 +222,7 @@ with study.trial() as trial:
     mse = tf.keras.losses.MeanSquaredError()
     hp.get("loss", mse.name)
 
-    model.compile(
-        loss=mse,
-        optimizer=opt,
-        weighted_metrics=hp.get("metrics", ["mae"]),
-    )
+    model.compile(loss=mse, optimizer=opt, weighted_metrics=hp.get("metrics", ["mae"]))
 
     # +--------------------------+
     # |   Callbacks definition   |
@@ -497,8 +499,14 @@ with study.trial() as trial:
     for i, evt in enumerate(events):
         event_example(
             report=report,
-            photon_xy=(photon_val[evt, :, 0].flatten(), photon_val[evt, :, 1].flatten()),
-            cluster_xy=(cluster_val[evt, :, 0].flatten(), cluster_val[evt, :, 1].flatten()),
+            photon_xy=(
+                photon_val[evt, :, 0].flatten(),
+                photon_val[evt, :, 1].flatten(),
+            ),
+            cluster_xy=(
+                cluster_val[evt, :, 0].flatten(),
+                cluster_val[evt, :, 1].flatten(),
+            ),
             output_xy=(output[evt, :, 0].flatten(), output[evt, :, 1].flatten()),
             photon_energy=photon_val[evt, :, 2].flatten(),
             cluster_energy=cluster_val[evt, :, 2].flatten(),

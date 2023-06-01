@@ -92,7 +92,9 @@ photon_train = photon[:train_size]
 cluster_train = cluster[:train_size]
 weight_train = weight[:train_size]
 train_ds = (
-    tf.data.Dataset.from_tensor_slices(((photon_train, cluster_train), cluster_train, weight_train))
+    tf.data.Dataset.from_tensor_slices(
+        ((photon_train, cluster_train), cluster_train, weight_train)
+    )
     .batch(hp.get("batch_size", BATCHSIZE), drop_remainder=True)
     .cache()
     .prefetch(tf.data.AUTOTUNE)
@@ -103,7 +105,9 @@ if TRAIN_RATIO != 1.0:
     cluster_val = cluster[train_size:]
     weight_val = weight[train_size:]
     val_ds = (
-        tf.data.Dataset.from_tensor_slices(((photon_val, cluster_val), cluster_val, weight_val))
+        tf.data.Dataset.from_tensor_slices(
+            ((photon_val, cluster_val), cluster_val, weight_val)
+        )
         .batch(BATCHSIZE, drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
@@ -158,11 +162,7 @@ opt = tf.keras.optimizers.RMSprop(hp.get("lr0", 1e-3))
 mse = tf.keras.losses.MeanSquaredError()
 hp.get("loss", mse.name)
 
-model.compile(
-    loss=mse,
-    optimizer=opt,
-    weighted_metrics=hp.get("metrics", ["mae"]),
-)
+model.compile(loss=mse, optimizer=opt, weighted_metrics=hp.get("metrics", ["mae"]))
 
 # +--------------------------+
 # |   Callbacks definition   |

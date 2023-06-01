@@ -112,10 +112,7 @@ study = hpc.Study(
     special_properties={"address": address, "node_name": str(args.node_name)},
     direction="minimize",
     pruner=hpc.pruners.MedianPruner(
-        n_startup_trials=20,
-        n_warmup_steps=50,
-        interval_steps=1,
-        n_min_trials=10
+        n_startup_trials=20, n_warmup_steps=50, interval_steps=1, n_min_trials=10
     ),
     sampler=hpc.samplers.TPESampler(n_startup_trials=50),
     client=client,
@@ -200,7 +197,9 @@ with study.trial() as trial:
         ),
         seq_ord_normalizations=hp.get("seq_ord_normalizations", seq_ord_normalizations),
         attn_mask_init_nonzero_size=hp.get("attn_mask_init_nonzero_size", 8),
-        enable_residual_smoothing=hp.get("enable_residual_smoothing", enable_residual_smoothing),
+        enable_residual_smoothing=hp.get(
+            "enable_residual_smoothing", enable_residual_smoothing
+        ),
         enable_source_baseline=hp.get("enable_source_baseline", True),
         enable_attention_mask=hp.get("enable_attention_mask", False),
         output_activations=hp.get("output_activations", None),
@@ -245,7 +244,8 @@ with study.trial() as trial:
             "loss_bce_options", {"injected_noise_stddev": 0.01, "label_smoothing": 0.1}
         ),
         wass_options=hp.get(
-            "loss_wass_options", {"lipschitz_penalty": 100.0, "virtual_direction_upds": 1}
+            "loss_wass_options",
+            {"lipschitz_penalty": 100.0, "virtual_direction_upds": 1},
         ),
     )
     hp.get("loss", loss.name)
@@ -284,10 +284,7 @@ with study.trial() as trial:
     callbacks.append(d_sched)
 
     pruner = HopaasPruner(
-        trial=trial,
-        loss_name="val_wass_dist",
-        report_frequency=1,
-        enable_pruning=True,
+        trial=trial, loss_name="val_wass_dist", report_frequency=1, enable_pruning=True
     )
     callbacks.append(pruner)
 
@@ -364,7 +361,7 @@ with study.trial() as trial:
         f"- Model training completed in **{duration}**",
         f"- Report generated on **{date}** at **{hour}**",
     ]
-    
+
     if args.weights:
         info += ["- Model trained with **matching weights**"]
     else:
@@ -590,8 +587,14 @@ with study.trial() as trial:
     for i, evt in enumerate(events):
         event_example(
             report=report,
-            photon_xy=(photon_val[evt, :, 0].flatten(), photon_val[evt, :, 1].flatten()),
-            cluster_xy=(cluster_val[evt, :, 0].flatten(), cluster_val[evt, :, 1].flatten()),
+            photon_xy=(
+                photon_val[evt, :, 0].flatten(),
+                photon_val[evt, :, 1].flatten(),
+            ),
+            cluster_xy=(
+                cluster_val[evt, :, 0].flatten(),
+                cluster_val[evt, :, 1].flatten(),
+            ),
             output_xy=(output[evt, :, 0].flatten(), output[evt, :, 1].flatten()),
             photon_energy=photon_val[evt, :, 2].flatten(),
             cluster_energy=cluster_val[evt, :, 2].flatten(),
@@ -630,4 +633,6 @@ with study.trial() as trial:
     report_fname = f"{reports_dir}/{prefix}_train-report.html"
     report.write_report(filename=report_fname)
     print(f"[INFO] Training report correctly exported to {report_fname}")
-    print(f"[INFO] The trained model of Trial n. {trial.id} scored {train.history['val_wass_dist'][-1]:.3f}")
+    print(
+        f"[INFO] The trained model of Trial n. {trial.id} scored {train.history['val_wass_dist'][-1]:.3f}"
+    )

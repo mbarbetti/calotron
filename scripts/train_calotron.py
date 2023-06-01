@@ -327,7 +327,7 @@ if args.weights:
     info += ["- Model trained with **matching weights**"]
 else:
     info += ["- Model trained **avoiding padded values**"]
-    
+
 report.add_markdown("\n".join([i for i in info]))
 
 report.add_markdown("---")
