@@ -3,21 +3,30 @@ import socket
 from argparse import ArgumentParser
 from datetime import datetime
 
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import yaml
 from html_reports import Report
 from sklearn.utils import shuffle
+from utils import (
+    attention_plot,
+    calorimeter_deposits,
+    energy_sequences,
+    event_example,
+    learn_rate_scheduling,
+    metric_curves,
+    photon2cluster_corr,
+    validation_histogram,
+)
 
-from calotron.callbacks.schedulers import ExponentialDecay
-from calotron.models import Transformer
+from calotron.callbacks.schedulers import LearnRateExpDecay
+from calotron.models.transformers import MaskedTransformer
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
-DTYPE = tf.float32
-TRAIN_RATIO = 1.0
-BATCHSIZE = 128
+DTYPE = np.float32
+TRAIN_RATIO = 0.7
+BATCHSIZE = 512
 EPOCHS = 500
 
 # +------------------+
@@ -28,7 +37,15 @@ parser = ArgumentParser(description="transformer training setup")
 
 parser.add_argument("--saving", action="store_true")
 parser.add_argument("--no-saving", dest="saving", action="store_false")
-parser.set_defaults(saving=True)
+parser.set_defaults(saving=False)
+
+parser.add_argument("--weights", action="store_true")
+parser.add_argument("--no-weights", dest="weights", action="store_false")
+parser.set_defaults(weights=True)
+
+parser.add_argument("--test", action="store_true")
+parser.add_argument("--no-test", dest="test", action="store_false")
+parser.set_defaults(test=False)
 
 args = parser.parse_args()
 
@@ -50,14 +67,19 @@ reports_dir = config_dir["reports_dir"]
 # |   Data loading   |
 # +------------------+
 
-npzfile = np.load(f"{data_dir}/train-data-demo.npz")
-photon = npzfile["photon"][:, ::-1]
-cluster = npzfile["cluster"][:, ::-1]
+npzfile = np.load(f"{data_dir}/calotron-dataset-demo.npz")
+photon = npzfile["photon"].astype(DTYPE)[:200_000]
+cluster = npzfile["cluster"].astype(DTYPE)[:200_000]
+weight = npzfile["weight"].astype(DTYPE)[:200_000]
 
 print(f"[INFO] Generated photons - shape: {photon.shape}")
 print(f"[INFO] Reconstructed clusters - shape: {cluster.shape}")
+print(f"[INFO] Matching weights - shape: {weight.shape}")
 
-photon, cluster = shuffle(photon, cluster)
+if not args.weights:
+    weight = (weight > 0.0).astype(DTYPE)
+
+photon, cluster, weight = shuffle(photon, cluster, weight)
 
 chunk_size = photon.shape[0]
 train_size = int(TRAIN_RATIO * chunk_size)
@@ -66,63 +88,68 @@ train_size = int(TRAIN_RATIO * chunk_size)
 # |   Dataset preparation   |
 # +-------------------------+
 
-X = tf.cast(photon, dtype=DTYPE)
-Y = tf.cast(cluster, dtype=DTYPE)
-
+photon_train = photon[:train_size]
+cluster_train = cluster[:train_size]
+weight_train = weight[:train_size]
 train_ds = (
-    tf.data.Dataset.from_tensor_slices(
-        ((X[:train_size], Y[:train_size]), Y[:train_size])
-    )
+    tf.data.Dataset.from_tensor_slices(((photon_train, cluster_train), cluster_train, weight_train))
     .batch(hp.get("batch_size", BATCHSIZE), drop_remainder=True)
     .cache()
     .prefetch(tf.data.AUTOTUNE)
 )
 
 if TRAIN_RATIO != 1.0:
+    photon_val = photon[train_size:]
+    cluster_val = cluster[train_size:]
+    weight_val = weight[train_size:]
     val_ds = (
-        tf.data.Dataset.from_tensor_slices(
-            ((X[train_size:], Y[train_size:]), Y[train_size:])
-        )
+        tf.data.Dataset.from_tensor_slices(((photon_val, cluster_val), cluster_val, weight_val))
         .batch(BATCHSIZE, drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
     )
 else:
+    photon_val = photon_train
+    cluster_val = cluster_train
+    weight_val = weight_train
     val_ds = None
 
 # +------------------------+
 # |   Model construction   |
 # +------------------------+
 
-model = Transformer(
-    output_depth=hp.get("output_depth", Y.shape[2]),
-    encoder_depth=hp.get("encoder_depth", X.shape[2] + 16),  # 32
-    decoder_depth=hp.get("decoder_depth", Y.shape[2] + 16),  # 32
+model = MaskedTransformer(
+    output_depth=hp.get("output_depth", cluster.shape[2]),
+    encoder_depth=hp.get("encoder_depth", 32),
+    decoder_depth=hp.get("decoder_depth", 32),
     num_layers=hp.get("num_layers", 5),
     num_heads=hp.get("num_heads", 4),
-    key_dims=hp.get("key_dims", 32),  # 64
-    fnn_units=hp.get("fnn_units", 128),  # 256
+    key_dims=hp.get("key_dims", 64),
+    mlp_units=hp.get("mlp_units", 128),
     dropout_rates=hp.get("dropout_rates", 0.1),
-    seq_ord_latent_dims=hp.get("seq_ord_latent_dims", 16),  # 32
-    seq_ord_max_lengths=hp.get("seq_ord_max_lengths", [X.shape[1], Y.shape[1]]),
-    seq_ord_normalizations=hp.get("seq_ord_normalizations", 10_000),  # 128
-    residual_smoothing=hp.get("residual_smoothing", False),  # True
-    output_activations=hp.get("output_activations", ["linear", "linear", "sigmoid"]),
-    start_token_initializer=hp.get("start_toke_initializer", "zeros"),
+    seq_ord_latent_dims=hp.get("seq_ord_latent_dims", 64),
+    seq_ord_max_lengths=hp.get(
+        "seq_ord_max_lengths", [photon.shape[1], cluster.shape[1]]
+    ),
+    seq_ord_normalizations=hp.get("seq_ord_normalizations", 10_000),
+    attn_mask_init_nonzero_size=hp.get("attn_mask_init_nonzero_size", 8),
+    enable_residual_smoothing=hp.get("enable_residual_smoothing", True),
+    enable_source_baseline=hp.get("enable_source_baseline", True),
+    enable_attention_mask=hp.get("enable_attention_mask", False),
+    output_activations=hp.get("output_activations", None),
+    start_token_initializer=hp.get("start_toke_initializer", "ones"),
     dtype=DTYPE,
 )
 
-output = model((X, Y))
+output = model((photon[:BATCHSIZE], cluster[:BATCHSIZE]))
 model.summary()
 
 # +----------------------+
 # |   Optimizers setup   |
 # +----------------------+
 
-lr0 = 1e-3
-rms = tf.keras.optimizers.RMSprop(lr0)
 hp.get("optimizer", "RMSprop")
-hp.get("lr0", lr0)
+opt = tf.keras.optimizers.RMSprop(hp.get("lr0", 1e-3))
 
 # +----------------------------+
 # |   Training configuration   |
@@ -131,20 +158,27 @@ hp.get("lr0", lr0)
 mse = tf.keras.losses.MeanSquaredError()
 hp.get("loss", mse.name)
 
-model.compile(loss=mse, optimizer=rms, metrics=hp.get("metrics", ["mae"]))
-
-# +------------------------------+
-# |   Learning rate scheduling   |
-# +------------------------------+
-
-decay_rate = 0.10
-decay_steps = 50_000
-sched = ExponentialDecay(
-    model.optimizer, decay_rate=decay_rate, decay_steps=decay_steps, verbose=True
+model.compile(
+    loss=mse,
+    optimizer=opt,
+    weighted_metrics=hp.get("metrics", ["mae"]),
 )
-hp.get("sched", "ExponentialDecay")
-hp.get("decay_rate", decay_rate)
-hp.get("decay_steps", decay_steps)
+
+# +--------------------------+
+# |   Callbacks definition   |
+# +--------------------------+
+
+callbacks = list()
+
+lr_sched = LearnRateExpDecay(
+    model.optimizer,
+    decay_rate=hp.get("decay_rate", 0.10),
+    decay_steps=hp.get("decay_steps", 100_000),
+    min_learning_rate=hp.get("min_learning_rate", 1e-6),
+    verbose=True,
+)
+hp.get("lr_sched", "LearnRateExpDecay")
+callbacks.append(lr_sched)
 
 # +------------------------+
 # |   Training procedure   |
@@ -152,7 +186,10 @@ hp.get("decay_steps", decay_steps)
 
 start = datetime.now()
 train = model.fit(
-    train_ds, epochs=hp.get("epochs", EPOCHS), validation_data=val_ds, callbacks=[sched]
+    train_ds,
+    epochs=hp.get("epochs", EPOCHS),
+    validation_data=val_ds,
+    callbacks=callbacks,
 )
 stop = datetime.now()
 
@@ -160,33 +197,54 @@ duration = str(stop - start).split(".")[0].split(":")  # [HH, MM, SS]
 duration = f"{duration[0]}h {duration[1]}min {duration[2]}s"
 print(f"[INFO] Model training completed in {duration}")
 
+# +---------------------+
+# |   Model inference   |
+# +---------------------+
+
+start_token = model.get_start_token(cluster_train)
+start_token = np.mean(start_token, axis=0)
+
+sim = Simulator(model, start_token=start_token)
+exp_sim = ExportSimulator(sim, max_length=cluster.shape[1])
+
+dataset = (
+    tf.data.Dataset.from_tensor_slices(photon_val)
+    .batch(BATCHSIZE, drop_remainder=True)
+    .cache()
+    .prefetch(tf.data.AUTOTUNE)
+)
+
+output, attn_weights = [exp_out.numpy() for exp_out in exp_sim(dataset)]
+photon_val = photon_val[: len(output)]
+cluster_val = cluster_val[: len(output)]
+weight_val = weight_val[: len(output)]
+
 # +------------------+
 # |   Model export   |
 # +------------------+
-
-start_token = model.get_start_token(Y)
-sim = Simulator(model, start_token=start_token)
-exp_sim = ExportSimulator(sim, max_length=Y.shape[1])
-out = exp_sim(X)
 
 timestamp = str(datetime.now())
 date, hour = timestamp.split(" ")
 date = date.replace("-", "/")
 hour = hour.split(".")[0]
 
-prefix = ""
-timestamp = timestamp.split(".")[0].replace("-", "").replace(" ", "-")
-for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
-    prefix += time + unit  # YYYYMMDD-HHhMMmSSs
-prefix += "_transformer"
+if args.test:
+    prefix = "test"
+else:
+    prefix = ""
+    timestamp = timestamp.split(".")[0].replace("-", "").replace(" ", "-")
+    for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
+        prefix += time + unit  # YYYYMMDD-HHhMMmSSs
+prefix += f"_transformer"
+
+export_model_fname = f"{models_dir}/{prefix}_model"
+export_img_dirname = f"{images_dir}/{prefix}_img"
 
 if args.saving:
-    export_model_fname = f"{models_dir}/{prefix}_model"
-    tf.saved_model.save(exp_sim, models_dir=export_model_fname)
+    tf.saved_model.save(exp_sim, export_dir=export_model_fname)
     hp.dump(f"{export_model_fname}/hyperparams.yml")  # export also list of hyperparams
     print(f"[INFO] Trained model correctly exported to {export_model_fname}")
-    export_img_fname = f"{images_dir}/{prefix}_img"
-    os.makedirs(export_img_fname)  # need to save images
+    os.makedirs(export_img_dirname)  # need to save images
 
 # +---------------------+
 # |   Training report   |
@@ -194,26 +252,34 @@ if args.saving:
 
 report = Report()
 report.add_markdown('<h1 align="center">Transformer training report</h1>')
+
 info = [
     f"- Script executed on **{socket.gethostname()}**",
     f"- Model training completed in **{duration}**",
     f"- Report generated on **{date}** at **{hour}**",
 ]
+
+if args.weights:
+    info += ["- Model trained with **matching weights**"]
+else:
+    info += ["- Model trained **avoiding padded values**"]
+
 report.add_markdown("\n".join([i for i in info]))
 
 report.add_markdown("---")
 
 ## Hyperparameters and other details
 report.add_markdown('<h2 align="center">Hyperparameters and other details</h2>')
-content = ""
+hyperparams = ""
 for k, v in hp.get_dict().items():
-    content += f"- **{k}:** {v}\n"
-report.add_markdown(content)
+    hyperparams += f"- **{k}:** {v}\n"
+report.add_markdown(hyperparams)
 
 report.add_markdown("---")
 
 ## Transformer architecture
 report.add_markdown('<h2 align="center">Transformer architecture</h2>')
+report.add_markdown(f"**Model name:** {model.name}")
 html_table, num_params = getSummaryHTML(model)
 report.add_markdown(html_table)
 report.add_markdown(f"**Total params:** {num_params}")
@@ -223,220 +289,195 @@ report.add_markdown("---")
 ## Training plots
 report.add_markdown('<h2 align="center">Training plots</h2>')
 
+start_epoch = int(EPOCHS / 20)
+
 #### Learning curves
-plt.figure(figsize=(8, 5), dpi=100)
-plt.title("Learning curves", fontsize=14)
-plt.xlabel("Training epochs", fontsize=12)
-plt.ylabel("Loss", fontsize=12)
-plt.plot(np.array(train.history["loss"]), lw=1.5, color="#3288bd", label="MSE")
-plt.yscale("log")
-plt.legend(loc="upper right", fontsize=10)
-if args.saving:
-    plt.savefig(fname=f"{export_img_fname}/learn-curves.png")
-report.add_figure(options="width=45%")
-plt.close()
+metric_curves(
+    report=report,
+    history=train.history,
+    start_epoch=start_epoch,
+    key="loss",
+    ylabel="Transformer loss",
+    title="Learning curves",
+    validation_set=(TRAIN_RATIO != 1.0),
+    colors=["#d01c8b", "#4dac26"],
+    labels=["training set", "validation set"],
+    legend_loc=None,
+    yscale="linear",
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/learn-curves",
+)
 
 #### Learning rate scheduling
-plt.figure(figsize=(8, 5), dpi=100)
-plt.title("Learning rate scheduling", fontsize=14)
-plt.xlabel("Training epochs", fontsize=12)
-plt.ylabel("Learning rate", fontsize=12)
-plt.plot(np.array(train.history["lr"]), lw=1.5, color="#3288bd", label="transformer")
-plt.yscale("log")
-plt.legend(loc="upper right", fontsize=10)
-if args.saving:
-    plt.savefig(fname=f"{export_img_fname}/lr-sched.png")
-report.add_figure(options="width=45%")
-plt.close()
+learn_rate_scheduling(
+    report=report,
+    history=train.history,
+    start_epoch=0,
+    keys=["lr"],
+    colors=["#d01c8b"],
+    labels=["transformer"],
+    legend_loc="upper right",
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/lr-sched",
+)
 
-#### MAE curves
-plt.figure(figsize=(8, 5), dpi=100)
-plt.title("Metric curves", fontsize=14)
-plt.xlabel("Training epochs", fontsize=12)
-plt.ylabel("Mean absolute error", fontsize=12)
-plt.plot(np.array(train.history["mae"]), lw=1.5, color="#4dac26", label="training set")
-if TRAIN_RATIO != 1.0:
-    plt.plot(
-        np.array(train.history["val_mae"]),
-        lw=1.5,
-        color="#d01c8b",
-        label="validation set",
+#### Metric curves
+metric_curves(
+    report=report,
+    history=train.history,
+    start_epoch=start_epoch,
+    key="mae",
+    ylabel="Mean absolute error",
+    title="Metric curves",
+    validation_set=(TRAIN_RATIO != 1.0),
+    colors=["#d01c8b", "#4dac26"],
+    labels=["training set", "validation set"],
+    legend_loc=None,
+    yscale="linear",
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/metric-curves",
+)
+
+report.add_markdown("<br>")
+
+#### Attention weights
+for head_id in range(attn_weights.shape[1]):
+    attention_plot(
+        report=report,
+        attn_weights=attn_weights,
+        head_id=head_id,
+        save_figure=args.saving,
+        export_fname=f"{export_img_dirname}/attn-plot",
     )
-plt.legend(loc="upper right", fontsize=10)
-if args.saving:
-    plt.savefig(fname=f"{export_img_fname}/metric-curves.png")
-report.add_figure(options="width=45%")
-plt.close()
 
 report.add_markdown("---")
 
 ## Validation plots
 report.add_markdown('<h2 align="center">Validation plots</h2>')
 
+photon_x = photon_val[:, :, 0].flatten()
+photon_y = photon_val[:, :, 1].flatten()
+photon_energy = photon_val[:, :, 2].flatten()
+
+cluster_x = cluster_val[:, :, 0].flatten()
+cluster_y = cluster_val[:, :, 1].flatten()
+cluster_energy = cluster_val[:, :, 2].flatten()
+
+output_x = output[:, :, 0].flatten()
+output_y = output[:, :, 1].flatten()
+output_energy = output[:, :, 2].flatten()
+
+w = weight_val.flatten()
+
 #### X histogram
-plt.figure(figsize=(8, 5), dpi=100)
-plt.xlabel("$x$ coordinate", fontsize=12)
-plt.ylabel("Candidates", fontsize=12)
-x_min = Y[:, :, 0].numpy().flatten().min()
-x_max = Y[:, :, 0].numpy().flatten().max()
-x_bins = np.linspace(x_min, x_max, 101)
-plt.hist(
-    Y[:, :, 0].numpy().flatten(), bins=x_bins, color="#3288bd", label="Training data"
-)
-plt.hist(
-    out[:, :, 0].numpy().flatten(),
-    bins=x_bins,
-    histtype="step",
-    color="#fc8d59",
-    lw=2,
-    label="Transformer output",
-)
-plt.yscale("log")
-plt.legend(loc="upper left", fontsize=10)
-if args.saving:
-    plt.savefig(f"{export_img_fname}/x-hist.png")
-report.add_figure(options="width=45%")
-plt.close()
+for log_scale in [False, True]:
+    validation_histogram(
+        report=report,
+        data_ref=cluster_x,
+        data_gen=output_x,
+        weights_ref=w,
+        weights_gen=w,
+        xlabel="Preprocessed $x$-coordinate [a.u.]",
+        density=False,
+        ref_label="Training data",
+        gen_label="Transformer output",
+        log_scale=log_scale,
+        legend_loc="upper right",
+        save_figure=args.saving,
+        export_fname=f"{export_img_dirname}/x-hist",
+    )
 
 #### Y histogram
-plt.figure(figsize=(8, 5), dpi=100)
-plt.xlabel("$y$ coordinate", fontsize=12)
-plt.ylabel("Candidates", fontsize=12)
-y_min = Y[:, :, 1].numpy().flatten().min()
-y_max = Y[:, :, 1].numpy().flatten().max()
-y_bins = np.linspace(y_min, y_max, 101)
-plt.hist(
-    Y[:, :, 1].numpy().flatten(), bins=y_bins, color="#3288bd", label="Training data"
-)
-plt.hist(
-    out[:, :, 1].numpy().flatten(),
-    bins=y_bins,
-    histtype="step",
-    color="#fc8d59",
-    lw=2,
-    label="Transformer output",
-)
-plt.yscale("log")
-plt.legend(loc="upper left", fontsize=10)
-if args.saving:
-    plt.savefig(f"{export_img_fname}/y-hist.png")
-report.add_figure(options="width=45%")
-plt.close()
-
-#### XY 2D-histogram
-plt.figure(figsize=(16, 5), dpi=100)
-plt.subplot(1, 2, 1)
-plt.title("Training data", fontsize=14)
-plt.xlabel("$x$ coordinate", fontsize=12)
-plt.ylabel("$y$ coordinate", fontsize=12)
-plt.hist2d(
-    Y[:, :, 0].numpy().flatten(),
-    Y[:, :, 1].numpy().flatten(),
-    weights=Y[:, :, 2].numpy().flatten(),
-    bins=(x_bins, y_bins),
-    cmin=0,
-    cmap="gist_heat",
-)
-plt.subplot(1, 2, 2)
-plt.title("Transformer output", fontsize=14)
-plt.xlabel("$x$ coordinate", fontsize=12)
-plt.ylabel("$y$ coordinate", fontsize=12)
-plt.hist2d(
-    out[:, :, 0].numpy().flatten(),
-    out[:, :, 1].numpy().flatten(),
-    weights=out[:, :, 2].numpy().flatten(),
-    bins=(x_bins, y_bins),
-    cmin=0,
-    cmap="gist_heat",
-)
-if args.saving:
-    plt.savefig(f"{export_img_fname}/xy-hist2d.png")
-report.add_figure(options="width=95%")
-plt.close()
-
-#### Event examples
-for i in range(4):
-    evt = int(np.random.uniform(0, chunk_size))
-    plt.figure(figsize=(8, 6), dpi=100)
-    plt.xlabel("$x$ coordinate", fontsize=12)
-    plt.ylabel("$y$ coordinate", fontsize=12)
-    plt.scatter(
-        X[evt, :, 0].numpy().flatten(),
-        X[evt, :, 1].numpy().flatten(),
-        s=50 * X[evt, :, 2].numpy().flatten() / Y[evt, :, 2].numpy().flatten().max(),
-        marker="o",
-        facecolors="none",
-        edgecolors="#d7191c",
-        lw=0.75,
-        label="True photon",
+for log_scale in [False, True]:
+    validation_histogram(
+        report=report,
+        data_ref=cluster_y,
+        data_gen=output_y,
+        weights_ref=w,
+        weights_gen=w,
+        xlabel="Preprocessed $y$-coordinate [a.u.]",
+        density=False,
+        ref_label="Training data",
+        gen_label="Transformer output",
+        log_scale=log_scale,
+        legend_loc="upper right",
+        save_figure=args.saving,
+        export_fname=f"{export_img_dirname}/y-hist",
     )
-    plt.scatter(
-        Y[evt, :, 0].numpy().flatten(),
-        Y[evt, :, 1].numpy().flatten(),
-        s=50 * Y[evt, :, 2].numpy().flatten() / Y[evt, :, 2].numpy().flatten().max(),
-        marker="s",
-        facecolors="none",
-        edgecolors="#2b83ba",
-        lw=0.75,
-        label="Calo neutral cluster",
-    )
-    plt.scatter(
-        out[evt, :, 0].numpy().flatten(),
-        out[evt, :, 1].numpy().flatten(),
-        s=50 * out[evt, :, 2].numpy().flatten() / Y[evt, :, 2].numpy().flatten().max(),
-        marker="^",
-        facecolors="none",
-        edgecolors="#1a9641",
-        lw=0.75,
-        label="Transformer output",
-    )
-    plt.legend()
-    if args.saving:
-        plt.savefig(f"{export_img_fname}/evt-example-{i}.png")
-    report.add_figure(options="width=45%")
-plt.close()
 
 #### Energy histogram
-plt.figure(figsize=(8, 5), dpi=100)
-plt.xlabel("Preprocessed energy [a.u]", fontsize=12)
-plt.ylabel("Candidates", fontsize=12)
-e_min = Y[:, :, 2].numpy().flatten().min()
-e_max = Y[:, :, 2].numpy().flatten().max()
-e_bins = np.linspace(e_min, e_max, 101)
-plt.hist(
-    Y[:, :, 2].numpy().flatten(), bins=e_bins, color="#3288bd", label="Training data"
-)
-plt.hist(
-    out[:, :, 2].numpy().flatten(),
-    bins=e_bins,
-    histtype="step",
-    color="#fc8d59",
-    lw=2,
-    label="Transformer output",
-)
-plt.yscale("log")
-plt.legend(loc="upper left", fontsize=10)
-if args.saving:
-    plt.savefig(f"{export_img_fname}/energy-hist.png")
-report.add_figure(options="width=45%")
-plt.close()
+for log_scale in [False, True]:
+    validation_histogram(
+        report=report,
+        data_ref=cluster_energy,
+        data_gen=output_energy,
+        weights_ref=w,
+        weights_gen=w,
+        xlabel="Preprocessed energy [a.u.]",
+        density=False,
+        ref_label="Training data",
+        gen_label="Transformer output",
+        log_scale=log_scale,
+        legend_loc="upper right",
+        save_figure=args.saving,
+        export_fname=f"{export_img_dirname}/energy-hist",
+    )
 
-#### Energy batches plot
-plt.figure(figsize=(16, 10), dpi=100)
-plt.subplot(1, 2, 1)
-plt.title("Training data", fontsize=14)
-plt.xlabel("Cluster energy deposits", fontsize=12)
-plt.ylabel("Events", fontsize=12)
-plt.imshow(Y[:128, :, 2].numpy(), aspect="auto", interpolation="none")
-plt.subplot(1, 2, 2)
-plt.title("Transformer output", fontsize=14)
-plt.xlabel("Cluster energy deposits", fontsize=12)
-plt.ylabel("Events", fontsize=12)
-plt.imshow(out[:128, :, 2].numpy(), aspect="auto", interpolation="none")
-if args.saving:
-    plt.savefig(f"{export_img_fname}/energy-batches.png")
-report.add_figure(options="width=95%")
-plt.close()
+#### Calorimeter deposits
+for log_scale in [False, True]:
+    calorimeter_deposits(
+        report=report,
+        ref_xy=(cluster_x, cluster_y),
+        gen_xy=(output_x, output_y),
+        ref_energy=cluster_energy * w,
+        gen_energy=output_energy * w,
+        min_energy=0.0,
+        model_name="Transformer",
+        log_scale=log_scale,
+        save_figure=args.saving,
+        export_fname=f"{export_img_dirname}/calo-deposits",
+    )
+
+#### Event examples
+cluster_mean_energy = np.mean(cluster_val[:, :, 2], axis=-1)
+events = np.argsort(cluster_mean_energy)[::-1][:4]
+for i, evt in enumerate(events):
+    event_example(
+        report=report,
+        photon_xy=(photon_val[evt, :, 0].flatten(), photon_val[evt, :, 1].flatten()),
+        cluster_xy=(cluster_val[evt, :, 0].flatten(), cluster_val[evt, :, 1].flatten()),
+        output_xy=(output[evt, :, 0].flatten(), output[evt, :, 1].flatten()),
+        photon_energy=photon_val[evt, :, 2].flatten(),
+        cluster_energy=cluster_val[evt, :, 2].flatten(),
+        output_energy=output[evt, :, 2].flatten(),
+        min_energy=0.0,
+        model_name="Transformer",
+        save_figure=args.saving,
+        export_fname=f"{export_img_dirname}/evt-example-{i}",
+    )
+
+#### Energy sequences
+energy_sequences(
+    report=report,
+    ref_energy=cluster_val[:64, :, 2],
+    gen_energy=output[:64, :, 2],
+    min_energy=0.0,
+    model_name="Transformer",
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/energy-seq",
+)
+
+#### Photon-to-cluster correlations
+photon2cluster_corr(
+    report,
+    photon=photon_val,
+    cluster=cluster_val,
+    output=output,
+    min_energy=0.0,
+    log_scale=True,
+    save_figure=args.saving,
+    export_fname=f"{export_img_dirname}/gamma2calo-corr",
+)
 
 report.add_markdown("---")
 

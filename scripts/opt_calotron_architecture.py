@@ -22,19 +22,19 @@ from utils import (
 )
 
 from calotron.callbacks.schedulers import LearnRateExpDecay
-from calotron.losses import PhotonClusterMatch
+from calotron.losses import MeanSquaredError
 from calotron.models import Calotron
 from calotron.models.discriminators import Discriminator
 from calotron.models.transformers import MaskedTransformer
-from calotron.optimization.scores import EMDistance
+from calotron.optimization.callbacks import HopaasPruner
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
-STUDY_NAME = "Calotron::AdvTerm::v2"
+STUDY_NAME = "Calotron::ModArch::Testv0"
 DTYPE = np.float32
 TRAIN_RATIO = 0.7
 BATCHSIZE = 256
-EPOCHS = 350
+EPOCHS = 500
 
 # +------------------+
 # |   Parser setup   |
@@ -44,7 +44,11 @@ parser = ArgumentParser(description="calotron optimization setup")
 
 parser.add_argument("--saving", action="store_true")
 parser.add_argument("--no-saving", dest="saving", action="store_false")
-parser.set_defaults(saving=True)
+parser.set_defaults(saving=False)
+
+parser.add_argument("--weights", action="store_true")
+parser.add_argument("--no-weights", dest="weights", action="store_false")
+parser.set_defaults(weights=True)
 
 address = socket.gethostbyname(socket.gethostname())
 parser.add_argument("-n", "--node_name", default=f"{address}")
@@ -91,11 +95,11 @@ client = hpc.Client(server=server, token=token)
 # +----------------------+
 
 properties = {
-    "alpha": hpc.suggestions.Float(0.0, 1.0),
-    "t_lr0": hpc.suggestions.Float(5e-5, 5e-4),
-    "d_lr0": hpc.suggestions.Float(1e-5, 1e-4),
-    "t_ds": hpc.suggestions.Int(10_000, 200_000, step=10_000),
-    "d_ds": hpc.suggestions.Int(10_000, 200_000, step=10_000),
+    "enc_d": hpc.suggestions.Int(4, 32, step=4),
+    "dec_d": hpc.suggestions.Int(4, 32, step=4),
+    "lat_d": hpc.suggestions.Int(4, 64, step=4),
+    "so_norm": hpc.suggestions.Float(100, 10_000),
+    "res_s": hpc.suggestions.Categorical(["true", "false"]),
 }
 
 properties.update(
@@ -107,7 +111,12 @@ study = hpc.Study(
     properties=properties,
     special_properties={"address": address, "node_name": str(args.node_name)},
     direction="minimize",
-    pruner=hpc.pruners.NopPruner(),
+    pruner=hpc.pruners.MedianPruner(
+        n_startup_trials=20,
+        n_warmup_steps=50,
+        interval_steps=1,
+        n_min_trials=10
+    ),
     sampler=hpc.samplers.TPESampler(n_startup_trials=50),
     client=client,
 )
@@ -119,14 +128,19 @@ with study.trial() as trial:
     # |   Data loading   |
     # +------------------+
 
-    npzfile = np.load(f"{data_dir}/trainset-demo-v1.npz")
-    photon = npzfile["photon"].astype(DTYPE)[:100_000]
-    cluster = npzfile["cluster"].astype(DTYPE)[:100_000]
+    npzfile = np.load(f"{data_dir}/calotron-dataset-demo.npz")
+    photon = npzfile["photon"].astype(DTYPE)[:150_000]
+    cluster = npzfile["cluster"].astype(DTYPE)[:150_000]
+    weight = npzfile["weight"].astype(DTYPE)[:150_000]
 
     print(f"[INFO] Generated photons - shape: {photon.shape}")
     print(f"[INFO] Reconstructed clusters - shape: {cluster.shape}")
+    print(f"[INFO] Matching weights - shape: {weight.shape}")
 
-    photon, cluster = shuffle(photon, cluster)
+    if not args.weights:
+        weight = (weight > 0.0).astype(DTYPE)
+
+    photon, cluster, weight = shuffle(photon, cluster, weight)
 
     chunk_size = photon.shape[0]
     train_size = int(TRAIN_RATIO * chunk_size)
@@ -137,8 +151,9 @@ with study.trial() as trial:
 
     photon_train = photon[:train_size]
     cluster_train = cluster[:train_size]
+    weight_train = weight[:train_size]
     train_ds = (
-        tf.data.Dataset.from_tensor_slices((photon_train, cluster_train))
+        tf.data.Dataset.from_tensor_slices((photon_train, cluster_train, weight_train))
         .batch(hp.get("batch_size", BATCHSIZE), drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
@@ -147,8 +162,9 @@ with study.trial() as trial:
     if TRAIN_RATIO != 1.0:
         photon_val = photon[train_size:]
         cluster_val = cluster[train_size:]
+        weight_val = weight[train_size:]
         val_ds = (
-            tf.data.Dataset.from_tensor_slices((photon_val, cluster_val))
+            tf.data.Dataset.from_tensor_slices((photon_val, cluster_val, weight_val))
             .batch(BATCHSIZE, drop_remainder=True)
             .cache()
             .prefetch(tf.data.AUTOTUNE)
@@ -156,31 +172,39 @@ with study.trial() as trial:
     else:
         photon_val = photon_train
         cluster_val = cluster_train
+        weight_val = weight_train
         val_ds = None
 
     # +------------------------+
     # |   Model construction   |
     # +------------------------+
 
+    encoder_depth = int(trial.enc_d) if trial.res_s == "true" else int(trial.lat_d)
+    decoder_depth = int(trial.dec_d) if trial.res_s == "true" else int(trial.lat_d)
+    seq_ord_latent_dims = int(trial.lat_d)
+    seq_ord_normalizations = float(trial.so_norm)
+    enable_residual_smoothing = trial.res_s == "true"
+
     transformer = MaskedTransformer(
-        output_depth=hp.get("t_output_depth", cluster.shape[2]),
-        encoder_depth=hp.get("t_encoder_depth", 32),
-        decoder_depth=hp.get("t_decoder_depth", 32),
-        num_layers=hp.get("t_num_layers", 5),
-        num_heads=hp.get("t_num_heads", 4),
-        key_dims=hp.get("t_key_dims", 64),
-        mlp_units=hp.get("t_mlp_units", 128),
-        dropout_rates=hp.get("t_dropout_rates", 0.1),
-        seq_ord_latent_dims=hp.get("t_seq_ord_latent_dims", 64),
+        output_depth=hp.get("output_depth", cluster.shape[2]),
+        encoder_depth=hp.get("encoder_depth", encoder_depth),
+        decoder_depth=hp.get("decoder_depth", decoder_depth),
+        num_layers=hp.get("num_layers", 5),
+        num_heads=hp.get("num_heads", 4),
+        key_dims=hp.get("key_dims", 64),
+        mlp_units=hp.get("mlp_units", 128),
+        dropout_rates=hp.get("dropout_rates", 0.1),
+        seq_ord_latent_dims=hp.get("seq_ord_latent_dims", seq_ord_latent_dims),
         seq_ord_max_lengths=hp.get(
-            "t_seq_ord_max_lengths", [photon.shape[1], cluster.shape[1]]
+            "seq_ord_max_lengths", [photon.shape[1], cluster.shape[1]]
         ),
-        seq_ord_normalizations=hp.get("t_seq_ord_normalizations", 10_000),
-        attn_mask_init_nonzero_size=hp.get("t_attn_mask_init_nonzero_size", 8),
-        enable_residual_smoothing=hp.get("t_enable_residual_smoothing", True),
-        enable_attention_mask=hp.get("t_enable_attention_mask", False),
-        output_activations=hp.get("t_output_activations", ["tanh", "tanh", "sigmoid"]),
-        start_token_initializer=hp.get("t_start_toke_initializer", "ones"),
+        seq_ord_normalizations=hp.get("seq_ord_normalizations", seq_ord_normalizations),
+        attn_mask_init_nonzero_size=hp.get("attn_mask_init_nonzero_size", 8),
+        enable_residual_smoothing=hp.get("enable_residual_smoothing", enable_residual_smoothing),
+        enable_source_baseline=hp.get("enable_source_baseline", True),
+        enable_attention_mask=hp.get("enable_attention_mask", False),
+        output_activations=hp.get("output_activations", None),
+        start_token_initializer=hp.get("start_toke_initializer", "ones"),
         dtype=DTYPE,
     )
 
@@ -194,9 +218,7 @@ with study.trial() as trial:
         dtype=DTYPE,
     )
 
-    model = Calotron(
-        transformer=transformer, discriminator=discriminator, aux_classifier=None
-    )
+    model = Calotron(transformer=transformer, discriminator=discriminator)
 
     output = model((photon[:BATCHSIZE], cluster[:BATCHSIZE]))
     model.summary()
@@ -206,39 +228,35 @@ with study.trial() as trial:
     # +----------------------+
 
     hp.get("t_optimizer", "RMSprop")
-    t_opt = tf.keras.optimizers.RMSprop(hp.get("t_lr0", trial.t_lr0))
+    t_opt = tf.keras.optimizers.RMSprop(hp.get("t_lr0", 1e-3))
 
     hp.get("d_optimizer", "RMSprop")
-    d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", trial.d_lr0))
+    d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", 1e-4))
 
     # +----------------------------+
     # |   Training configuration   |
     # +----------------------------+
 
-    hp.get("loss", "PhotonClusterMatch")
-    loss = PhotonClusterMatch(
-        alpha=hp.get("loss_alpha", trial.alpha),
-        max_match_distance=hp.get("loss_max_match_distance", 1e-3),
+    loss = MeanSquaredError(
+        warmup_energy=hp.get("warmup_energy", 0.0),
+        alpha=hp.get("loss_alpha", 0.0),
         adversarial_metric=hp.get("loss_adversarial_metric", "wasserstein-distance"),
+        bce_options=hp.get(
+            "loss_bce_options", {"injected_noise_stddev": 0.01, "label_smoothing": 0.1}
+        ),
         wass_options=hp.get(
-            "loss_wass_options",
-            {
-                "lipschitz_penalty": 100.0,
-                "virtual_direction_upds": 1,
-                "ignore_padding": False,
-            },
+            "loss_wass_options", {"lipschitz_penalty": 100.0, "virtual_direction_upds": 1}
         ),
     )
+    hp.get("loss", loss.name)
 
     model.compile(
         loss=loss,
         metrics=hp.get("metrics", ["wass_dist"]),
         transformer_optimizer=t_opt,
         discriminator_optimizer=d_opt,
-        aux_classifier_optimizer=None,
-        transformer_upds_per_batch=hp.get("transformer_upds_per_batch", 1),
+        transformer_upds_per_batch=hp.get("Calotron_upds_per_batch", 1),
         discriminator_upds_per_batch=hp.get("discriminator_upds_per_batch", 1),
-        aux_classifier_upds_per_batch=None,
     )
 
     # +--------------------------+
@@ -250,7 +268,7 @@ with study.trial() as trial:
     t_sched = LearnRateExpDecay(
         model.transformer_optimizer,
         decay_rate=hp.get("t_decay_rate", 0.10),
-        decay_steps=hp.get("t_decay_steps", trial.t_ds),
+        decay_steps=hp.get("t_decay_steps", 100_000),
         min_learning_rate=hp.get("t_min_learning_rate", 1e-6),
     )
     hp.get("t_sched", "LearnRateExpDecay")
@@ -259,11 +277,19 @@ with study.trial() as trial:
     d_sched = LearnRateExpDecay(
         model.discriminator_optimizer,
         decay_rate=hp.get("d_decay_rate", 0.10),
-        decay_steps=hp.get("d_decay_steps", trial.d_ds),
+        decay_steps=hp.get("d_decay_steps", 50_000),
         min_learning_rate=hp.get("d_min_learning_rate", 1e-6),
     )
     hp.get("d_sched", "LearnRateExpDecay")
     callbacks.append(d_sched)
+
+    pruner = HopaasPruner(
+        trial=trial,
+        loss_name="val_wass_dist",
+        report_frequency=1,
+        enable_pruning=True,
+    )
+    callbacks.append(pruner)
 
     # +------------------------+
     # |   Training procedure   |
@@ -302,6 +328,7 @@ with study.trial() as trial:
     output, attn_weights = [exp_out.numpy() for exp_out in exp_sim(dataset)]
     photon_val = photon_val[: len(output)]
     cluster_val = cluster_val[: len(output)]
+    weight_val = weight_val[: len(output)]
 
     # +------------------+
     # |   Model export   |
@@ -337,6 +364,12 @@ with study.trial() as trial:
         f"- Model training completed in **{duration}**",
         f"- Report generated on **{date}** at **{hour}**",
     ]
+    
+    if args.weights:
+        info += ["- Model trained with **matching weights**"]
+    else:
+        info += ["- Model trained **avoiding padded values**"]
+
     report.add_markdown("\n".join([i for i in info]))
 
     report.add_markdown("---")
@@ -384,7 +417,7 @@ with study.trial() as trial:
         legend_loc=None,
         save_figure=args.saving,
         scale_curves=True,
-        export_fname=f"{export_img_dirname}/learn-curves.png",
+        export_fname=f"{export_img_dirname}/learn-curves",
     )
 
     #### Learning rate scheduling
@@ -397,7 +430,7 @@ with study.trial() as trial:
         labels=["transformer", "discriminator"],
         legend_loc="upper right",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/lr-sched.png",
+        export_fname=f"{export_img_dirname}/lr-sched",
     )
 
     #### Transformer loss
@@ -412,9 +445,9 @@ with study.trial() as trial:
         colors=["#d01c8b", "#4dac26"],
         labels=["training set", "validation set"],
         legend_loc=None,
-        yscale="log",
+        yscale="linear",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/transf-loss.png",
+        export_fname=f"{export_img_dirname}/transf-loss",
     )
 
     #### Discriminator loss
@@ -431,7 +464,7 @@ with study.trial() as trial:
         legend_loc=None,
         yscale="linear",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/disc-loss.png",
+        export_fname=f"{export_img_dirname}/disc-loss",
     )
 
     #### Wass curves
@@ -448,7 +481,7 @@ with study.trial() as trial:
         legend_loc=None,
         yscale="linear",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/wass-curves.png",
+        export_fname=f"{export_img_dirname}/wass-curves",
     )
 
     report.add_markdown("<br>")
@@ -460,7 +493,7 @@ with study.trial() as trial:
             attn_weights=attn_weights,
             head_id=head_id,
             save_figure=args.saving,
-            export_fname=f"{export_img_dirname}/attn-plot.png",
+            export_fname=f"{export_img_dirname}/attn-plot",
         )
 
     report.add_markdown("---")
@@ -468,26 +501,19 @@ with study.trial() as trial:
     ## Validation plots
     report.add_markdown('<h2 align="center">Validation plots</h2>')
 
-    photon_xy = np.tile(photon_val[:, None, :, :2], (1, cluster_val.shape[1], 1, 1))
-    cluster_xy = np.tile(cluster_val[:, :, None, :2], (1, 1, photon_val.shape[1], 1))
-    pairwise_distance = np.linalg.norm(cluster_xy - photon_xy, axis=-1)
-    cluster_matched = pairwise_distance.min(axis=-1) <= loss.max_match_distance
+    photon_x = photon_val[:, :, 0].flatten()
+    photon_y = photon_val[:, :, 1].flatten()
+    photon_energy = photon_val[:, :, 2].flatten()
 
     cluster_x = cluster_val[:, :, 0].flatten()
     cluster_y = cluster_val[:, :, 1].flatten()
     cluster_energy = cluster_val[:, :, 2].flatten()
 
-    cluster_x_matched = cluster_val[:, :, 0][cluster_matched].flatten()
-    cluster_y_matched = cluster_val[:, :, 1][cluster_matched].flatten()
-    cluster_energy_matched = cluster_val[:, :, 2][cluster_matched].flatten()
-
     output_x = output[:, :, 0].flatten()
     output_y = output[:, :, 1].flatten()
     output_energy = output[:, :, 2].flatten()
 
-    output_x_matched = output[:, :, 0][cluster_matched].flatten()
-    output_y_matched = output[:, :, 1][cluster_matched].flatten()
-    output_energy_matched = output[:, :, 2][cluster_matched].flatten()
+    w = weight_val.flatten()
 
     #### X histogram
     for log_scale in [False, True]:
@@ -495,32 +521,16 @@ with study.trial() as trial:
             report=report,
             data_ref=cluster_x,
             data_gen=output_x,
-            weights_ref=cluster_energy,
-            weights_gen=output_energy,
-            xlabel="Weighted $x$-coordinate",
+            weights_ref=w,
+            weights_gen=w,
+            xlabel="Preprocessed $x$-coordinate [a.u.]",
+            density=False,
             ref_label="Training data",
             gen_label="Calotron output",
             log_scale=log_scale,
             legend_loc="upper right",
             save_figure=args.saving,
-            export_fname=f"{export_img_dirname}/x-hist.png",
-        )
-
-    #### X histogram (matched clusters)
-    for log_scale in [False, True]:
-        validation_histogram(
-            report=report,
-            data_ref=cluster_x_matched,
-            data_gen=output_x_matched,
-            weights_ref=cluster_energy_matched,
-            weights_gen=output_energy_matched,
-            xlabel="Weighted $x$-coordinate of matched clusters",
-            ref_label="Training data",
-            gen_label="Calotron output",
-            log_scale=log_scale,
-            legend_loc="upper right",
-            save_figure=args.saving,
-            export_fname=f"{export_img_dirname}/x-match-hist.png",
+            export_fname=f"{export_img_dirname}/x-hist",
         )
 
     #### Y histogram
@@ -529,64 +539,16 @@ with study.trial() as trial:
             report=report,
             data_ref=cluster_y,
             data_gen=output_y,
-            weights_ref=cluster_energy,
-            weights_gen=output_energy,
-            xlabel="Weighted $y$-coordinate",
+            weights_ref=w,
+            weights_gen=w,
+            xlabel="Preprocessed $y$-coordinate [a.u.]",
+            density=False,
             ref_label="Training data",
             gen_label="Calotron output",
             log_scale=log_scale,
             legend_loc="upper right",
             save_figure=args.saving,
-            export_fname=f"{export_img_dirname}/y-hist.png",
-        )
-
-    #### Y histogram (matched clusters)
-    for log_scale in [False, True]:
-        validation_histogram(
-            report=report,
-            data_ref=cluster_y_matched,
-            data_gen=output_y_matched,
-            weights_ref=cluster_energy_matched,
-            weights_gen=output_energy_matched,
-            xlabel="Weighted $y$-coordinate of matched clusters",
-            ref_label="Training data",
-            gen_label="Calotron output",
-            log_scale=log_scale,
-            legend_loc="upper right",
-            save_figure=args.saving,
-            export_fname=f"{export_img_dirname}/y-match-hist.png",
-        )
-
-    #### Calorimeter deposits
-    calorimeter_deposits(
-        report=report,
-        ref_xy=(cluster_val[:, :, 0].flatten(), cluster_val[:, :, 1].flatten()),
-        gen_xy=(output[:, :, 0].flatten(), output[:, :, 1].flatten()),
-        ref_energy=cluster_val[:, :, 2].flatten(),
-        gen_energy=output[:, :, 2].flatten(),
-        save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/calo-deposits.png",
-    )
-
-    #### Event examples
-    for i in range(4):
-        evt = int(np.random.uniform(0, len(cluster_val)))
-        event_example(
-            report=report,
-            photon_xy=(
-                photon_val[evt, :, 0].flatten(),
-                photon_val[evt, :, 1].flatten(),
-            ),
-            cluster_xy=(
-                cluster_val[evt, :, 0].flatten(),
-                cluster_val[evt, :, 1].flatten(),
-            ),
-            output_xy=(output[evt, :, 0].flatten(), output[evt, :, 1].flatten()),
-            photon_energy=photon_val[evt, :, 2].flatten(),
-            cluster_energy=cluster_val[evt, :, 2].flatten(),
-            output_energy=output[evt, :, 2].flatten(),
-            save_figure=args.saving,
-            export_fname=f"{export_img_dirname}/evt-example-{i}.png",
+            export_fname=f"{export_img_dirname}/y-hist",
         )
 
     #### Energy histogram
@@ -595,32 +557,49 @@ with study.trial() as trial:
             report=report,
             data_ref=cluster_energy,
             data_gen=output_energy,
-            weights_ref=cluster_energy,
-            weights_gen=output_energy,
-            xlabel="Weighted preprocessed energy",
+            weights_ref=w,
+            weights_gen=w,
+            xlabel="Preprocessed energy [a.u.]",
+            density=False,
             ref_label="Training data",
             gen_label="Calotron output",
             log_scale=log_scale,
             legend_loc="upper right",
             save_figure=args.saving,
-            export_fname=f"{export_img_dirname}/energy-hist.png",
+            export_fname=f"{export_img_dirname}/energy-hist",
         )
 
-    #### Energy histogram (matched clusters)
+    #### Calorimeter deposits
     for log_scale in [False, True]:
-        validation_histogram(
+        calorimeter_deposits(
             report=report,
-            data_ref=cluster_energy_matched,
-            data_gen=output_energy_matched,
-            weights_ref=cluster_energy_matched,
-            weights_gen=output_energy_matched,
-            xlabel="Weighted preprocessed energy of matched clusters",
-            ref_label="Training data",
-            gen_label="Calotron output",
+            ref_xy=(cluster_x, cluster_y),
+            gen_xy=(output_x, output_y),
+            ref_energy=cluster_energy * w,
+            gen_energy=output_energy * w,
+            min_energy=0.0,
+            model_name="Calotron",
             log_scale=log_scale,
-            legend_loc="upper right",
             save_figure=args.saving,
-            export_fname=f"{export_img_dirname}/energy-match-hist.png",
+            export_fname=f"{export_img_dirname}/calo-deposits",
+        )
+
+    #### Event examples
+    cluster_mean_energy = np.mean(cluster_val[:, :, 2], axis=-1)
+    events = np.argsort(cluster_mean_energy)[::-1][:4]
+    for i, evt in enumerate(events):
+        event_example(
+            report=report,
+            photon_xy=(photon_val[evt, :, 0].flatten(), photon_val[evt, :, 1].flatten()),
+            cluster_xy=(cluster_val[evt, :, 0].flatten(), cluster_val[evt, :, 1].flatten()),
+            output_xy=(output[evt, :, 0].flatten(), output[evt, :, 1].flatten()),
+            photon_energy=photon_val[evt, :, 2].flatten(),
+            cluster_energy=cluster_val[evt, :, 2].flatten(),
+            output_energy=output[evt, :, 2].flatten(),
+            min_energy=0.0,
+            model_name="Calotron",
+            save_figure=args.saving,
+            export_fname=f"{export_img_dirname}/evt-example-{i}",
         )
 
     #### Energy sequences
@@ -628,20 +607,22 @@ with study.trial() as trial:
         report=report,
         ref_energy=cluster_val[:64, :, 2],
         gen_energy=output[:64, :, 2],
+        min_energy=0.0,
+        model_name="Calotron",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/energy-seq.png",
+        export_fname=f"{export_img_dirname}/energy-seq",
     )
 
     #### Photon-to-cluster correlations
     photon2cluster_corr(
         report,
-        photon_energy=(
-            0.5 * (photon_val[:, 0::2, 2] + photon_val[:, 1::2, 2])
-        ).flatten(),
-        cluster_energy=cluster_val[:, :, 2].flatten(),
-        output_energy=output[:, :, 2].flatten(),
+        photon=photon_val,
+        cluster=cluster_val,
+        output=output,
+        min_energy=0.0,
+        log_scale=True,
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/gamma2calo-corr.png",
+        export_fname=f"{export_img_dirname}/gamma2calo-corr",
     )
 
     report.add_markdown("---")
@@ -649,38 +630,4 @@ with study.trial() as trial:
     report_fname = f"{reports_dir}/{prefix}_train-report.html"
     report.write_report(filename=report_fname)
     print(f"[INFO] Training report correctly exported to {report_fname}")
-
-    # +--------------------------------+
-    # |   Feedbacks to Hopaas server   |
-    # +--------------------------------+
-
-    EMD = EMDistance(dtype=DTYPE)
-
-    emd_x = EMD(
-        x_true=cluster_val[:, :, 0].flatten(),
-        x_pred=output[:, :, 0].flatten(),
-        bins=np.linspace(-1.0, 1.0, 101),
-        weights_true=cluster_val[:, :, 2].flatten(),
-        weights_pred=output[:, :, 2].flatten(),
-    )
-
-    emd_y = EMD(
-        x_true=cluster_val[:, :, 1].flatten(),
-        x_pred=output[:, :, 1].flatten(),
-        bins=np.linspace(-1.0, 1.0, 101),
-        weights_true=cluster_val[:, :, 2].flatten(),
-        weights_pred=output[:, :, 2].flatten(),
-    )
-
-    emd_energy = EMD(
-        x_true=cluster_val[:, :, 2].flatten(),
-        x_pred=output[:, :, 2].flatten(),
-        bins=np.linspace(0.0, 1.0, 101),
-        weights_true=cluster_val[:, :, 2].flatten(),
-        weights_pred=output[:, :, 2].flatten(),
-    )
-
-    final_score = 0.5 * (emd_x + emd_y) + emd_energy
-    trial.loss = final_score
-
-    print(f"[INFO] The trained model of Trial n. {trial.id} scored {final_score:.2f}")
+    print(f"[INFO] The trained model of Trial n. {trial.id} scored {train.history['val_wass_dist'][-1]:.3f}")

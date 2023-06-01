@@ -20,21 +20,21 @@ from utils import (
     validation_histogram,
 )
 
-from calotron.callbacks.schedulers import ExponentialDecay
-from calotron.losses import PhotonClusterMatch
+from calotron.callbacks.schedulers import AdvExpDamping, LearnRateExpDecay
+from calotron.losses import MeanSquaredError
 from calotron.models import Calotron
 from calotron.models.discriminators import Discriminator
 from calotron.models.transformers import MaskedTransformer
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
-VERSION = "v0"
 DTYPE = np.float32
 ADV_METRIC = "wass"
 TRAIN_RATIO = 0.7
 BATCHSIZE = 256
-EPOCHS = 400
-ALPHA = 0.7
+EPOCHS = 100
+ALPHA = 1e-2
+ALPHA_DAMPING = False
 
 # +------------------+
 # |   Parser setup   |
@@ -44,7 +44,15 @@ parser = ArgumentParser(description="calotron training setup")
 
 parser.add_argument("--saving", action="store_true")
 parser.add_argument("--no-saving", dest="saving", action="store_false")
-parser.set_defaults(saving=True)
+parser.set_defaults(saving=False)
+
+parser.add_argument("--weights", action="store_true")
+parser.add_argument("--no-weights", dest="weights", action="store_false")
+parser.set_defaults(weights=True)
+
+parser.add_argument("--test", action="store_true")
+parser.add_argument("--no-test", dest="test", action="store_false")
+parser.set_defaults(test=False)
 
 args = parser.parse_args()
 
@@ -66,14 +74,19 @@ reports_dir = config_dir["reports_dir"]
 # |   Data loading   |
 # +------------------+
 
-npzfile = np.load(f"{data_dir}/trainset-demo-{VERSION}.npz")
-photon = npzfile["photon"].astype(DTYPE)
-cluster = npzfile["cluster"].astype(DTYPE)
+npzfile = np.load(f"{data_dir}/calotron-dataset-demo.npz")
+photon = npzfile["photon"].astype(DTYPE)[:50_000]
+cluster = npzfile["cluster"].astype(DTYPE)[:50_000]
+weight = npzfile["weight"].astype(DTYPE)[:50_000]
 
 print(f"[INFO] Generated photons - shape: {photon.shape}")
 print(f"[INFO] Reconstructed clusters - shape: {cluster.shape}")
+print(f"[INFO] Matching weights - shape: {weight.shape}")
 
-photon, cluster = shuffle(photon, cluster)
+if not args.weights:
+    weight = (weight > 0.0).astype(DTYPE)
+
+photon, cluster, weight = shuffle(photon, cluster, weight)
 
 chunk_size = photon.shape[0]
 train_size = int(TRAIN_RATIO * chunk_size)
@@ -84,8 +97,9 @@ train_size = int(TRAIN_RATIO * chunk_size)
 
 photon_train = photon[:train_size]
 cluster_train = cluster[:train_size]
+weight_train = weight[:train_size]
 train_ds = (
-    tf.data.Dataset.from_tensor_slices((photon_train, cluster_train))
+    tf.data.Dataset.from_tensor_slices((photon_train, cluster_train, weight_train))
     .batch(hp.get("batch_size", BATCHSIZE), drop_remainder=True)
     .cache()
     .prefetch(tf.data.AUTOTUNE)
@@ -94,8 +108,9 @@ train_ds = (
 if TRAIN_RATIO != 1.0:
     photon_val = photon[train_size:]
     cluster_val = cluster[train_size:]
+    weight_val = weight[train_size:]
     val_ds = (
-        tf.data.Dataset.from_tensor_slices((photon_val, cluster_val))
+        tf.data.Dataset.from_tensor_slices((photon_val, cluster_val, weight_val))
         .batch(BATCHSIZE, drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
@@ -103,6 +118,7 @@ if TRAIN_RATIO != 1.0:
 else:
     photon_val = photon_train
     cluster_val = cluster_train
+    weight_val = weight_train
     val_ds = None
 
 # +------------------------+
@@ -125,8 +141,9 @@ transformer = MaskedTransformer(
     seq_ord_normalizations=hp.get("t_seq_ord_normalizations", 10_000),
     attn_mask_init_nonzero_size=hp.get("t_attn_mask_init_nonzero_size", 8),
     enable_residual_smoothing=hp.get("t_enable_residual_smoothing", True),
+    enable_source_baseline=hp.get("t_enable_source_baseline", True),
     enable_attention_mask=hp.get("t_enable_attention_mask", False),
-    output_activations=hp.get("t_output_activations", ["tanh", "tanh", "sigmoid"]),
+    output_activations=hp.get("t_output_activations", None),
     start_token_initializer=hp.get("t_start_toke_initializer", "ones"),
     dtype=DTYPE,
 )
@@ -141,9 +158,7 @@ discriminator = Discriminator(
     dtype=DTYPE,
 )
 
-model = Calotron(
-    transformer=transformer, discriminator=discriminator, aux_classifier=None
-)
+model = Calotron(transformer=transformer, discriminator=discriminator)
 
 output = model((photon[:BATCHSIZE], cluster[:BATCHSIZE]))
 model.summary()
@@ -153,10 +168,10 @@ model.summary()
 # +----------------------+
 
 hp.get("t_optimizer", "RMSprop")
-t_opt = tf.keras.optimizers.RMSprop(hp.get("t_lr0", 7e-4))
+t_opt = tf.keras.optimizers.RMSprop(hp.get("t_lr0", 1e-4))
 
 hp.get("d_optimizer", "RMSprop")
-d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", 3e-5))
+d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", 1e-4))
 
 # +----------------------------+
 # |   Training configuration   |
@@ -165,59 +180,62 @@ d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", 3e-5))
 adv_metric = "binary-crossentropy" if ADV_METRIC == "bce" else "wasserstein-distance"
 metrics = ["accuracy", "bce"] if ADV_METRIC == "bce" else ["wass_dist"]
 
-hp.get("loss", "PhotonClusterMatch")
-loss = PhotonClusterMatch(
+loss = MeanSquaredError(
+    warmup_energy=hp.get("warmup_energy", 0.0),
     alpha=hp.get("loss_alpha", ALPHA),
-    max_match_distance=hp.get("loss_max_match_distance", 1e-3),
     adversarial_metric=hp.get("loss_adversarial_metric", adv_metric),
     bce_options=hp.get(
-        "loss_bce_options",
-        {
-            "injected_noise_stddev": 0.01,
-            "label_smoothing": 0.1,
-            "ignore_padding": False,
-        },
+        "loss_bce_options", {"injected_noise_stddev": 0.01, "label_smoothing": 0.1}
     ),
     wass_options=hp.get(
-        "loss_wass_options",
-        {
-            "lipschitz_penalty": 100.0,
-            "virtual_direction_upds": 1,
-            "ignore_padding": False,
-        },
+        "loss_wass_options", {"lipschitz_penalty": 100.0, "virtual_direction_upds": 1}
     ),
 )
+hp.get("loss", loss.name)
 
 model.compile(
     loss=loss,
     metrics=hp.get("metrics", metrics),
     transformer_optimizer=t_opt,
     discriminator_optimizer=d_opt,
-    aux_classifier_optimizer=None,
     transformer_upds_per_batch=hp.get("transformer_upds_per_batch", 1),
     discriminator_upds_per_batch=hp.get("discriminator_upds_per_batch", 1),
-    aux_classifier_upds_per_batch=None,
 )
 
 # +--------------------------+
 # |   Callbacks definition   |
 # +--------------------------+
 
-t_sched = ExponentialDecay(
+callbacks = list()
+
+t_sched = LearnRateExpDecay(
     model.transformer_optimizer,
     decay_rate=hp.get("t_decay_rate", 0.10),
-    decay_steps=hp.get("t_decay_steps", 20_000),
+    decay_steps=hp.get("t_decay_steps", 100_000),
     min_learning_rate=hp.get("t_min_learning_rate", 1e-6),
 )
-hp.get("t_sched", "ExponentialDecay")
+hp.get("t_sched", "LearnRateExpDecay")
+callbacks.append(t_sched)
 
-d_sched = ExponentialDecay(
+d_sched = LearnRateExpDecay(
     model.discriminator_optimizer,
     decay_rate=hp.get("d_decay_rate", 0.10),
-    decay_steps=hp.get("d_decay_steps", 130_000),
-    min_learning_rate=hp.get("d_min_learning_rate", 1e-8),
+    decay_steps=hp.get("d_decay_steps", 50_000),
+    min_learning_rate=hp.get("d_min_learning_rate", 1e-6),
 )
-hp.get("d_sched", "ExponentialDecay")
+hp.get("d_sched", "LearnRateExpDecay")
+callbacks.append(d_sched)
+
+if ALPHA_DAMPING:
+    alpha_sched = AdvExpDamping(
+        loss.alpha,
+        decay_rate=hp.get("alpha_decay_rate", 0.50),
+        decay_steps=hp.get("alpha_decay_steps", 25_000),
+        min_adv_scale=hp.get("alpha_min_value", 0.05),
+        verbose=True,
+    )
+    hp.get("alpha_sched", "AdvExpDamping")
+    callbacks.append(alpha_sched)
 
 # +------------------------+
 # |   Training procedure   |
@@ -228,7 +246,7 @@ train = model.fit(
     train_ds,
     epochs=hp.get("epochs", EPOCHS),
     validation_data=val_ds,
-    callbacks=[t_sched, d_sched],
+    callbacks=callbacks,
 )
 stop = datetime.now()
 
@@ -248,7 +266,7 @@ exp_sim = ExportSimulator(sim, max_length=cluster.shape[1])
 
 dataset = (
     tf.data.Dataset.from_tensor_slices(photon_val)
-    .batch(512, drop_remainder=True)
+    .batch(BATCHSIZE, drop_remainder=True)
     .cache()
     .prefetch(tf.data.AUTOTUNE)
 )
@@ -256,6 +274,7 @@ dataset = (
 output, attn_weights = [exp_out.numpy() for exp_out in exp_sim(dataset)]
 photon_val = photon_val[: len(output)]
 cluster_val = cluster_val[: len(output)]
+weight_val = weight_val[: len(output)]
 
 # +------------------+
 # |   Model export   |
@@ -266,10 +285,13 @@ date, hour = timestamp.split(" ")
 date = date.replace("-", "/")
 hour = hour.split(".")[0]
 
-prefix = ""
-timestamp = timestamp.split(".")[0].replace("-", "").replace(" ", "-")
-for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
-    prefix += time + unit  # YYYYMMDD-HHhMMmSSs
+if args.test:
+    prefix = "test"
+else:
+    prefix = ""
+    timestamp = timestamp.split(".")[0].replace("-", "").replace(" ", "-")
+    for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
+        prefix += time + unit  # YYYYMMDD-HHhMMmSSs
 prefix += f"_calotron_{ADV_METRIC}"
 
 export_model_fname = f"{models_dir}/{prefix}_model"
@@ -282,7 +304,7 @@ if args.saving:
     os.makedirs(export_img_dirname)  # need to save images
 
 np.savez(
-    f"{data_dir}/calotron-export-{VERSION}.npz",
+    f"{data_dir}/calotron-export.npz",
     photon=photon_val,
     cluster=cluster_val,
     output=output,
@@ -300,6 +322,12 @@ info = [
     f"- Model training completed in **{duration}**",
     f"- Report generated on **{date}** at **{hour}**",
 ]
+
+if args.weights:
+    info += ["- Model trained with **matching weights**"]
+else:
+    info += ["- Model trained **avoiding padded values**"]
+    
 report.add_markdown("\n".join([i for i in info]))
 
 report.add_markdown("---")
@@ -347,7 +375,7 @@ learning_curves(
     legend_loc=None,
     save_figure=args.saving,
     scale_curves=True,
-    export_fname=f"{export_img_dirname}/learn-curves.png",
+    export_fname=f"{export_img_dirname}/learn-curves",
 )
 
 #### Learning rate scheduling
@@ -360,7 +388,7 @@ learn_rate_scheduling(
     labels=["transformer", "discriminator"],
     legend_loc="upper right",
     save_figure=args.saving,
-    export_fname=f"{export_img_dirname}/lr-sched.png",
+    export_fname=f"{export_img_dirname}/lr-sched",
 )
 
 #### Transformer loss
@@ -375,8 +403,9 @@ metric_curves(
     colors=["#d01c8b", "#4dac26"],
     labels=["training set", "validation set"],
     legend_loc=None,
+    yscale="log" if ALPHA_DAMPING else "linear",
     save_figure=args.saving,
-    export_fname=f"{export_img_dirname}/transf-loss.png",
+    export_fname=f"{export_img_dirname}/transf-loss",
 )
 
 #### Discriminator loss
@@ -391,8 +420,9 @@ metric_curves(
     colors=["#d01c8b", "#4dac26"],
     labels=["training set", "validation set"],
     legend_loc=None,
+    yscale="linear",
     save_figure=args.saving,
-    export_fname=f"{export_img_dirname}/disc-loss.png",
+    export_fname=f"{export_img_dirname}/disc-loss",
 )
 
 if ADV_METRIC == "bce":
@@ -408,8 +438,9 @@ if ADV_METRIC == "bce":
         colors=["#d01c8b", "#4dac26"],
         labels=["training set", "validation set"],
         legend_loc=None,
+        yscale="linear",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/accuracy-curves.png",
+        export_fname=f"{export_img_dirname}/accuracy-curves",
     )
 
     #### BCE curves
@@ -424,8 +455,9 @@ if ADV_METRIC == "bce":
         colors=["#d01c8b", "#4dac26"],
         labels=["training set", "validation set"],
         legend_loc=None,
+        yscale="linear",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/bce-curves.png",
+        export_fname=f"{export_img_dirname}/bce-curves",
     )
 else:
     #### Wass curves
@@ -440,8 +472,9 @@ else:
         colors=["#d01c8b", "#4dac26"],
         labels=["training set", "validation set"],
         legend_loc=None,
+        yscale="linear",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/wass-curves.png",
+        export_fname=f"{export_img_dirname}/wass-curves",
     )
 
 report.add_markdown("<br>")
@@ -453,7 +486,7 @@ for head_id in range(attn_weights.shape[1]):
         attn_weights=attn_weights,
         head_id=head_id,
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/attn-plot.png",
+        export_fname=f"{export_img_dirname}/attn-plot",
     )
 
 report.add_markdown("---")
@@ -461,101 +494,93 @@ report.add_markdown("---")
 ## Validation plots
 report.add_markdown('<h2 align="center">Validation plots</h2>')
 
-photon_xy = np.tile(photon_val[:, None, :, :2], (1, cluster_val.shape[1], 1, 1))
-cluster_xy = np.tile(cluster_val[:, :, None, :2], (1, 1, photon_val.shape[1], 1))
-pairwise_distance = np.linalg.norm(cluster_xy - photon_xy, axis=-1)
-cluster_matched = pairwise_distance.min(axis=-1) <= loss.max_match_distance
+photon_x = photon_val[:, :, 0].flatten()
+photon_y = photon_val[:, :, 1].flatten()
+photon_energy = photon_val[:, :, 2].flatten()
 
-photon_not_padded = photon_val[:, :, 2] > 0.0
-cluster_not_padded = cluster_val[:, :, 2] > 0.0
-output_not_padded = output[:, :, 2] > 1e-8
+cluster_x = cluster_val[:, :, 0].flatten()
+cluster_y = cluster_val[:, :, 1].flatten()
+cluster_energy = cluster_val[:, :, 2].flatten()
+
+output_x = output[:, :, 0].flatten()
+output_y = output[:, :, 1].flatten()
+output_energy = output[:, :, 2].flatten()
+
+w = weight_val.flatten()
 
 #### X histogram
-cluster_x = cluster_val[:, :, 0][cluster_not_padded].flatten()
-output_x = output[:, :, 0][output_not_padded].flatten()
 for log_scale in [False, True]:
     validation_histogram(
         report=report,
-        ref_data=cluster_x,
-        gen_data=output_x,
-        xlabel="$x$ coordinate",
+        data_ref=cluster_x,
+        data_gen=output_x,
+        weights_ref=w,
+        weights_gen=w,
+        xlabel="Preprocessed $x$-coordinate [a.u.]",
+        density=False,
         ref_label="Training data",
         gen_label="Calotron output",
         log_scale=log_scale,
         legend_loc="upper right",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/x-hist.png",
-    )
-
-#### X histogram (matched clusters)
-cluster_x_matched = cluster_val[:, :, 0][
-    cluster_not_padded & cluster_not_padded
-].flatten()
-output_x_matched = output[:, :, 0][output_not_padded & output_not_padded].flatten()
-for log_scale in [False, True]:
-    validation_histogram(
-        report=report,
-        ref_data=cluster_x_matched,
-        gen_data=output_x_matched,
-        xlabel="$x$ coordinate of matched clusters",
-        ref_label="Training data",
-        gen_label="Calotron output",
-        log_scale=log_scale,
-        legend_loc="upper right",
-        save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/x-match-hist.png",
+        export_fname=f"{export_img_dirname}/x-hist",
     )
 
 #### Y histogram
-cluster_y = cluster_val[:, :, 1][cluster_not_padded].flatten()
-output_y = output[:, :, 1][output_not_padded].flatten()
 for log_scale in [False, True]:
     validation_histogram(
         report=report,
-        ref_data=cluster_y,
-        gen_data=output_y,
-        xlabel="$y$ coordinate",
+        data_ref=cluster_y,
+        data_gen=output_y,
+        weights_ref=w,
+        weights_gen=w,
+        xlabel="Preprocessed $y$-coordinate [a.u.]",
+        density=False,
         ref_label="Training data",
         gen_label="Calotron output",
         log_scale=log_scale,
         legend_loc="upper right",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/y-hist.png",
+        export_fname=f"{export_img_dirname}/y-hist",
     )
 
-#### Y histogram (matched clusters)
-cluster_y_matched = cluster_val[:, :, 1][
-    cluster_not_padded & cluster_not_padded
-].flatten()
-output_y_matched = output[:, :, 1][output_not_padded & output_not_padded].flatten()
+#### Energy histogram
 for log_scale in [False, True]:
     validation_histogram(
         report=report,
-        ref_data=cluster_y_matched,
-        gen_data=output_y_matched,
-        xlabel="$y$ coordinate of matched clusters",
+        data_ref=cluster_energy,
+        data_gen=output_energy,
+        weights_ref=w,
+        weights_gen=w,
+        xlabel="Preprocessed energy [a.u.]",
+        density=False,
         ref_label="Training data",
         gen_label="Calotron output",
         log_scale=log_scale,
         legend_loc="upper right",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/y-match-hist.png",
+        export_fname=f"{export_img_dirname}/energy-hist",
     )
 
 #### Calorimeter deposits
-calorimeter_deposits(
-    report=report,
-    ref_xy=(cluster_val[:, :, 0].flatten(), cluster_val[:, :, 1].flatten()),
-    gen_xy=(output[:, :, 0].flatten(), output[:, :, 1].flatten()),
-    ref_energy=cluster_val[:, :, 2].flatten(),
-    gen_energy=output[:, :, 2].flatten(),
-    save_figure=args.saving,
-    export_fname=f"{export_img_dirname}/calo-deposits.png",
-)
+for log_scale in [False, True]:
+    calorimeter_deposits(
+        report=report,
+        ref_xy=(cluster_x, cluster_y),
+        gen_xy=(output_x, output_y),
+        ref_energy=cluster_energy * w,
+        gen_energy=output_energy * w,
+        min_energy=loss.warmup_energy,
+        model_name="Calotron",
+        log_scale=log_scale,
+        save_figure=args.saving,
+        export_fname=f"{export_img_dirname}/calo-deposits",
+    )
 
 #### Event examples
-for i in range(4):
-    evt = int(np.random.uniform(0, len(cluster_val)))
+cluster_mean_energy = np.mean(cluster_val[:, :, 2], axis=-1)
+events = np.argsort(cluster_mean_energy)[::-1][:4]
+for i, evt in enumerate(events):
     event_example(
         report=report,
         photon_xy=(photon_val[evt, :, 0].flatten(), photon_val[evt, :, 1].flatten()),
@@ -564,44 +589,10 @@ for i in range(4):
         photon_energy=photon_val[evt, :, 2].flatten(),
         cluster_energy=cluster_val[evt, :, 2].flatten(),
         output_energy=output[evt, :, 2].flatten(),
+        min_energy=loss.warmup_energy,
+        model_name="Calotron",
         save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/evt-example-{i}.png",
-    )
-
-#### Energy histogram
-cluster_energy = cluster_val[:, :, 2][cluster_not_padded].flatten()
-output_energy = output[:, :, 2][output_not_padded].flatten()
-for log_scale in [False, True]:
-    validation_histogram(
-        report=report,
-        ref_data=cluster_energy,
-        gen_data=output_energy,
-        xlabel="Preprocessed energy [a.u]",
-        ref_label="Training data",
-        gen_label="Calotron output",
-        log_scale=log_scale,
-        legend_loc="upper right",
-        save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/energy-hist.png",
-    )
-
-#### Energy histogram (matched clusters)
-cluster_energy_matched = cluster_val[:, :, 2][
-    cluster_not_padded & cluster_not_padded
-].flatten()
-output_energy_matched = output[:, :, 2][output_not_padded & output_not_padded].flatten()
-for log_scale in [False, True]:
-    validation_histogram(
-        report=report,
-        ref_data=cluster_energy_matched,
-        gen_data=output_energy_matched,
-        xlabel="Preprocessed energy of matched clusters [a.u]",
-        ref_label="Training data",
-        gen_label="Calotron output",
-        log_scale=log_scale,
-        legend_loc="upper right",
-        save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/energy-match-hist.png",
+        export_fname=f"{export_img_dirname}/evt-example-{i}",
     )
 
 #### Energy sequences
@@ -609,18 +600,22 @@ energy_sequences(
     report=report,
     ref_energy=cluster_val[:64, :, 2],
     gen_energy=output[:64, :, 2],
+    min_energy=loss.warmup_energy,
+    model_name="Calotron",
     save_figure=args.saving,
-    export_fname=f"{export_img_dirname}/energy-seq.png",
+    export_fname=f"{export_img_dirname}/energy-seq",
 )
 
 #### Photon-to-cluster correlations
 photon2cluster_corr(
     report,
-    photon_energy=(0.5 * (photon_val[:, 0::2, 2] + photon_val[:, 1::2, 2])).flatten(),
-    cluster_energy=cluster_val[:, :, 2].flatten(),
-    output_energy=output[:, :, 2].flatten(),
+    photon=photon_val,
+    cluster=cluster_val,
+    output=output,
+    min_energy=loss.warmup_energy,
+    log_scale=True,
     save_figure=args.saving,
-    export_fname=f"{export_img_dirname}/gamma2calo-corr.png",
+    export_fname=f"{export_img_dirname}/gamma2calo-corr",
 )
 
 report.add_markdown("---")

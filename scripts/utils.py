@@ -1,6 +1,10 @@
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import copy
+
+my_cmap = copy.copy(mpl.cm.get_cmap("gist_heat"))
+my_cmap.set_bad((0,0,0))
 
 
 def learning_curves(
@@ -13,7 +17,7 @@ def learning_curves(
     legend_loc="upper right",
     save_figure=False,
     scale_curves=True,
-    export_fname="./images/learn-curves.png",
+    export_fname="./images/learn-curves",
 ) -> None:
     if scale_curves:
         if "t_loss" in keys:
@@ -59,7 +63,7 @@ def learning_curves(
         plt.plot(num_epochs, loss, lw=1.5, color=c, label=l)
     plt.legend(loc=legend_loc, fontsize=10)
     if save_figure:
-        plt.savefig(export_fname)
+        plt.savefig(f"{export_fname}.png")
     report.add_figure(options="width=45%")
     plt.close()
 
@@ -73,7 +77,7 @@ def learn_rate_scheduling(
     labels=None,
     legend_loc="upper right",
     save_figure=False,
-    export_fname="./images/lr-sched.png",
+    export_fname="./images/lr-sched",
 ) -> None:
     if colors is None:
         colors = [None for _ in range(len(keys))]
@@ -96,7 +100,7 @@ def learn_rate_scheduling(
     plt.legend(loc=legend_loc, fontsize=10)
     plt.yscale("log")
     if save_figure:
-        plt.savefig(export_fname)
+        plt.savefig(f"{export_fname}.png")
     report.add_figure(options="width=45%")
     plt.close()
 
@@ -114,7 +118,7 @@ def metric_curves(
     legend_loc="upper right",
     yscale="linear",
     save_figure=False,
-    export_fname="./images/metric-curves.png",
+    export_fname="./images/metric-curves",
 ) -> None:
     keys = [key]
     if validation_set:
@@ -143,7 +147,7 @@ def metric_curves(
     plt.legend(loc=legend_loc, fontsize=10)
     plt.yscale(yscale)
     if save_figure:
-        plt.savefig(export_fname)
+        plt.savefig(f"{export_fname}.png")
     report.add_figure(options="width=45%")
     plt.close()
 
@@ -155,12 +159,13 @@ def validation_histogram(
     weights_ref=None,
     weights_gen=None,
     xlabel=None,
+    density=False,
     ref_label=None,
     gen_label=None,
     log_scale=False,
     legend_loc="upper left",
     save_figure=False,
-    export_fname="./images/val-hist.png",
+    export_fname="./images/val-hist",
 ) -> None:
     min_ = data_ref.min()
     max_ = data_ref.max()
@@ -169,10 +174,18 @@ def validation_histogram(
     plt.figure(figsize=(8, 5), dpi=300)
     plt.xlabel(xlabel, fontsize=12)
     plt.ylabel("Candidates", fontsize=12)
-    plt.hist(data_ref, bins=bins, weights=weights_ref, color="#3288bd", label=ref_label)
+    plt.hist(
+        data_ref,
+        bins=bins,
+        density=density,
+        weights=weights_ref,
+        color="#3288bd",
+        label=ref_label,
+    )
     plt.hist(
         data_gen,
         bins=bins,
+        density=density,
         weights=weights_gen,
         histtype="step",
         color="#fc8d59",
@@ -181,9 +194,10 @@ def validation_histogram(
     )
     if log_scale:
         plt.yscale("log")
+        export_fname += "-log"
     plt.legend(loc=legend_loc, fontsize=10)
     if save_figure:
-        plt.savefig(export_fname)
+        plt.savefig(f"{export_fname}.png")
     report.add_figure(options="width=45%")
     plt.close()
 
@@ -194,44 +208,48 @@ def calorimeter_deposits(
     gen_xy,
     ref_energy=None,
     gen_energy=None,
+    min_energy=0.0,
+    model_name="Calotron",
+    log_scale=False,
     save_figure=False,
-    export_fname="./images/calo-deposits.png",
+    export_fname="./images/calo-deposits",
 ) -> None:
-    x_ref, y_ref = ref_xy
-    x_gen, y_gen = gen_xy
+    coords = [ref_xy, gen_xy]
+    weights = [ref_energy, gen_energy]
+    bins = np.linspace(-0.4, 0.4, 81)
+    vmin = 1.0 if log_scale else 0.0
+    vmax = 0.0
+    for xy, w in zip(coords, weights):
+        x, y = xy
+        w = np.where(w > min_energy, w, 0.0)
 
-    x_bins = np.linspace(x_ref.min(), x_ref.max(), 101)
-    y_bins = np.linspace(y_ref.min(), y_ref.max(), 101)
+        h, _, _ = np.histogram2d(x, y, bins=bins, weights=w)
+        vmax = max(h.max(), vmax)
+
+    titles = ["Training data", f"{model_name} output"]
 
     plt.figure(figsize=(18, 5), dpi=300)
-    plt.subplot(1, 2, 1)
-    plt.title("Training data", fontsize=14)
-    plt.xlabel("$x$ coordinate", fontsize=12)
-    plt.ylabel("$y$ coordinate", fontsize=12)
-    plt.hist2d(
-        x_ref,
-        y_ref,
-        weights=ref_energy,
-        bins=(x_bins, y_bins),
-        cmin=0,
-        cmap="gist_heat",
-    )
-    plt.colorbar()
-    plt.subplot(1, 2, 2)
-    plt.title("Calotron output", fontsize=14)
-    plt.xlabel("$x$ coordinate", fontsize=12)
-    plt.ylabel("$y$ coordinate", fontsize=12)
-    plt.hist2d(
-        x_gen,
-        y_gen,
-        weights=gen_energy,
-        bins=(x_bins, y_bins),
-        cmin=0,
-        cmap="gist_heat",
-    )
-    plt.colorbar()
+    for i, (xy, w, title) in enumerate(zip(coords, weights, titles)):
+        x, y = xy
+        w = np.where(w > min_energy, w, 0.0)
+        plt.subplot(1, 2, i + 1)
+        plt.title(title, fontsize=14)
+        plt.xlabel("$x$ coordinate", fontsize=12)
+        plt.ylabel("$y$ coordinate", fontsize=12)
+        plt.hist2d(
+            x,
+            y,
+            norm=mpl.colors.LogNorm(vmin=vmin) if log_scale else None,
+            weights=w,
+            bins=bins,
+            cmap=my_cmap,
+        )
+        plt.clim(vmin=vmin, vmax=vmax)
+        plt.colorbar()
     if save_figure:
-        plt.savefig(export_fname)
+        if log_scale:
+            export_fname += "-log"
+        plt.savefig(f"{export_fname}.png")
     report.add_figure(options="width=95%")
     plt.close()
 
@@ -244,8 +262,10 @@ def event_example(
     photon_energy=None,
     cluster_energy=None,
     output_energy=None,
+    min_energy=0.0,
+    model_name="Calotron",
     save_figure=False,
-    export_fname="./images/evt-example.png",
+    export_fname="./images/evt-example",
 ) -> None:
     x_photon, y_photon = photon_xy
     x_cluster, y_cluster = cluster_xy
@@ -256,6 +276,10 @@ def event_example(
         & (cluster_energy is not None)
         & (output_energy is not None)
     ):
+        photon_energy = np.where(photon_energy > min_energy, photon_energy, 0.0)
+        cluster_energy = np.where(cluster_energy > min_energy, cluster_energy, 0.0)
+        output_energy = np.where(output_energy > min_energy, output_energy, 0.0)
+
         photon_size = 50.0 * photon_energy / cluster_energy.max()
         cluster_size = 50.0 * cluster_energy / cluster_energy.max()
         output_size = 50.0 * output_energy / cluster_energy.max()
@@ -293,11 +317,11 @@ def event_example(
         facecolors="none",
         edgecolors="#1a9641",
         lw=0.75,
-        label="Calotron output",
+        label=f"{model_name} output",
     )
     plt.legend(fontsize=10)
     if save_figure:
-        plt.savefig(export_fname)
+        plt.savefig(f"{export_fname}.png")
     report.add_figure(options="width=45%")
     plt.close()
 
@@ -306,9 +330,13 @@ def energy_sequences(
     report,
     ref_energy,
     gen_energy,
+    min_energy=0.0,
+    model_name="Calotron",
     save_figure=False,
-    export_fname="./images/energy-seq.png",
+    export_fname="./images/energy-seq",
 ) -> None:
+    ref_energy = np.where(ref_energy > min_energy, ref_energy, 0.0)
+    gen_energy = np.where(gen_energy > min_energy, gen_energy, 0.0)
     vmax = max(ref_energy.max(), gen_energy.max())
 
     plt.figure(figsize=(18, 10), dpi=300)
@@ -316,30 +344,53 @@ def energy_sequences(
     plt.title("Reconstructed clusters", fontsize=14)
     plt.xlabel("Preprocessed energy deposits [a.u.]", fontsize=12)
     plt.ylabel("Events", fontsize=12)
-    plt.imshow(ref_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap="gist_heat")
+    plt.imshow(ref_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap=my_cmap)
     plt.colorbar()
     plt.subplot(1, 2, 2)
-    plt.title("Calotron output", fontsize=14)
+    plt.title(f"{model_name} output", fontsize=14)
     plt.xlabel("Preprocessed energy deposits [a.u.]", fontsize=12)
     plt.ylabel("Events", fontsize=12)
-    plt.imshow(gen_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap="gist_heat")
+    plt.imshow(gen_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap=my_cmap)
     plt.colorbar()
     if save_figure:
-        plt.savefig(export_fname)
+        plt.savefig(f"{export_fname}.png")
     report.add_figure(options="width=95%")
     plt.close()
 
 
 def photon2cluster_corr(
     report,
-    photon_energy,
-    cluster_energy,
-    output_energy,
+    photon,
+    cluster,
+    output,
+    min_energy=0.0,
+    log_scale=False,
     save_figure=False,
-    export_fname="./images/gamma2calo-corr.png",
+    export_fname="./images/gamma2calo-corr",
 ) -> None:
+    reco_objects = [cluster, output]
+    energies = list()
     bins = np.linspace(0, 1, 76)
-    energies = [cluster_energy, output_energy]
+    vmin = 1.0 if log_scale else 0.0
+    vmax = 0.0
+    for object in reco_objects:
+        photon_xy = np.tile(photon[:, None, :, :2], (1, object.shape[1], 1, 1))
+        object_xy = np.tile(cluster[:, :, None, :2], (1, 1, photon.shape[1], 1))
+
+        pairwise_distance = np.linalg.norm(object_xy - photon_xy, axis=-1)
+        match_photon_idx = np.argmin(pairwise_distance, axis=-1)
+        matched_photon = np.take_along_axis(photon, match_photon_idx[:, :, None], axis=1)
+
+        photon_energy = matched_photon[:, :, 2].flatten()
+        object_energy = object[:, :, 2].flatten()
+
+        photon_energy = np.where(photon_energy > min_energy, photon_energy, 0.0)
+        object_energy = np.where(object_energy > min_energy, object_energy, 0.0)
+        energies.append((photon_energy, object_energy))
+
+        h, _, _ = np.histogram2d(photon_energy, object_energy, bins=bins)
+        vmax = max(h.max(), vmax)
+
     titles = ["Photon-to-cluster correlations", "Photon-to-output correlations"]
     ylabels = [
         "Cluster preprocessed energy [a.u.]",
@@ -348,21 +399,24 @@ def photon2cluster_corr(
 
     plt.figure(figsize=(14, 5), dpi=300)
     for i, (energy, title, ylabel) in enumerate(zip(energies, titles, ylabels)):
+        photon_energy, object_energy = energy
         plt.subplot(1, 2, i + 1)
         plt.title(title, fontsize=14)
         plt.xlabel("Photon preprocessed energy [a.u.]", fontsize=12)
         plt.ylabel(ylabel, fontsize=12)
         plt.hist2d(
             photon_energy,
-            energy,
+            object_energy,
             bins=bins,
-            norm=mpl.colors.LogNorm(),
-            cmap="gist_heat",
+            norm=mpl.colors.LogNorm(vmin=vmin) if log_scale else None,
+            cmap=my_cmap,
         )
-        # plt.clim(vmin=1e0, vmax=1e4)
+        plt.clim(vmin=vmin, vmax=vmax)
         plt.colorbar()
     if save_figure:
-        plt.savefig(export_fname)
+        if log_scale:
+            export_fname += "-log"
+        plt.savefig(f"{export_fname}.png")
     report.add_figure(options="width=95%")
     plt.close()
 
@@ -372,7 +426,7 @@ def attention_plot(
     attn_weights,
     head_id=0,
     save_figure=False,
-    export_fname="./images/attn-plot.png",
+    export_fname="./images/attn-plot",
 ) -> None:
     if len(attn_weights.shape) == 4:
         attn_weights = np.mean(attn_weights, axis=0)
@@ -384,9 +438,9 @@ def attention_plot(
     plt.title(f"Last attention weights of head #{head_id+1}", fontsize=14)
     plt.xlabel("Generated photons", fontsize=12)
     plt.ylabel("Reconstructed clusters", fontsize=12)
-    plt.imshow(attn_weights[head_id], aspect="auto", cmap="gist_heat")
+    plt.imshow(attn_weights[head_id], aspect="auto", cmap=my_cmap)
     plt.colorbar()
     if save_figure:
-        plt.savefig(export_fname)
+        plt.savefig(f"{export_fname}.png")
     report.add_figure(options="width=45%")
     plt.close()

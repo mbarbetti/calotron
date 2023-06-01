@@ -12,14 +12,19 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.utils import shuffle
 from tqdm import tqdm
 
-VERSION = "v1"
 ECAL_W = 8000
 ECAL_H = 6500
+MAX_OVX = 50
+MAX_OVY = 50
+MAX_OVZ = 150
+MAX_MATCH_DISTANCE = 0.01
+
 PADDING_VALUE = 0.0
-MAX_INPUT_PHOTONS = 80
-MAX_OUTPUT_CLUSTERS = 80
-MAX_INPUT_PHOTONS_DEMO = 40
-MAX_OUTPUT_CLUSTERS_DEMO = 20
+MAX_INPUT_PHOTONS = 96
+MAX_OUTPUT_CLUSTERS = 96
+MAX_INPUT_PHOTONS_DEMO = 32
+MAX_OUTPUT_CLUSTERS_DEMO = 32
+
 
 # +------------------+
 # |   Parser setup   |
@@ -27,7 +32,7 @@ MAX_OUTPUT_CLUSTERS_DEMO = 20
 
 parser = ArgumentParser(description="dataset preparation setup")
 
-parser.add_argument("-f", "--filename", required=True)
+parser.add_argument("-f", "--filename", default="./data/LamarrTraining.root")
 parser.add_argument("-m", "--max_files", default=10)
 parser.add_argument("-c", "--chunk_size", default=-1)
 
@@ -105,8 +110,10 @@ photon_df["E"] = photon_df["p"]
 photon_df["logE"] = np.log(photon_df.E)
 photon_df["tx"] = photon_df.px / photon_df.pz
 photon_df["ty"] = photon_df.py / photon_df.pz
+photon_df["NotPadding"] = 1.0
 
 true_vars = ["x", "y", "logE", "tx", "ty", "ovx", "ovy", "ovz"]
+true_vars += ["NotPadding"]
 
 if args.verbose:
     print(photon_df[true_vars].describe())
@@ -117,15 +124,15 @@ if args.verbose:
 
 p_photon_df = photon_df.copy()
 
-photon_e_scaler = MinMaxScaler()
+photon_scaler_logE = MinMaxScaler()
 
 start = time()
 p_photon_df["x"] = p_photon_df.x / ECAL_W * 2
 p_photon_df["y"] = p_photon_df.y / ECAL_H * 2
-p_photon_df["logE"] = photon_e_scaler.fit_transform(np.c_[p_photon_df.logE])
-p_photon_df["ovx"] = p_photon_df.ovx / 50
-p_photon_df["ovy"] = p_photon_df.ovy / 50
-p_photon_df["ovz"] = p_photon_df.ovz / 150
+p_photon_df["logE"] = photon_scaler_logE.fit_transform(np.c_[p_photon_df.logE])
+p_photon_df["ovx"] = p_photon_df.ovx / MAX_OVX
+p_photon_df["ovy"] = p_photon_df.ovy / MAX_OVY
+p_photon_df["ovz"] = p_photon_df.ovz / MAX_OVZ
 print(f"[INFO] Generated photons preprocessing completed in {time()-start:.2f} s")
 
 if args.verbose:
@@ -141,9 +148,10 @@ cluster_df["NotPadding"] = 1.0
 reco_vars = ["x", "y", "logE"]
 
 if not args.demo:
-    bool_vars = ["PhotonFromMergedPi0", "Pi0Merged", "Photon", "NotPadding"]
+    bool_vars = ["PhotonFromMergedPi0", "Pi0Merged", "Photon"]
     pid_vars = ["PhotonID", "IsNotE", "IsNotH"]
     reco_vars += bool_vars + pid_vars
+reco_vars += ["NotPadding"]
 
 if args.verbose:
     print(cluster_df[reco_vars].describe())
@@ -154,15 +162,15 @@ if args.verbose:
 
 p_cluster_df = cluster_df.copy()
 
-cluster_e_scaler = MinMaxScaler()
-cluster_pid_scaler = StandardScaler()
+cluster_scaler_logE = MinMaxScaler()
+cluster_scaler_pid = StandardScaler()
 
 start = time()
 p_cluster_df["x"] = p_cluster_df.x / ECAL_W * 2
 p_cluster_df["y"] = p_cluster_df.y / ECAL_H * 2
-p_cluster_df["logE"] = cluster_e_scaler.fit_transform(np.c_[p_cluster_df.logE])
+p_cluster_df["logE"] = cluster_scaler_logE.fit_transform(np.c_[p_cluster_df.logE])
 if not args.demo:
-    p_cluster_df[pid_vars] = cluster_pid_scaler.fit_transform(
+    p_cluster_df[pid_vars] = cluster_scaler_pid.fit_transform(
         cluster_df[pid_vars].values
     )
 print(
@@ -254,7 +262,7 @@ plt.hist(
     label="Reconstructed clusters",
 )
 plt.legend(loc="upper right", fontsize=10)
-plt.savefig(fname=f"{images_dir}/evt-multiplicity-hist.png")
+plt.savefig(fname=f"{images_dir}/evt-multi-hist.png")
 plt.close()
 
 # +------------------------------+
@@ -264,8 +272,12 @@ plt.close()
 max_input_photons = MAX_INPUT_PHOTONS_DEMO if args.demo else MAX_INPUT_PHOTONS
 max_output_clusters = MAX_OUTPUT_CLUSTERS_DEMO if args.demo else MAX_OUTPUT_CLUSTERS
 
-pad_photons = PADDING_VALUE * np.ones((nEvents, max_input_photons, len(true_vars)))
-pad_clusters = PADDING_VALUE * np.ones((nEvents, max_output_clusters, len(reco_vars)))
+pad_photons = PADDING_VALUE * np.ones(
+    shape=(nEvents, max_input_photons, len(true_vars))
+)
+pad_clusters = PADDING_VALUE * np.ones(
+    shape=(nEvents, max_output_clusters, len(reco_vars))
+)
 
 for iRow, photon in enumerate(true_photons):
     photons_trunkated = photon[:max_input_photons]
@@ -285,8 +297,8 @@ plt.subplot(1, 2, 1)
 plt.title("Generated photons", fontsize=14)
 plt.xlabel("$x$ coordinate", fontsize=12)
 plt.ylabel("$y$ coordinate", fontsize=12)
-x_bins = np.linspace(-1.0, 1.0, 101)
-y_bins = np.linspace(-1.0, 1.0, 101)
+x_bins = np.linspace(-0.4, 0.4, 41)
+y_bins = np.linspace(-0.4, 0.4, 41)
 plt.hist2d(
     pad_photons[:, :, 0].flatten(),
     pad_photons[:, :, 1].flatten(),
@@ -301,8 +313,8 @@ plt.subplot(1, 2, 2)
 plt.title("Reconstructed calo-clusters", fontsize=14)
 plt.xlabel("$x$ coordinate", fontsize=12)
 plt.ylabel("$y$ coordinate", fontsize=12)
-x_bins = np.linspace(-1.0, 1.0, 101)
-y_bins = np.linspace(-1.0, 1.0, 101)
+x_bins = np.linspace(-0.4, 0.4, 41)
+y_bins = np.linspace(-0.4, 0.4, 41)
 plt.hist2d(
     pad_clusters[:, :, 0].flatten(),
     pad_clusters[:, :, 1].flatten(),
@@ -321,35 +333,59 @@ plt.close()
 # |   Energy sequences   |
 # +----------------------+
 
+photon_energy = pad_photons[:64, :, 2]
+cluster_energy = pad_clusters[:64, :, 2]
+vmax = max(photon_energy.max(), cluster_energy.max())
+
 plt.figure(figsize=(18, 10), dpi=300)
 
 plt.subplot(1, 2, 1)
 plt.title("Generated photons", fontsize=14)
 plt.xlabel("Photon energy", fontsize=12)
 plt.ylabel("Events", fontsize=12)
-plt.imshow(pad_photons[:64, :, 2], aspect="auto", cmap="gist_heat")
+plt.imshow(photon_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap="gist_heat")
 plt.colorbar()
 
 plt.subplot(1, 2, 2)
 plt.title("Reconstructed calo-clusters", fontsize=14)
 plt.xlabel("Cluster energy deposits", fontsize=12)
 plt.ylabel("Events", fontsize=12)
-plt.imshow(pad_clusters[:64, :, 2], aspect="auto", cmap="gist_heat")
+plt.imshow(cluster_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap="gist_heat")
 plt.colorbar()
 
 img_name = "energy-seq-demo" if args.demo else "energy-seq"
 plt.savefig(fname=f"{images_dir}/{img_name}.png")
 plt.close()
 
+# +----------------------+
+# |   Matching weights   |
+# +----------------------+
+
+photons_xy = np.tile(pad_photons[:, None, :, :2], (1, pad_clusters.shape[1], 1, 1))
+clusters_xy = np.tile(pad_clusters[:, :, None, :2], (1, 1, pad_photons.shape[1], 1))
+
+pairwise_distance = np.linalg.norm(clusters_xy - photons_xy, axis=-1)
+min_pairwise_distance = np.min(pairwise_distance, axis=-1)
+
+match_weights = MAX_MATCH_DISTANCE / np.maximum(
+    min_pairwise_distance, MAX_MATCH_DISTANCE
+)
+match_weights *= pad_clusters[:, :, -1]  # NotPadding boolean
+
 # +--------------------------+
 # |   Training data export   |
 # +--------------------------+
 
-export_data_fname = "trainset"
+export_data_fname = "calotron-dataset"
 if args.demo:
     export_data_fname += "-demo"
-npz_fname = f"{export_data_dir}/{export_data_fname}-{VERSION}.npz"
-np.savez(npz_fname, photon=pad_photons, cluster=pad_clusters)
+npz_fname = f"{export_data_dir}/{export_data_fname}.npz"
+np.savez(
+    file=npz_fname,
+    photon=pad_photons[:, :, :-1],  # avoid NotPadding boolean
+    cluster=pad_clusters[:, :, :-1],  # avoid NotPadding boolean
+    weight=match_weights,
+)
 print(
     f"[INFO] Training data of {len(pad_photons)} instances correctly saved to {npz_fname}"
 )
@@ -358,18 +394,18 @@ print(
 # |   Preprocessing models export   |
 # +---------------------------------+
 
-export_scaler_fname = "photon-energy-scaler"
+export_scaler_fname = "photon-scaler-logE"
 pkl_fname = f"{models_dir}/{export_scaler_fname}.pkl"
-pickle.dump(photon_e_scaler, open(pkl_fname, "wb"))
+pickle.dump(photon_scaler_logE, open(pkl_fname, "wb"))
 print(f"[INFO] Photon energy scaler correctly saved to {pkl_fname}")
 
-export_scaler_fname = "cluster-energy-scaler"
+export_scaler_fname = "cluster-scaler-logE"
 pkl_fname = f"{models_dir}/{export_scaler_fname}.pkl"
-pickle.dump(cluster_e_scaler, open(pkl_fname, "wb"))
+pickle.dump(cluster_scaler_logE, open(pkl_fname, "wb"))
 print(f"[INFO] Cluster energy scaler correctly saved to {pkl_fname}")
 
 if not args.demo:
-    export_scaler_fname = "cluster-pid-scaler"
+    export_scaler_fname = "cluster-scaler-pid"
     pkl_fname = f"{models_dir}/{export_scaler_fname}.pkl"
-    pickle.dump(cluster_pid_scaler, open(pkl_fname, "wb"))
+    pickle.dump(cluster_scaler_pid, open(pkl_fname, "wb"))
     print(f"[INFO] Cluster PID scaler correctly saved to {pkl_fname}")
