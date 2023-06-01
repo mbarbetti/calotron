@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.keras.losses import Huber as TF_Huber
 
 from calotron.losses.BaseLoss import BaseLoss
 from calotron.losses.BinaryCrossentropy import BinaryCrossentropy
@@ -7,10 +8,11 @@ from calotron.losses.WassersteinDistance import WassersteinDistance
 ADV_METRICS = ["binary-crossentropy", "wasserstein-distance"]
 
 
-class ConservationLaw(BaseLoss):
+class Huber(BaseLoss):
     def __init__(
         self,
         warmup_energy=0.0,
+        delta=0.1,
         alpha=0.1,
         adversarial_metric="binary-crossentropy",
         bce_options={
@@ -19,7 +21,7 @@ class ConservationLaw(BaseLoss):
             "label_smoothing": 0.0,
         },
         wass_options={"lipschitz_penalty": 100.0, "virtual_direction_upds": 1},
-        name="conserv_law_loss",
+        name="huber_loss",
     ) -> None:
         super().__init__(name)
 
@@ -27,6 +29,11 @@ class ConservationLaw(BaseLoss):
         assert isinstance(warmup_energy, (int, float))
         assert warmup_energy >= 0.0
         self._warmup_energy = float(warmup_energy)
+
+        # Huber delta
+        assert isinstance(delta, (int, float))
+        assert delta > 0.0
+        self._delta = float(delta)
 
         # Adversarial scale
         assert isinstance(alpha, (int, float))
@@ -54,9 +61,10 @@ class ConservationLaw(BaseLoss):
             options.update(dict(warmup_energy=warmup_energy))
 
         # Losses definition
-        if self._adversarial_metric == "binary-crossentropy":
+        self._huber_loss = TF_Huber(delta=delta)
+        if adversarial_metric == "binary-crossentropy":
             self._adv_loss = BinaryCrossentropy(**self._bce_options)
-        elif self._adversarial_metric == "wasserstein-distance":
+        elif adversarial_metric == "wasserstein-distance":
             self._adv_loss = WassersteinDistance(**self._wass_options)
 
     def transformer_loss(
@@ -68,42 +76,16 @@ class ConservationLaw(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
+        # Huber loss
         output = transformer((source, target), training=training)
         energy_mask = tf.cast(
             target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
         )
-
-        # L2 loss
-        l2_norm = tf.math.sqrt(tf.reduce_sum((target - output) ** 2, axis=-1))
         if sample_weight is None:
             sample_weight = tf.identity(energy_mask)
         else:
             sample_weight *= energy_mask
-        evt_errors = tf.reduce_sum(l2_norm * sample_weight, axis=-1)
-        batch_rmse = tf.math.sqrt(tf.reduce_mean(evt_errors**2))
-        l2_loss = batch_rmse / tf.cast(tf.shape(target)[1], dtype=target.dtype)
-        l2_loss = tf.cast(l2_loss, dtype=target.dtype)
-
-        # Energy conservation
-        filter = tf.cast(sample_weight > 0.0, dtype=target.dtype)
-        target_tot_energy = tf.reduce_sum(target[:, :, 2] * filter, axis=-1)
-        output_tot_energy = tf.reduce_sum(output[:, :, 2] * filter, axis=-1)
-        batch_rmse = tf.math.sqrt(
-            tf.reduce_mean((target_tot_energy - output_tot_energy) ** 2)
-        )
-        conserv_loss = batch_rmse / tf.cast(tf.shape(target)[1], dtype=target.dtype)
-        conserv_loss = tf.cast(conserv_loss, dtype=target.dtype)
-
-        # Monotonic function
-        # output_energy = tf.math.maximum(output[:, :, 2], 1e-8)
-        # non_monotonic_func = output_energy[:, 1:] / output_energy[:, :-1] > 1.0
-        # count_non_monotonic = tf.cast(
-        #     tf.math.count_nonzero(non_monotonic_func, axis=-1), dtype=target.dtype
-        # )
-        # monotonic_loss = tf.reduce_mean(count_non_monotonic) / tf.cast(
-        #     tf.shape(target)[1], dtype=target.dtype
-        # )
-        # monotonic_loss = tf.cast(monotonic_loss, dtype=target.dtype)
+        huber_loss = self._huber_loss(target, output, sample_weight=sample_weight)
 
         # Adversarial loss
         adv_loss = self._adv_loss.transformer_loss(
@@ -115,8 +97,7 @@ class ConservationLaw(BaseLoss):
             training=training,
         )
 
-        tot_loss = l2_loss + conserv_loss + self._alpha * adv_loss
-        # tot_loss = l2_loss + conserv_loss + monotonic_loss + self._alpha * adv_loss
+        tot_loss = huber_loss + self._alpha * adv_loss
         return tot_loss
 
     def discriminator_loss(
@@ -141,6 +122,10 @@ class ConservationLaw(BaseLoss):
     @property
     def warmup_energy(self) -> float:
         return self._warmup_energy
+    
+    @property
+    def delta(self) -> float:
+        return self._delta
 
     @property
     def init_alpha(self) -> float:

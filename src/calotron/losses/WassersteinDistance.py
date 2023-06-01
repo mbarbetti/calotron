@@ -129,10 +129,10 @@ class WassersteinDistance(BaseLoss):
                     clip_value_max=tf.reduce_max(output),
                 )
                 y_true_hat = discriminator(
-                    (source, target_hat), filter=sample_weight, training=training
+                    (source, target_hat), training=training
                 )
                 y_pred_hat = discriminator(
-                    (source, output_hat), filter=sample_weight, training=training
+                    (source, output_hat), training=training
                 )
                 y_diff = tf.abs(
                     tf.concat([y_true, y_pred], axis=0)
@@ -171,10 +171,10 @@ class WassersteinDistance(BaseLoss):
         x_diff = tf.norm(x_diff, axis=[1, 2], keepdims=True)
 
         y_true_hat = discriminator(
-            (source, target_hat), filter=sample_weight, training=training
+            (source, target_hat), training=training
         )
         y_pred_hat = discriminator(
-            (source, output_hat), filter=sample_weight, training=training
+            (source, output_hat), training=training
         )
         y_diff = tf.abs(
             tf.concat([y_true, y_pred], axis=0)

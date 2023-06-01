@@ -5,3 +5,4 @@ from .KLDivergence import KLDivergence
 from .MeanAbsoluteError import MeanAbsoluteError
 from .MeanSquaredError import MeanSquaredError
 from .WassersteinDistance import WassersteinDistance
+from .Huber import Huber
