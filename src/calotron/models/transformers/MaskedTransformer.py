@@ -46,6 +46,7 @@ class MaskedTransformer(Transformer):
         seq_ord_normalizations=10_000,
         attn_mask_init_nonzero_size=8,
         enable_residual_smoothing=True,
+        enable_source_baseline=True,
         enable_attention_mask=True,
         output_activations=None,
         start_token_initializer="ones",
@@ -65,6 +66,7 @@ class MaskedTransformer(Transformer):
             seq_ord_max_lengths=seq_ord_max_lengths,
             seq_ord_normalizations=seq_ord_normalizations,
             enable_residual_smoothing=enable_residual_smoothing,
+            enable_source_baseline=enable_source_baseline,
             output_activations=output_activations,
             start_token_initializer=start_token_initializer,
             name=name,
@@ -172,7 +174,8 @@ class MaskedTransformer(Transformer):
         output = self._output_layer(output)
         if self._multi_activations is not None:
             output = self._multi_activations(output)
-        return output
+        baseline = self._prepare_output_baseline(source, target)
+        return baseline + output
 
     @property
     def attn_mask_init_nonzero_size(self) -> list:

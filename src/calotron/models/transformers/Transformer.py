@@ -22,6 +22,7 @@ class Transformer(BaseTransformer):
         seq_ord_max_lengths=512,
         seq_ord_normalizations=10_000,
         enable_residual_smoothing=True,
+        enable_source_baseline=True,
         output_activations=None,
         start_token_initializer="ones",
         name=None,
@@ -157,6 +158,10 @@ class Transformer(BaseTransformer):
                 assert isinstance(flag, bool)
                 self._enable_residual_smoothing.append(flag)
 
+        # Source baseline
+        assert isinstance(enable_source_baseline, bool)
+        self._enable_source_baseline = enable_source_baseline
+
         # Output activations
         self._output_activations = output_activations
 
@@ -229,7 +234,8 @@ class Transformer(BaseTransformer):
         output = self._output_layer(output)
         if self._multi_activations is not None:
             output = self._multi_activations(output)
-        return output
+        baseline = self._prepare_output_baseline(source, target)
+        return baseline + output
 
     def _prepare_input_target(self, target) -> tf.Tensor:
         if self._start_token_initializer == "zeros":
@@ -242,6 +248,24 @@ class Transformer(BaseTransformer):
             start_token = tf.reduce_mean(target, axis=(0, 1))[None, None, :]
             start_token = tf.tile(start_token, (tf.shape(target)[0], 1, 1))
         return tf.concat([start_token, target[:, :-1, :]], axis=1)
+    
+    def _prepare_output_baseline(self, source, target) -> tf.Tensor:
+        source_max_length, target_max_length = self._seq_ord_max_lengths
+        if self._enable_source_baseline:
+            if source_max_length < target_max_length:
+                baseline = tf.concat([
+                    source[:, :, :3],
+                    tf.zeros(shape=(tf.shape(source)[0], target_max_length - source_max_length, 3))
+                ], axis=1)
+            elif source_max_length == target_max_length:
+                baseline = source[:, :, :3]
+            else:
+                baseline = source[:, :target_max_length, :3]
+            if self._output_depth > 3:
+                baseline = tf.concat([baseline, tf.zeros(shape=(tf.shape(source)[0], target_max_length, self._output_depth - 3))], axis=-1)
+        else:
+            baseline = tf.zeros(shape=(tf.shape(source)[0], target_max_length, self._output_depth))
+        return baseline[:, :tf.shape(target)[1], :]
 
     def get_start_token(self, target) -> tf.Tensor:
         if self._start_token_initializer == "zeros":
@@ -302,6 +326,10 @@ class Transformer(BaseTransformer):
     @property
     def enable_residual_smoothing(self) -> list:
         return self._enable_residual_smoothing
+    
+    @property
+    def enable_source_baseline(self) -> bool:
+        return self._enable_source_baseline
 
     @property
     def output_activations(self):  # TODO: add Union[list, None]
