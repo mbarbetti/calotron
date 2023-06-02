@@ -29,8 +29,8 @@ from calotron.utils import getSummaryHTML, initHPSingleton
 STUDY_NAME = "Transformer::ModArch::v0"
 DTYPE = np.float32
 TRAIN_RATIO = 0.7
-BATCHSIZE = 512
-EPOCHS = 500
+BATCHSIZE = 256
+EPOCHS = 400
 
 # +------------------+
 # |   Parser setup   |
@@ -120,9 +120,9 @@ with study.trial() as trial:
     # +------------------+
 
     npzfile = np.load(f"{data_dir}/calotron-dataset-demo.npz")
-    photon = npzfile["photon"].astype(DTYPE)[:150_000]
-    cluster = npzfile["cluster"].astype(DTYPE)[:150_000]
-    weight = npzfile["weight"].astype(DTYPE)[:150_000]
+    photon = npzfile["photon"].astype(DTYPE)[:100_000]
+    cluster = npzfile["cluster"].astype(DTYPE)[:100_000]
+    weight = npzfile["weight"].astype(DTYPE)[:100_000]
 
     print(f"[INFO] Generated photons - shape: {photon.shape}")
     print(f"[INFO] Reconstructed clusters - shape: {cluster.shape}")

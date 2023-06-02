@@ -27,14 +27,15 @@ from calotron.models import Calotron
 from calotron.models.discriminators import Discriminator
 from calotron.models.transformers import MaskedTransformer
 from calotron.optimization.callbacks import HopaasPruner
+from calotron.optimization.scores import EMDistance
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils import getSummaryHTML, initHPSingleton
 
-STUDY_NAME = "Calotron::ModArch::Testv0"
+STUDY_NAME = "Calotron::ModArch::v0"
 DTYPE = np.float32
 TRAIN_RATIO = 0.7
 BATCHSIZE = 256
-EPOCHS = 500
+EPOCHS = 400
 
 # +------------------+
 # |   Parser setup   |
@@ -112,7 +113,7 @@ study = hpc.Study(
     special_properties={"address": address, "node_name": str(args.node_name)},
     direction="minimize",
     pruner=hpc.pruners.MedianPruner(
-        n_startup_trials=20, n_warmup_steps=50, interval_steps=1, n_min_trials=10
+        n_startup_trials=50, n_warmup_steps=10, interval_steps=1, n_min_trials=10
     ),
     sampler=hpc.samplers.TPESampler(n_startup_trials=50),
     client=client,
@@ -126,9 +127,9 @@ with study.trial() as trial:
     # +------------------+
 
     npzfile = np.load(f"{data_dir}/calotron-dataset-demo.npz")
-    photon = npzfile["photon"].astype(DTYPE)[:150_000]
-    cluster = npzfile["cluster"].astype(DTYPE)[:150_000]
-    weight = npzfile["weight"].astype(DTYPE)[:150_000]
+    photon = npzfile["photon"].astype(DTYPE)[:100_000]
+    cluster = npzfile["cluster"].astype(DTYPE)[:100_000]
+    weight = npzfile["weight"].astype(DTYPE)[:100_000]
 
     print(f"[INFO] Generated photons - shape: {photon.shape}")
     print(f"[INFO] Reconstructed clusters - shape: {cluster.shape}")
@@ -284,7 +285,7 @@ with study.trial() as trial:
     callbacks.append(d_sched)
 
     pruner = HopaasPruner(
-        trial=trial, loss_name="val_wass_dist", report_frequency=1, enable_pruning=True
+        trial=trial, loss_name="val_wass_dist", report_frequency=5, enable_pruning=True
     )
     callbacks.append(pruner)
 
@@ -633,6 +634,38 @@ with study.trial() as trial:
     report_fname = f"{reports_dir}/{prefix}_train-report.html"
     report.write_report(filename=report_fname)
     print(f"[INFO] Training report correctly exported to {report_fname}")
-    print(
-        f"[INFO] The trained model of Trial n. {trial.id} scored {train.history['val_wass_dist'][-1]:.3f}"
+    
+    # +--------------------------------+
+    # |   Feedbacks to Hopaas server   |
+    # +--------------------------------+
+
+    EMD = EMDistance(dtype=DTYPE)
+
+    emd_x = EMD(
+        x_true=cluster_x,
+        x_pred=output_x,
+        bins=np.linspace(-1.0, 1.0, 101),
+        weights_true=w,
+        weights_pred=w,
     )
+
+    emd_y = EMD(
+        x_true=cluster_y,
+        x_pred=output_y,
+        bins=np.linspace(-1.0, 1.0, 101),
+        weights_true=w,
+        weights_pred=w,
+    )
+
+    emd_energy = EMD(
+        x_true=cluster_energy,
+        x_pred=output_energy,
+        bins=np.linspace(0.0, 1.0, 101),
+        weights_true=w,
+        weights_pred=w,
+    )
+
+    final_score = emd_x + emd_y + emd_energy
+    trial.loss = final_score
+
+    print(f"[INFO] The trained model of Trial n. {trial.id} scored {final_score:.3f}")
