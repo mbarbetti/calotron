@@ -6,6 +6,7 @@ from calotron.callbacks.schedulers.LearnRateBaseScheduler import LearnRateBaseSc
 class LearnRateAttnDecay(LearnRateBaseScheduler):
     def __init__(self, optimizer, d_model, warmup_steps=4000, verbose=False) -> None:
         super().__init__(optimizer, verbose)
+        self._name = "LearnRateAttnDecay"
 
         # d_model
         assert isinstance(d_model, (int, float))

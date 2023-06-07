@@ -14,6 +14,7 @@ class AdvExpDamping(AdvBaseDamping):
         verbose=False,
     ) -> None:
         super().__init__(adv_scale, verbose)
+        self._name = "AdvExpDamping"
 
         # Decay rate
         assert isinstance(decay_rate, (int, float))

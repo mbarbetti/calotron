@@ -14,6 +14,7 @@ class LearnRatePolynomialDecay(LearnRateBaseScheduler):
         verbose=False,
     ) -> None:
         super().__init__(optimizer, verbose)
+        self._name = "LearnRatePolynomialDecay"
 
         # Decay steps
         assert isinstance(decay_steps, (int, float))

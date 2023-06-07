@@ -5,6 +5,7 @@ from tensorflow.keras.callbacks import Callback
 class AdvBaseDamping(Callback):
     def __init__(self, adv_scale, verbose=False) -> None:
         super().__init__()
+        self._name = "AdvBaseDamping"
 
         # Adversarial scale
         assert isinstance(adv_scale, tf.Variable)
@@ -38,6 +39,10 @@ class AdvBaseDamping(Callback):
         if self._verbose:
             key, _ = self._adv_scale.name.split(":")
             logs[key] = self._adv_scale.numpy()
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     @property
     def adv_scale(self) -> tf.Variable:

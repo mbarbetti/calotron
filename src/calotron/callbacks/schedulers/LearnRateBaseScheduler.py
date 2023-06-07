@@ -8,6 +8,7 @@ K = tf.keras.backend
 class LearnRateBaseScheduler(Callback):
     def __init__(self, optimizer, verbose=False) -> None:
         super().__init__()
+        self._name = "LearnRateBaseScheduler"
 
         # Optimizer
         assert isinstance(optimizer, Optimizer)
@@ -42,6 +43,10 @@ class LearnRateBaseScheduler(Callback):
         logs = logs or {}
         if self._verbose:
             logs["lr"] = K.get_value(self.model.optimizer.learning_rate)
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     @property
     def optimizer(self) -> tf.keras.optimizers.Optimizer:

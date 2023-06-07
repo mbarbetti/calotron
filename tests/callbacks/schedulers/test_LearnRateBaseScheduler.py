@@ -40,6 +40,7 @@ def test_sched_configuration(scheduler):
     )
 
     assert isinstance(scheduler, LearnRateBaseScheduler)
+    assert isinstance(scheduler.name, str)
     assert isinstance(scheduler.optimizer, tf.keras.optimizers.Optimizer)
 
 

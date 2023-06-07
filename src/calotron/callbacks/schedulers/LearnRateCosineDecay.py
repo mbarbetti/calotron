@@ -9,6 +9,7 @@ class LearnRateCosineDecay(LearnRateBaseScheduler):
         self, optimizer, decay_steps, alpha=0.0, min_learning_rate=None, verbose=False
     ) -> None:
         super().__init__(optimizer, verbose)
+        self._name = "LearnRateCosineDecay"
 
         # Decay steps
         assert isinstance(decay_steps, (int, float))

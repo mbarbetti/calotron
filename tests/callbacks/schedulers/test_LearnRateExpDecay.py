@@ -43,6 +43,7 @@ def test_sched_configuration(scheduler):
     from calotron.callbacks.schedulers import LearnRateExpDecay
 
     assert isinstance(scheduler, LearnRateExpDecay)
+    assert isinstance(scheduler.name, str)
     assert isinstance(scheduler.optimizer, tf.keras.optimizers.Optimizer)
     assert isinstance(scheduler.decay_rate, float)
     assert isinstance(scheduler.decay_steps, int)

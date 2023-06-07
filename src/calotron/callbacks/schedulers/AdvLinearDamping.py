@@ -6,6 +6,7 @@ from calotron.callbacks.schedulers.AdvBaseDamping import AdvBaseDamping
 class AdvLinearDamping(AdvBaseDamping):
     def __init__(self, adv_scale, steps_to_min, min_adv_scale, verbose=False) -> None:
         super().__init__(adv_scale, verbose)
+        self._name = "AdvLinearDamping"
 
         # Steps to min
         assert isinstance(steps_to_min, (int, float))

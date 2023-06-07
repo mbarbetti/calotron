@@ -14,6 +14,7 @@ class LearnRateInvTimeDecay(LearnRateBaseScheduler):
         verbose=False,
     ) -> None:
         super().__init__(optimizer, verbose)
+        self._name = "LearnRateInvTimeDecay"
 
         # Decay rate
         assert isinstance(decay_rate, (int, float))

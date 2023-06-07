@@ -7,6 +7,7 @@ from calotron.callbacks.schedulers.LearnRateBaseScheduler import LearnRateBaseSc
 class LearnRatePiecewiseConstDecay(LearnRateBaseScheduler):
     def __init__(self, optimizer, boundaries, values, verbose=False) -> None:
         super().__init__(optimizer, verbose)
+        self._name = "LearnRatePiecewiseConstDecay"
 
         # Boundaries and values
         assert isinstance(boundaries, (list, tuple, np.ndarray))
