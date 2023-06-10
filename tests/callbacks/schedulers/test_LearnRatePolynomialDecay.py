@@ -32,6 +32,7 @@ def scheduler(cycle=False):
         power=1.0,
         cycle=cycle,
         verbose=False,
+        key="lr",
     )
     return sched
 
@@ -49,6 +50,8 @@ def test_sched_configuration(scheduler):
     assert isinstance(scheduler.end_learning_rate, float)
     assert isinstance(scheduler.power, float)
     assert isinstance(scheduler.cycle, bool)
+    assert isinstance(scheduler.verbose, bool)
+    assert isinstance(scheduler.key, str)
 
 
 @pytest.mark.parametrize("cycle", [False, True])

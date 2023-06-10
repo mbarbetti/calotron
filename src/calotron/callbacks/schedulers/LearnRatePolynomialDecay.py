@@ -12,8 +12,9 @@ class LearnRatePolynomialDecay(LearnRateBaseScheduler):
         power=1.0,
         cycle=False,
         verbose=False,
+        key="lr",
     ) -> None:
-        super().__init__(optimizer, verbose)
+        super().__init__(optimizer, verbose, key)
         self._name = "LearnRatePolynomialDecay"
 
         # Decay steps

@@ -32,6 +32,7 @@ def scheduler(staircase=False):
         staircase=staircase,
         min_learning_rate=0.001,
         verbose=False,
+        key="lr",
     )
     return sched
 
@@ -49,6 +50,8 @@ def test_sched_configuration(scheduler):
     assert isinstance(scheduler.decay_steps, int)
     assert isinstance(scheduler.staircase, bool)
     assert isinstance(scheduler.min_learning_rate, float)
+    assert isinstance(scheduler.verbose, bool)
+    assert isinstance(scheduler.key, str)
 
 
 @pytest.mark.parametrize("staircase", [False, True])

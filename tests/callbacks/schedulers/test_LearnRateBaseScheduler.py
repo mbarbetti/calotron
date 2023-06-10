@@ -27,7 +27,7 @@ def scheduler():
         LearnRateBaseScheduler,
     )
 
-    sched = LearnRateBaseScheduler(optimizer=adam, verbose=True)
+    sched = LearnRateBaseScheduler(optimizer=adam, verbose=True, key="lr")
     return sched
 
 
@@ -42,6 +42,8 @@ def test_sched_configuration(scheduler):
     assert isinstance(scheduler, LearnRateBaseScheduler)
     assert isinstance(scheduler.name, str)
     assert isinstance(scheduler.optimizer, tf.keras.optimizers.Optimizer)
+    assert isinstance(scheduler.verbose, bool)
+    assert isinstance(scheduler.key, str)
 
 
 def test_sched_use(scheduler):

@@ -6,7 +6,7 @@ K = tf.keras.backend
 
 
 class LearnRateBaseScheduler(Callback):
-    def __init__(self, optimizer, verbose=False) -> None:
+    def __init__(self, optimizer, verbose=False, key="lr") -> None:
         super().__init__()
         self._name = "LearnRateBaseScheduler"
 
@@ -17,6 +17,10 @@ class LearnRateBaseScheduler(Callback):
         # Verbose
         assert isinstance(verbose, bool)
         self._verbose = verbose
+
+        # Key name
+        assert isinstance(key, str)
+        self._key = key
 
     def on_train_begin(self, logs=None) -> None:
         init_lr = K.get_value(self._optimizer.learning_rate)
@@ -37,12 +41,12 @@ class LearnRateBaseScheduler(Callback):
     def on_batch_end(self, batch, logs=None) -> None:
         logs = logs or {}
         if self._verbose:
-            logs["lr"] = K.get_value(self.model.optimizer.learning_rate)
+            logs[self._key] = K.get_value(self._optimizer.learning_rate)
 
     def on_epoch_end(self, epoch, logs=None) -> None:
         logs = logs or {}
         if self._verbose:
-            logs["lr"] = K.get_value(self.model.optimizer.learning_rate)
+            logs[self._key] = K.get_value(self._optimizer.learning_rate)
 
     @property
     def name(self) -> str:
@@ -51,3 +55,11 @@ class LearnRateBaseScheduler(Callback):
     @property
     def optimizer(self) -> tf.keras.optimizers.Optimizer:
         return self._optimizer
+
+    @property
+    def verbose(self) -> bool:
+        return self._verbose
+
+    @property
+    def key(self) -> str:
+        return self._key

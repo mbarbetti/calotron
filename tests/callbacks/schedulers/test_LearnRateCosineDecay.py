@@ -31,6 +31,7 @@ def scheduler():
         alpha=0.95,
         min_learning_rate=0.001,
         verbose=True,
+        key="lr",
     )
     return sched
 
@@ -47,6 +48,8 @@ def test_sched_configuration(scheduler):
     assert isinstance(scheduler.decay_steps, int)
     assert isinstance(scheduler.alpha, float)
     assert isinstance(scheduler.min_learning_rate, float)
+    assert isinstance(scheduler.verbose, bool)
+    assert isinstance(scheduler.key, str)
 
 
 @pytest.mark.parametrize("min_learning_rate", [None, 0.0005])

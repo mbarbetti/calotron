@@ -30,6 +30,7 @@ def scheduler():
         boundaries=[25, 50],
         values=[0.001, 0.0005, 0.0001],
         verbose=True,
+        key="lr",
     )
     return sched
 
@@ -48,6 +49,8 @@ def test_sched_configuration(scheduler):
     assert isinstance(scheduler.values, list)
     assert isinstance(scheduler.values[0], float)
     assert len(scheduler.boundaries) == len(scheduler.values)
+    assert isinstance(scheduler.verbose, bool)
+    assert isinstance(scheduler.key, str)
 
 
 def test_sched_use(scheduler):

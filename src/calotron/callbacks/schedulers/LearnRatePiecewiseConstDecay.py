@@ -5,8 +5,8 @@ from calotron.callbacks.schedulers.LearnRateBaseScheduler import LearnRateBaseSc
 
 
 class LearnRatePiecewiseConstDecay(LearnRateBaseScheduler):
-    def __init__(self, optimizer, boundaries, values, verbose=False) -> None:
-        super().__init__(optimizer, verbose)
+    def __init__(self, optimizer, boundaries, values, verbose=False, key="lr") -> None:
+        super().__init__(optimizer, verbose, key)
         self._name = "LearnRatePiecewiseConstDecay"
 
         # Boundaries and values

@@ -6,9 +6,15 @@ from calotron.callbacks.schedulers.LearnRateBaseScheduler import LearnRateBaseSc
 
 class LearnRateCosineDecay(LearnRateBaseScheduler):
     def __init__(
-        self, optimizer, decay_steps, alpha=0.0, min_learning_rate=None, verbose=False
+        self,
+        optimizer,
+        decay_steps,
+        alpha=0.0,
+        min_learning_rate=None,
+        verbose=False,
+        key="lr",
     ) -> None:
-        super().__init__(optimizer, verbose)
+        super().__init__(optimizer, verbose, key)
         self._name = "LearnRateCosineDecay"
 
         # Decay steps

@@ -12,8 +12,9 @@ class LearnRateInvTimeDecay(LearnRateBaseScheduler):
         staircase=False,
         min_learning_rate=None,
         verbose=False,
+        key="lr",
     ) -> None:
-        super().__init__(optimizer, verbose)
+        super().__init__(optimizer, verbose, key)
         self._name = "LearnRateInvTimeDecay"
 
         # Decay rate
