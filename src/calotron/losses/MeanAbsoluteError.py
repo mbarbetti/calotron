@@ -51,7 +51,7 @@ class MeanAbsoluteError(BaseLoss):
         assert isinstance(wass_options, dict)
         self._wass_options = wass_options
 
-        for options in [bce_options, wass_options]:
+        for options in [self._bce_options, self._wass_options]:
             options.update(dict(warmup_energy=warmup_energy))
 
         # Losses definition

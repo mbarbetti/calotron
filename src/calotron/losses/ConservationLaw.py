@@ -50,7 +50,7 @@ class ConservationLaw(BaseLoss):
         assert isinstance(wass_options, dict)
         self._wass_options = wass_options
 
-        for options in [bce_options, wass_options]:
+        for options in [self._bce_options, self._wass_options]:
             options.update(dict(warmup_energy=warmup_energy))
 
         # Losses definition
@@ -115,7 +115,8 @@ class ConservationLaw(BaseLoss):
             training=training,
         )
 
-        tot_loss = l2_loss + conserv_loss + self._alpha * adv_loss
+        tot_loss = l2_loss + self._alpha * adv_loss
+        # tot_loss = l2_loss + conserv_loss + self._alpha * adv_loss
         # tot_loss = l2_loss + conserv_loss + monotonic_loss + self._alpha * adv_loss
         return tot_loss
 

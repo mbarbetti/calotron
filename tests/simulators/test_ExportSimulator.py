@@ -25,15 +25,15 @@ model = Transformer(
     decoder_depth=8,
     num_layers=2,
     num_heads=4,
-    key_dims=32,
+    key_dim=32,
+    admin_res_scale="O(n)",
     mlp_units=128,
-    dropout_rates=0.1,
-    seq_ord_latent_dims=16,
-    seq_ord_max_lengths=[source.shape[1], target.shape[1]],
-    seq_ord_normalizations=10_000,
-    enable_residual_smoothing=True,
-    enable_source_baseline=True,
-    output_activations="relu",
+    dropout_rate=0.1,
+    seq_ord_latent_dim=16,
+    seq_ord_max_length=max(source.shape[1], target.shape[1]),
+    seq_ord_normalization=10_000,
+    enable_res_smoothing=True,
+    output_activations="linear",
     start_token_initializer="ones",
 )
 
@@ -66,7 +66,7 @@ def test_export_use(export_simulator):
     assert output.shape == tuple(test_shape)
     test_shape = list()
     test_shape.append(BATCH_SIZE)
-    test_shape.append(model.num_heads[1])
+    test_shape.append(model.decoder_num_heads)
     test_shape.append(target.shape[1])
     test_shape.append(source.shape[1])
     assert attn_weights.shape == tuple(test_shape)
@@ -74,4 +74,6 @@ def test_export_use(export_simulator):
     reloaded = tf.saved_model.load(export_dir)
     output_reloaded, attn_weights_reloaded = reloaded(dataset)
     comparison = output.numpy() == output_reloaded.numpy()
+    assert comparison.all()
+    comparison = attn_weights.numpy() == attn_weights_reloaded.numpy()
     assert comparison.all()

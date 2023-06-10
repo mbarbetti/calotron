@@ -1,5 +1,4 @@
 import pytest
-import tensorflow as tf
 from tensorflow.keras.activations import relu, sigmoid, tanh
 from tensorflow.keras.layers import Activation, Layer, ReLU
 
