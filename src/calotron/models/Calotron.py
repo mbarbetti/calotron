@@ -80,7 +80,7 @@ class Calotron(tf.keras.Model):
         for _ in range(self._t_upds_per_batch):
             self._t_train_step(source, target, sample_weight)
 
-        train_dict = dict()
+        train_dict = dict(t_loss=self._t_loss.result(), d_loss=self._d_loss.result())
         if self._metrics is not None:
             output = self._transformer((source, target), training=False)
             y_pred = self._discriminator(
@@ -94,15 +94,6 @@ class Calotron(tf.keras.Model):
                     y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
                 )
                 train_dict.update({metric.name: metric.result()})
-
-        train_dict.update(
-            {
-                "t_loss": self._t_loss.result(),
-                "d_loss": self._d_loss.result(),
-                "t_lr": self._t_opt.learning_rate,
-                "d_lr": self._d_opt.learning_rate,
-            }
-        )
         return train_dict
 
     def _t_train_step(self, source, target, sample_weight) -> None:
@@ -162,7 +153,7 @@ class Calotron(tf.keras.Model):
         )
         self._d_loss.update_state(d_loss)
 
-        train_dict = dict()
+        train_dict = dict(t_loss=self._t_loss.result(), d_loss=self._d_loss.result())
         if self._metrics is not None:
             output = self._transformer((source, target), training=False)
             y_pred = self._discriminator(
@@ -176,15 +167,6 @@ class Calotron(tf.keras.Model):
                     y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
                 )
                 train_dict.update({metric.name: metric.result()})
-
-        train_dict.update(
-            {
-                "t_loss": self._t_loss.result(),
-                "d_loss": self._d_loss.result(),
-                "t_lr": self._t_opt.learning_rate,
-                "d_lr": self._d_opt.learning_rate,
-            }
-        )
         return train_dict
 
     def get_start_token(self, target) -> tf.Tensor:

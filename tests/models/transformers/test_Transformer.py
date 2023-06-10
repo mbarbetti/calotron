@@ -21,15 +21,15 @@ def model():
         decoder_depth=8,
         num_layers=2,
         num_heads=4,
-        key_dims=32,
+        key_dim=32,
+        admin_res_scale="O(n)",
         mlp_units=128,
-        dropout_rates=0.1,
-        seq_ord_latent_dims=16,
-        seq_ord_max_lengths=[source.shape[1], target.shape[1]],
-        seq_ord_normalizations=10_000,
-        enable_residual_smoothing=True,
-        enable_source_baseline=True,
-        output_activations="relu",
+        dropout_rate=0.1,
+        seq_ord_latent_dim=16,
+        seq_ord_max_length=max(source.shape[1], target.shape[1]),
+        seq_ord_normalization=10_000,
+        enable_res_smoothing=True,
+        output_activations="linear",
         start_token_initializer="ones",
     )
     return trans
@@ -43,27 +43,37 @@ def test_model_configuration(model):
 
     assert isinstance(model, Transformer)
     assert isinstance(model.output_depth, int)
-    assert isinstance(model.encoder_depth, int)
-    assert isinstance(model.decoder_depth, int)
-    assert isinstance(model.num_layers, list)
-    assert isinstance(model.num_heads, list)
-    assert isinstance(model.key_dims, list)
-    assert isinstance(model.mlp_units, list)
-    assert isinstance(model.dropout_rates, list)
-    assert isinstance(model.seq_ord_latent_dims, list)
-    assert isinstance(model.seq_ord_max_lengths, list)
-    assert isinstance(model.seq_ord_normalizations, list)
-    assert isinstance(model.enable_residual_smoothing, list)
-    assert isinstance(model.enable_source_baseline, bool)
+    assert isinstance(model.encoder_output_depth, int)
+    assert isinstance(model.decoder_output_depth, int)
+    assert isinstance(model.encoder_num_layers, int)
+    assert isinstance(model.decoder_num_layers, int)
+    assert isinstance(model.encoder_num_heads, int)
+    assert isinstance(model.decoder_num_heads, int)
+    assert isinstance(model.encoder_key_dim, int)
+    assert isinstance(model.decoder_key_dim, int)
+    assert isinstance(model.encoder_admin_res_scale, str)
+    assert isinstance(model.decoder_admin_res_scale, str)
+    assert isinstance(model.encoder_mlp_units, int)
+    assert isinstance(model.decoder_mlp_units, int)
+    assert isinstance(model.encoder_dropout_rate, float)
+    assert isinstance(model.decoder_dropout_rate, float)
+    assert isinstance(model.encoder_seq_ord_latent_dim, int)
+    assert isinstance(model.decoder_seq_ord_latent_dim, int)
+    assert isinstance(model.encoder_seq_ord_max_length, int)
+    assert isinstance(model.decoder_seq_ord_max_length, int)
+    assert isinstance(model.encoder_seq_ord_normalization, float)
+    assert isinstance(model.decoder_seq_ord_normalization, float)
+    assert isinstance(model.enable_res_smoothing, bool)
     assert isinstance(model.output_activations, str)
     assert isinstance(model.start_token_initializer, str)
 
 
-@pytest.mark.parametrize("enable_residual_smoothing", [True, False])
+@pytest.mark.parametrize("admin_res_scale", ["O(n)", "O(logn)", "O(1)"])
+@pytest.mark.parametrize("enable_res_smoothing", [True, False])
 @pytest.mark.parametrize("output_activations", ["relu", None])
-def test_model_use(enable_residual_smoothing, output_activations):
+def test_model_use(admin_res_scale, enable_res_smoothing, output_activations):
     latent_dim = 8
-    if enable_residual_smoothing:
+    if enable_res_smoothing:
         encoder_depth = latent_dim + ADDITIONAL_DIM
         decoder_depth = latent_dim + ADDITIONAL_DIM
     else:
@@ -77,13 +87,14 @@ def test_model_use(enable_residual_smoothing, output_activations):
         decoder_depth=decoder_depth,
         num_layers=2,
         num_heads=4,
-        key_dims=32,
+        key_dim=32,
+        admin_res_scale=admin_res_scale,
         mlp_units=128,
-        dropout_rates=0.1,
-        seq_ord_latent_dims=latent_dim,
-        seq_ord_max_lengths=[source.shape[1], target.shape[1]],
-        seq_ord_normalizations=10_000,
-        enable_residual_smoothing=enable_residual_smoothing,
+        dropout_rate=0.1,
+        seq_ord_latent_dim=latent_dim,
+        seq_ord_max_length=max(source.shape[1], target.shape[1]),
+        seq_ord_normalization=10_000,
+        enable_res_smoothing=enable_res_smoothing,
         output_activations=output_activations,
     )
     output = model((source, target))
@@ -111,15 +122,15 @@ def test_model_baseline(target):
         decoder_depth=8,
         num_layers=2,
         num_heads=4,
-        key_dims=32,
+        key_dim=32,
+        admin_res_scale="O(n)",
         mlp_units=128,
-        dropout_rates=0.1,
-        seq_ord_latent_dims=16,
-        seq_ord_max_lengths=[source.shape[1], target.shape[1]],
-        seq_ord_normalizations=10_000,
-        enable_residual_smoothing=True,
-        enable_source_baseline=True,
-        output_activations="relu",
+        dropout_rate=0.1,
+        seq_ord_latent_dim=16,
+        seq_ord_max_length=max(source.shape[1], target.shape[1]),
+        seq_ord_normalization=10_000,
+        enable_res_smoothing=True,
+        output_activations="linear",
         start_token_initializer="ones",
     )
     output = model((source, target))
@@ -139,14 +150,15 @@ def test_model_start_token(start_token_initializer):
         decoder_depth=8,
         num_layers=2,
         num_heads=4,
-        key_dims=32,
+        key_dim=32,
+        admin_res_scale="O(n)",
         mlp_units=128,
-        dropout_rates=0.1,
-        seq_ord_latent_dims=16,
-        seq_ord_max_lengths=[source.shape[1], target.shape[1]],
-        seq_ord_normalizations=10_000,
-        enable_residual_smoothing=True,
-        output_activations="relu",
+        dropout_rate=0.1,
+        seq_ord_latent_dim=16,
+        seq_ord_max_length=max(source.shape[1], target.shape[1]),
+        seq_ord_normalization=10_000,
+        enable_res_smoothing=True,
+        output_activations="linear",
         start_token_initializer=start_token_initializer,
     )
     output = model((source, target))

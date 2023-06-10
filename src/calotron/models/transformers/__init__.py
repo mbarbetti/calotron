@@ -1,3 +1,3 @@
 from .BaseTransformer import BaseTransformer
-from .MaskedTransformer import MaskedTransformer
+from .OptionalTransformer import OptionalTransformer
 from .Transformer import Transformer

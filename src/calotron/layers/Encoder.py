@@ -95,7 +95,7 @@ class Encoder(tf.keras.layers.Layer):
         seq_ord_latent_dim=16,
         seq_ord_max_length=512,
         seq_ord_normalization=10_000,
-        enable_residual_smoothing=True,
+        enable_res_smoothing=True,
         name=None,
         dtype=None,
     ) -> None:
@@ -107,8 +107,8 @@ class Encoder(tf.keras.layers.Layer):
         self._num_layers = int(num_layers)
 
         # Residual smoothing
-        assert isinstance(enable_residual_smoothing, bool)
-        self._enable_residual_smoothing = enable_residual_smoothing
+        assert isinstance(enable_res_smoothing, bool)
+        self._enable_res_smoothing = enable_res_smoothing
 
         # Sequence order embedding
         self._seq_ord_embedding = SeqOrderEmbedding(
@@ -121,7 +121,7 @@ class Encoder(tf.keras.layers.Layer):
         )
 
         # Smoothing layer
-        if self._enable_residual_smoothing:
+        if self._enable_res_smoothing:
             self._smooth_layer = tf.keras.Sequential(
                 [
                     tf.keras.layers.Dense(
@@ -209,5 +209,5 @@ class Encoder(tf.keras.layers.Layer):
         return self._seq_ord_embedding.normalization
 
     @property
-    def enable_residual_smoothing(self) -> bool:
-        return self._enable_residual_smoothing
+    def enable_res_smoothing(self) -> bool:
+        return self._enable_res_smoothing

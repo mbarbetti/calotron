@@ -19,7 +19,7 @@ def layer():
         seq_ord_latent_dim=16,
         seq_ord_max_length=512,
         seq_ord_normalization=10_000,
-        enable_residual_smoothing=True,
+        enable_res_smoothing=True,
     )
     return enc
 
@@ -41,16 +41,16 @@ def test_layer_configuration(layer):
     assert isinstance(layer.seq_ord_latent_dim, int)
     assert isinstance(layer.seq_ord_max_length, int)
     assert isinstance(layer.seq_ord_normalization, float)
-    assert isinstance(layer.enable_residual_smoothing, bool)
+    assert isinstance(layer.enable_res_smoothing, bool)
 
 
 @pytest.mark.parametrize("admin_res_scale", ["O(n)", "O(logn)", "O(1)"])
-@pytest.mark.parametrize("enable_residual_smoothing", [True, False])
-def test_layer_use(admin_res_scale, enable_residual_smoothing):
+@pytest.mark.parametrize("enable_res_smoothing", [True, False])
+def test_layer_use(admin_res_scale, enable_res_smoothing):
     input_dim = 4
     latent_dim = 8
     max_length = 32
-    if enable_residual_smoothing:
+    if enable_res_smoothing:
         output_dim = latent_dim + ADDITIONAL_DIM
     else:
         output_dim = latent_dim
@@ -67,7 +67,7 @@ def test_layer_use(admin_res_scale, enable_residual_smoothing):
         seq_ord_latent_dim=latent_dim,
         seq_ord_max_length=max_length,
         seq_ord_normalization=10_000,
-        enable_residual_smoothing=enable_residual_smoothing,
+        enable_res_smoothing=enable_res_smoothing,
     )
     input = tf.random.normal(shape=(100, max_length, input_dim))
     output = layer(input)
