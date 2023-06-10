@@ -1,38 +1,117 @@
 import tensorflow as tf
 
+from calotron.layers.AdminResidual import AdminResidual
+
 
 class BaseAttention(tf.keras.layers.Layer):
-    def __init__(self, **kwargs) -> None:
-        super().__init__()
-        self._mha = tf.keras.layers.MultiHeadAttention(**kwargs)
-        self._add = tf.keras.layers.Add()
+    def __init__(
+        self,
+        num_heads,
+        key_dim,
+        embed_dim,
+        num_res_layers,
+        admin_res_scale="O(n)",
+        dropout_rate=0.1,
+        name=None,
+        dtype=None,
+    ) -> None:
+        super().__init__(name=name, dtype=dtype)
+        if name is not None:
+            prefix = "_".join(w for w in name.split("_")[:-1])
+            suffix = name.split("_")[-1]
+        else:
+            prefix, suffix = None, None
+
+        # Number of heads
+        assert isinstance(num_heads, (int, float))
+        assert num_heads >= 1
+        self._num_heads = int(num_heads)
+
+        # Key dimension
+        assert isinstance(key_dim, (int, float))
+        assert key_dim >= 1
+        self._key_dim = int(key_dim)
+
+        # Dropout rate
+        assert isinstance(dropout_rate, (int, float))
+        assert dropout_rate >= 0.0 and dropout_rate < 1.0
+        self._dropout_rate = float(dropout_rate)
+
+        # Attention mechanism layers
+        self._mha = tf.keras.layers.MultiHeadAttention(
+            num_heads=num_heads,
+            key_dim=key_dim,
+            value_dim=None,
+            dropout=dropout_rate,
+            kernel_initializer="he_normal",
+            bias_initializer="zeros",
+            name=f"{prefix}_mha_{suffix}" if name else None,
+            dtype=self.dtype,
+        )
+        self._res = AdminResidual(
+            embed_dim=embed_dim,
+            num_res_layers=num_res_layers,
+            output_change_scale=admin_res_scale,
+            name=f"{prefix}_res_{suffix}" if name else None,
+            dtype=self.dtype,
+        )
+        self._ln = tf.keras.layers.LayerNormalization(
+            axis=-1, epsilon=1e-3, name=f"{prefix}_ln_{suffix}", dtype=self.dtype
+        )
+
+    @property
+    def num_heads(self) -> int:
+        return self._num_heads
+
+    @property
+    def key_dim(self) -> int:
+        return self._key_dim
+
+    @property
+    def embed_dim(self) -> int:
+        return self._res.embed_dim
+
+    @property
+    def num_res_layers(self) -> int:
+        return self._res.num_res_layers
+
+    @property
+    def admin_res_scale(self) -> str:
+        return self._res.output_change_scale
+
+    @property
+    def dropout_rate(self) -> float:
+        return self._dropout_rate
 
 
 class CrossAttention(BaseAttention):
     def call(self, x, condition, attention_mask=None) -> tf.Tensor:
-        attn_output, attn_scores = self._mha(
+        f_x, scores = self._mha(
             query=x,
             key=condition,
             value=condition,
             attention_mask=attention_mask,
             return_attention_scores=True,
         )
-        self._attn_scores = attn_scores
-        output = self._add([x, attn_output])
-        return output
+        self._attn_scores = scores
+        res = self._res(x, f_x)
+        out = self._ln(res)
+        return out
 
 
 class GlobalSelfAttention(BaseAttention):
     def call(self, x, attention_mask=None) -> tf.Tensor:
-        attn_output = self._mha(query=x, key=x, value=x, attention_mask=attention_mask)
-        output = self._add([x, attn_output])
-        return output
+        f_x = self._mha(query=x, key=x, value=x, attention_mask=attention_mask)
+        res = self._res(x, f_x)
+        out = self._ln(res)
+        return out
 
 
 class CausalSelfAttention(BaseAttention):
     def call(self, x, attention_mask=None) -> tf.Tensor:
-        attn_output = self._mha(
+        f_x = self._mha(
             query=x, key=x, value=x, attention_mask=attention_mask, use_causal_mask=True
         )
-        output = self._add([x, attn_output])
-        return output
+        res = self._res(x, f_x)
+        out = self._ln(res)
+        return out

@@ -6,7 +6,13 @@ import tensorflow as tf
 def layer():
     from calotron.layers import MultilayerPerceptron
 
-    mlp = MultilayerPerceptron(output_units=32, hidden_units=128, dropout_rate=0.1)
+    mlp = MultilayerPerceptron(
+        output_units=32,
+        hidden_units=128,
+        num_res_layers=5,
+        admin_res_scale="O(n)",
+        dropout_rate=0.1,
+    )
     return mlp
 
 
@@ -19,6 +25,8 @@ def test_layer_configuration(layer):
     assert isinstance(layer, MultilayerPerceptron)
     assert isinstance(layer.output_units, int)
     assert isinstance(layer.hidden_units, int)
+    assert isinstance(layer.num_res_layers, int)
+    assert isinstance(layer.admin_res_scale, str)
     assert isinstance(layer.dropout_rate, float)
 
 

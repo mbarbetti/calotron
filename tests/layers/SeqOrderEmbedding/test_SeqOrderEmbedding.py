@@ -7,11 +7,7 @@ def layer():
     from calotron.layers import SeqOrderEmbedding
 
     seq_order = SeqOrderEmbedding(
-        latent_dim=8,
-        max_length=512,
-        normalization=10_000,
-        dropout_rate=0.1,
-        epsilon=1e-12,
+        latent_dim=8, max_length=512, normalization=10_000, dropout_rate=0.1
     )
     return seq_order
 
@@ -27,7 +23,6 @@ def test_layer_configuration(layer):
     assert isinstance(layer.max_length, int)
     assert isinstance(layer.normalization, float)
     assert isinstance(layer.dropout_rate, float)
-    assert isinstance(layer.epsilon, float)
 
 
 def test_layer_use(layer):

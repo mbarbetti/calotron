@@ -11,6 +11,8 @@ class EncoderLayer(tf.keras.layers.Layer):
         output_depth,
         num_heads,
         key_dim,
+        num_res_layers,
+        admin_res_scale="O(n)",
         mlp_units=128,
         dropout_rate=0.1,
         name=None,
@@ -20,76 +22,64 @@ class EncoderLayer(tf.keras.layers.Layer):
         if name is not None:
             prefix = name.split("_")[0]
             suffix = name.split("_")[-1]
-
-        # Output depth
-        assert isinstance(output_depth, (int, float))
-        assert output_depth >= 1
-        self._output_depth = int(output_depth)
-
-        # Number of heads
-        assert isinstance(num_heads, (int, float))
-        assert num_heads >= 1
-        self._num_heads = int(num_heads)
-
-        # Key dimension
-        assert isinstance(key_dim, (int, float))
-        assert key_dim >= 1
-        self._key_dim = int(key_dim)
-
-        # Multilayer perceptron units
-        assert isinstance(mlp_units, (int, float))
-        assert mlp_units >= 1
-        self._mlp_units = int(mlp_units)
-
-        # Dropout rate
-        assert isinstance(dropout_rate, (int, float))
-        assert dropout_rate >= 0.0 and dropout_rate < 1.0
-        self._dropout_rate = float(dropout_rate)
+        else:
+            prefix, suffix = None, None
 
         # Multi-head attention
         self._global_attn = GlobalSelfAttention(
-            num_heads=self._num_heads,
-            key_dim=self._key_dim,
-            dropout=self._dropout_rate,
-            kernel_initializer="glorot_uniform",
-            bias_initializer="zeros",
+            num_heads=num_heads,
+            key_dim=key_dim,
+            embed_dim=output_depth,
+            num_res_layers=num_res_layers,
+            admin_res_scale=admin_res_scale,
+            dropout_rate=dropout_rate,
             name=f"{prefix}_global_attn_{suffix}" if name else None,
             dtype=self.dtype,
         )
 
         # Multilayer perceptron
         self._mlp = MultilayerPerceptron(
-            output_units=self._output_depth,
-            hidden_units=self._mlp_units,
-            dropout_rate=self._dropout_rate,
+            output_units=output_depth,
+            hidden_units=mlp_units,
+            num_res_layers=num_res_layers,
+            admin_res_scale=admin_res_scale,
+            dropout_rate=dropout_rate,
             name=f"{prefix}_mlp_{suffix}" if name else None,
             dtype=self.dtype,
         )
 
     def call(self, x, global_attn_mask=None) -> tf.Tensor:
-        output = self._global_attn(x, attention_mask=global_attn_mask)
-        output = self._mlp(output)
-        return output
+        f_x = self._global_attn(x, attention_mask=global_attn_mask)
+        out = self._mlp(f_x)
+        return out
 
     @property
     def output_depth(self) -> int:
-        return self._output_depth
+        return self._mlp.output_units
 
     @property
     def num_heads(self) -> int:
-        return self._num_heads
+        return self._global_attn.num_heads
 
     @property
-    def key_dim(self):  # TODO: add Union[int, None]
-        return self._key_dim
+    def key_dim(self) -> int:
+        return self._global_attn.key_dim
+
+    @property
+    def num_res_layers(self) -> int:
+        return self._global_attn.num_res_layers
+
+    @property
+    def admin_res_scale(self) -> str:
+        return self._global_attn.admin_res_scale
 
     @property
     def mlp_units(self) -> int:
-        return self._mlp_units
+        return self._mlp.hidden_units
 
     @property
     def dropout_rate(self) -> float:
-        return self._dropout_rate
+        return self._global_attn.dropout_rate
 
 
 class Encoder(tf.keras.layers.Layer):
@@ -99,6 +89,7 @@ class Encoder(tf.keras.layers.Layer):
         num_layers,
         num_heads,
         key_dim,
+        admin_res_scale="O(n)",
         mlp_units=128,
         dropout_rate=0.1,
         seq_ord_latent_dim=16,
@@ -110,50 +101,10 @@ class Encoder(tf.keras.layers.Layer):
     ) -> None:
         super().__init__(name=name, dtype=dtype)
 
-        # Output depth
-        assert isinstance(output_depth, (int, float))
-        assert output_depth >= 1
-        self._output_depth = int(output_depth)
-
         # Number of layers
         assert isinstance(num_layers, (int, float))
         assert num_layers >= 1
         self._num_layers = int(num_layers)
-
-        # Number of heads
-        assert isinstance(num_heads, (int, float))
-        assert num_heads >= 1
-        self._num_heads = int(num_heads)
-
-        # Key dimension
-        assert isinstance(key_dim, (int, float))
-        assert key_dim >= 1
-        self._key_dim = int(key_dim)
-
-        # Multilayer perceptron units
-        assert isinstance(mlp_units, (int, float))
-        assert mlp_units >= 1
-        self._mlp_units = int(mlp_units)
-
-        # Dropout rate
-        assert isinstance(dropout_rate, (int, float))
-        assert dropout_rate >= 0.0 and dropout_rate < 1.0
-        self._dropout_rate = float(dropout_rate)
-
-        # Sequence order latent space dimension
-        assert isinstance(seq_ord_latent_dim, (int, float))
-        assert seq_ord_latent_dim >= 1
-        self._seq_ord_latent_dim = int(seq_ord_latent_dim)
-
-        # Sequence max length
-        assert isinstance(seq_ord_max_length, (int, float))
-        assert seq_ord_max_length >= 1
-        self._seq_ord_max_length = int(seq_ord_max_length)
-
-        # Sequence order encoding normalization
-        assert isinstance(seq_ord_normalization, (int, float))
-        assert seq_ord_normalization > 0.0
-        self._seq_ord_normalization = float(seq_ord_normalization)
 
         # Residual smoothing
         assert isinstance(enable_residual_smoothing, bool)
@@ -161,11 +112,11 @@ class Encoder(tf.keras.layers.Layer):
 
         # Sequence order embedding
         self._seq_ord_embedding = SeqOrderEmbedding(
-            latent_dim=self._seq_ord_latent_dim,
-            max_length=self._seq_ord_max_length,
-            normalization=self._seq_ord_normalization,
-            dropout_rate=self._dropout_rate,
-            name="enc_seq_ord_embedding",
+            latent_dim=seq_ord_latent_dim,
+            max_length=seq_ord_max_length,
+            normalization=seq_ord_normalization,
+            dropout_rate=dropout_rate,
+            name="enc_so_embedding",
             dtype=self.dtype,
         )
 
@@ -174,15 +125,15 @@ class Encoder(tf.keras.layers.Layer):
             self._smooth_layer = tf.keras.Sequential(
                 [
                     tf.keras.layers.Dense(
-                        units=self._output_depth,
-                        activation="linear",
-                        kernel_initializer="truncated_normal",
+                        units=output_depth,
+                        activation="relu",
+                        kernel_initializer="glorot_normal",
                         bias_initializer="zeros",
-                        name="enc_smooth_layer",
+                        name="enc_sl_dense",
                         dtype=self.dtype,
                     ),
                     tf.keras.layers.Dropout(
-                        self._dropout_rate, name="enc_dropout", dtype=self.dtype
+                        dropout_rate, name="enc_sl_dropout", dtype=self.dtype
                     ),
                 ]
             )
@@ -192,11 +143,13 @@ class Encoder(tf.keras.layers.Layer):
         # Encoder layers
         self._encoder_layers = [
             EncoderLayer(
-                output_depth=self._output_depth,
-                num_heads=self._num_heads,
-                key_dim=self._key_dim,
-                mlp_units=self._mlp_units,
-                dropout_rate=self._dropout_rate,
+                output_depth=output_depth,
+                num_heads=num_heads,
+                key_dim=key_dim,
+                num_res_layers=2 * self._num_layers,
+                admin_res_scale=admin_res_scale,
+                mlp_units=mlp_units,
+                dropout_rate=dropout_rate,
                 name=f"enc_layer_{i}",
                 dtype=self.dtype,
             )
@@ -204,16 +157,16 @@ class Encoder(tf.keras.layers.Layer):
         ]
 
     def call(self, x, global_attn_mask=None) -> tf.Tensor:
-        output = self._seq_ord_embedding(x)
+        out = self._seq_ord_embedding(x)
         if self._smooth_layer is not None:
-            output = self._smooth_layer(output)
+            out = self._smooth_layer(out)
         for i in range(self._num_layers):
-            output = self._encoder_layers[i](output, global_attn_mask)
-        return output
+            out = self._encoder_layers[i](out, global_attn_mask)
+        return out
 
     @property
     def output_depth(self) -> int:
-        return self._output_depth
+        return self._encoder_layers[0].output_depth
 
     @property
     def num_layers(self) -> int:
@@ -221,31 +174,39 @@ class Encoder(tf.keras.layers.Layer):
 
     @property
     def num_heads(self) -> int:
-        return self._num_heads
+        return self._encoder_layers[0].num_heads
 
     @property
     def key_dim(self) -> int:
-        return self._key_dim
+        return self._encoder_layers[0].key_dim
+
+    @property
+    def num_res_layers(self) -> int:
+        return self._encoder_layers[0].num_res_layers
+
+    @property
+    def admin_res_scale(self) -> str:
+        return self._encoder_layers[0].admin_res_scale
 
     @property
     def mlp_units(self) -> int:
-        return self._mlp_units
+        return self._encoder_layers[0].mlp_units
 
     @property
     def dropout_rate(self) -> float:
-        return self._dropout_rate
+        return self._seq_ord_embedding.dropout_rate
 
     @property
     def seq_ord_latent_dim(self) -> int:
-        return self._seq_ord_latent_dim
+        return self._seq_ord_embedding.latent_dim
 
     @property
     def seq_ord_max_length(self) -> int:
-        return self._seq_ord_max_length
+        return self._seq_ord_embedding.max_length
 
     @property
     def seq_ord_normalization(self) -> float:
-        return self._seq_ord_normalization
+        return self._seq_ord_embedding.normalization
 
     @property
     def enable_residual_smoothing(self) -> bool:

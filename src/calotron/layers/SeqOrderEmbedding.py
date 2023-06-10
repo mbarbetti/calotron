@@ -9,7 +9,6 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
         max_length=512,
         normalization=10_000,
         dropout_rate=0.1,
-        epsilon=1e-12,
         name=None,
         dtype=None,
     ) -> None:
@@ -37,11 +36,6 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
         assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
-        # Epsilon
-        assert isinstance(epsilon, (int, float))
-        assert epsilon > 0.0
-        self._epsilon = float(epsilon)
-
         # Sequence order encoding
         self._seq_ord_encoding = self._seq_order_encoding(
             length=self._max_length,
@@ -55,8 +49,8 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
             [
                 tf.keras.layers.Dense(
                     units=self._latent_dim,
-                    activation="linear",
-                    kernel_initializer="he_normal",
+                    activation="relu",
+                    kernel_initializer="he_uniform",
                     bias_initializer="zeros",
                     name=f"{prefix}_seq_ord_dense" if name else None,
                     dtype=self.dtype,
@@ -77,7 +71,7 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
             self._seq_ord_encoding[None, : tf.shape(x)[1], :],
             multiples=(tf.shape(x)[0], 1, 1),
         )
-        emb_output = self._embedding(x) + self._epsilon
+        emb_output = self._embedding(x)
         output = self._add([emb_output, seq_order])
         return output
 
@@ -108,7 +102,3 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
     @property
     def dropout_rate(self) -> float:
         return self._dropout_rate
-
-    @property
-    def epsilon(self) -> float:
-        return self._epsilon

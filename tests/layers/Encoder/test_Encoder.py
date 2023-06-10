@@ -13,6 +13,7 @@ def layer():
         num_layers=4,
         num_heads=8,
         key_dim=32,
+        admin_res_scale="O(n)",
         mlp_units=128,
         dropout_rate=0.1,
         seq_ord_latent_dim=16,
@@ -34,6 +35,7 @@ def test_layer_configuration(layer):
     assert isinstance(layer.num_layers, int)
     assert isinstance(layer.num_heads, int)
     assert isinstance(layer.key_dim, int)
+    assert isinstance(layer.admin_res_scale, str)
     assert isinstance(layer.mlp_units, int)
     assert isinstance(layer.dropout_rate, float)
     assert isinstance(layer.seq_ord_latent_dim, int)
@@ -42,8 +44,9 @@ def test_layer_configuration(layer):
     assert isinstance(layer.enable_residual_smoothing, bool)
 
 
+@pytest.mark.parametrize("admin_res_scale", ["O(n)", "O(logn)", "O(1)"])
 @pytest.mark.parametrize("enable_residual_smoothing", [True, False])
-def test_layer_use(enable_residual_smoothing):
+def test_layer_use(admin_res_scale, enable_residual_smoothing):
     input_dim = 4
     latent_dim = 8
     max_length = 32
@@ -58,6 +61,7 @@ def test_layer_use(enable_residual_smoothing):
         num_layers=4,
         num_heads=8,
         key_dim=32,
+        admin_res_scale=admin_res_scale,
         mlp_units=128,
         dropout_rate=0.1,
         seq_ord_latent_dim=latent_dim,
