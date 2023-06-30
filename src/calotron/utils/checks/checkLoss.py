@@ -1,5 +1,3 @@
-import tensorflow as tf
-
 from calotron.losses import BinaryCrossentropy as BCE
 from calotron.losses import JSDivergence as JS_div
 from calotron.losses import KLDivergence as KL_div
