@@ -27,19 +27,23 @@
 [![Docker - Version](https://img.shields.io/docker/v/mbarbetti/calotron?label=docker)](https://hub.docker.com/r/mbarbetti/calotron)
 -->
 
-### Transformer
-The Transformer architecture is freely inspired by Vaswani et al. [[arXiv:1706.03762](https://arxiv.org/abs/1706.03762)] and Dosovitskiy et al. [[arXiv:2010.11929](https://arxiv.org/abs/2010.11929)].
+### Transformers
 
-<div align="center">
-  <img alt="calotron transformer architecture" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/transf-scheme.png" width="400"/>
-</div>
+|         Models        | Generator | Implementation | Test | Design inspired by |
+|:---------------------:|:---------:|:--------------:|:----:|:---------------------------------------------------:|
+|     `Transformer`     |     ❌    |       ✅       |  ✅  | [arXiv:1706.03762](https://arxiv.org/abs/1706.03762), [arXiv:2004.08249](https://arxiv.org/abs/2004.08249) |
+| `OptionalTransformer` |     ❌    |       ✅       |  ✅  | [arXiv:1706.03762](https://arxiv.org/abs/1706.03762), [arXiv:2004.08249](https://arxiv.org/abs/2004.08249) |
+|  `MaskedTransformer`  |     ❌    |       ❌       |  ❌  | |
+|    `GigaGenerator`    |     ✅    |       🛠️       |  ❌  | [arXiv:2107.04589](https://arxiv.org/abs/2107.04589), [arXiv:2303.05511](https://arxiv.org/abs/2303.05511) |
 
-### Discriminator
-The Discriminator is implemented through the Deep Sets model proposed by Zaheer et al. [[arXiv:1703.06114](https://arxiv.org/abs/1703.06114)] and its architecture is freely inspired by what developed by the ATLAS Collaboration for flavor tagging [[ATL-PHYS-PUB-2020-014](https://cds.cern.ch/record/2718948)].
+### Discriminators
 
-<div align="center">
-  <img alt="calotron discriminator architecture" src="https://raw.githubusercontent.com/mbarbetti/calotron/main/.github/images/disc-scheme.png" width="800"/>
-</div>
+|          Models         |  Algorithm  | Implementation | Test | Design inspired by |
+|:-----------------------:|:-----------:|:--------------:|:----:|:---------------------------------------------------:|
+|     `Discriminator`     |   DeepSets  |       ✅       |  ✅  | [ATL-PHYS-PUB-2020-014](https://cds.cern.ch/record/2718948), [arXiv:1703.06114](https://arxiv.org/abs/1703.06114) |
+| `PairwiseDiscriminator` |   DeepSets  |       ✅       |  ✅  | [ATL-PHYS-PUB-2020-014](https://cds.cern.ch/record/2718948), [arXiv:1703.06114](https://arxiv.org/abs/1703.06114) |
+|    `GNNDiscriminator`   |     GNN     |       ❌       |  ❌  | |
+|   `GigaDiscriminator`   | Transformer |       🛠️       |  ❌  | [arXiv:2303.05511](https://arxiv.org/abs/2303.05511), [arXiv:2107.04589](https://arxiv.org/abs/2107.04589) |
 
 ### Credits
 Transformer implementation freely inspired by the TensorFlow tutorial [Neural machine translation with a Transformer and Keras](https://www.tensorflow.org/text/tutorials/transformer).
