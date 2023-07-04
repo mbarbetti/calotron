@@ -4,9 +4,9 @@ import tensorflow as tf
 
 @pytest.fixture
 def layer():
-    from calotron.layers import GlobalSelfAttention
+    from calotron.layers import SelfAttention
 
-    att = GlobalSelfAttention(
+    att = SelfAttention(
         num_heads=8,
         key_dim=64,
         embed_dim=24,
@@ -21,9 +21,9 @@ def layer():
 
 
 def test_layer_configuration(layer):
-    from calotron.layers import GlobalSelfAttention
+    from calotron.layers import SelfAttention
 
-    assert isinstance(layer, GlobalSelfAttention)
+    assert isinstance(layer, SelfAttention)
     assert isinstance(layer.num_heads, int)
     assert isinstance(layer.key_dim, int)
     assert isinstance(layer.embed_dim, int)
@@ -32,7 +32,8 @@ def test_layer_configuration(layer):
     assert isinstance(layer.dropout_rate, float)
 
 
-def test_layer_use(layer):
+@pytest.mark.parametrize("use_causal_mask", [True, False])
+def test_layer_use(layer, use_causal_mask):
     input = tf.keras.Input(shape=(16, 24))
-    output = layer(input)
+    output = layer(input, use_causal_mask=use_causal_mask)
     assert output.shape == input.shape

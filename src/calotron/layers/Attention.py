@@ -1,9 +1,12 @@
 import tensorflow as tf
+from tensorflow.keras.layers import Layer, LayerNormalization, MultiHeadAttention
 
 from calotron.layers.AdminResidual import AdminResidual
 
+LN_EPSILON = 0.001
 
-class BaseAttention(tf.keras.layers.Layer):
+
+class BaseAttention(Layer):
     def __init__(
         self,
         num_heads,
@@ -11,7 +14,7 @@ class BaseAttention(tf.keras.layers.Layer):
         embed_dim,
         num_res_layers,
         admin_res_scale="O(n)",
-        dropout_rate=0.1,
+        dropout_rate=0.0,
         name=None,
         dtype=None,
     ) -> None:
@@ -38,7 +41,7 @@ class BaseAttention(tf.keras.layers.Layer):
         self._dropout_rate = float(dropout_rate)
 
         # Attention mechanism layers
-        self._mha = tf.keras.layers.MultiHeadAttention(
+        self._mha = MultiHeadAttention(
             num_heads=num_heads,
             key_dim=key_dim,
             value_dim=None,
@@ -55,8 +58,11 @@ class BaseAttention(tf.keras.layers.Layer):
             name=f"{prefix}_res_{suffix}" if name else None,
             dtype=self.dtype,
         )
-        self._ln = tf.keras.layers.LayerNormalization(
-            axis=-1, epsilon=1e-3, name=f"{prefix}_ln_{suffix}", dtype=self.dtype
+        self._ln = LayerNormalization(
+            axis=-1,
+            epsilon=LN_EPSILON,
+            name=f"{prefix}_ln_{suffix}" if name else None,
+            dtype=self.dtype,
         )
 
     @property
@@ -94,24 +100,20 @@ class CrossAttention(BaseAttention):
             return_attention_scores=True,
         )
         self._attn_scores = scores
-        res = self._res(x, f_x)
+        res = self._res([x, f_x])
         out = self._ln(res)
         return out
 
 
-class GlobalSelfAttention(BaseAttention):
-    def call(self, x, attention_mask=None) -> tf.Tensor:
-        f_x = self._mha(query=x, key=x, value=x, attention_mask=attention_mask)
-        res = self._res(x, f_x)
-        out = self._ln(res)
-        return out
-
-
-class CausalSelfAttention(BaseAttention):
-    def call(self, x, attention_mask=None) -> tf.Tensor:
+class SelfAttention(BaseAttention):
+    def call(self, x, attention_mask=None, use_causal_mask=False) -> tf.Tensor:
         f_x = self._mha(
-            query=x, key=x, value=x, attention_mask=attention_mask, use_causal_mask=True
+            query=x,
+            key=x,
+            value=x,
+            attention_mask=attention_mask,
+            use_causal_mask=use_causal_mask,
         )
-        res = self._res(x, f_x)
+        res = self._res([x, f_x])
         out = self._ln(res)
         return out

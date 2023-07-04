@@ -1,6 +1,8 @@
 import pytest
 import tensorflow as tf
 
+from calotron.layers.AdminResidual import OUTPUT_CHANGE_SCALES
+
 ADDITIONAL_DIM = 2
 
 
@@ -20,6 +22,7 @@ def layer():
         seq_ord_max_length=512,
         seq_ord_normalization=10_000,
         enable_res_smoothing=True,
+        autoregressive_mode=True,
     )
     return dec
 
@@ -42,11 +45,13 @@ def test_layer_configuration(layer):
     assert isinstance(layer.seq_ord_max_length, int)
     assert isinstance(layer.seq_ord_normalization, float)
     assert isinstance(layer.enable_res_smoothing, bool)
+    assert isinstance(layer.autoregressive_mode, bool)
 
 
-@pytest.mark.parametrize("admin_res_scale", ["O(n)", "O(logn)", "O(1)"])
+@pytest.mark.parametrize("admin_res_scale", OUTPUT_CHANGE_SCALES)
 @pytest.mark.parametrize("enable_res_smoothing", [True, False])
-def test_layer_use(admin_res_scale, enable_res_smoothing):
+@pytest.mark.parametrize("autoregressive_mode", [True, False])
+def test_layer_use(admin_res_scale, enable_res_smoothing, autoregressive_mode):
     input_dim = 4
     latent_dim = 8
     max_length = 32
@@ -68,10 +73,11 @@ def test_layer_use(admin_res_scale, enable_res_smoothing):
         seq_ord_max_length=max_length,
         seq_ord_normalization=10_000,
         enable_res_smoothing=enable_res_smoothing,
+        autoregressive_mode=autoregressive_mode,
     )
     source = tf.random.normal(shape=(100, 10, 5))
     target = tf.random.normal(shape=(100, max_length, input_dim))
-    output = layer(target, source)
+    output = layer(target, condition=source)
     test_shape = list(target.shape)
     test_shape[-1] = layer.output_depth
     assert output.shape == tuple(test_shape)

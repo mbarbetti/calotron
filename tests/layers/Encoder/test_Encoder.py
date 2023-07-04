@@ -1,6 +1,8 @@
 import pytest
 import tensorflow as tf
 
+from calotron.layers.AdminResidual import OUTPUT_CHANGE_SCALES
+
 ADDITIONAL_DIM = 2
 
 
@@ -44,7 +46,7 @@ def test_layer_configuration(layer):
     assert isinstance(layer.enable_res_smoothing, bool)
 
 
-@pytest.mark.parametrize("admin_res_scale", ["O(n)", "O(logn)", "O(1)"])
+@pytest.mark.parametrize("admin_res_scale", OUTPUT_CHANGE_SCALES)
 @pytest.mark.parametrize("enable_res_smoothing", [True, False])
 def test_layer_use(admin_res_scale, enable_res_smoothing):
     input_dim = 4

@@ -1,11 +1,12 @@
 import tensorflow as tf
+from tensorflow.keras.layers import Dense, Dropout, Layer
 
-from calotron.layers.Attention import GlobalSelfAttention
+from calotron.layers.Attention import SelfAttention
 from calotron.layers.MultilayerPerceptron import MultilayerPerceptron
 from calotron.layers.SeqOrderEmbedding import SeqOrderEmbedding
 
 
-class EncoderLayer(tf.keras.layers.Layer):
+class EncoderLayer(Layer):
     def __init__(
         self,
         output_depth,
@@ -14,7 +15,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         num_res_layers,
         admin_res_scale="O(n)",
         mlp_units=128,
-        dropout_rate=0.1,
+        dropout_rate=0.0,
         name=None,
         dtype=None,
     ) -> None:
@@ -25,15 +26,15 @@ class EncoderLayer(tf.keras.layers.Layer):
         else:
             prefix, suffix = None, None
 
-        # Multi-head attention
-        self._global_attn = GlobalSelfAttention(
+        # Multi-head self-attention
+        self._self_attn = SelfAttention(
             num_heads=num_heads,
             key_dim=key_dim,
             embed_dim=output_depth,
             num_res_layers=num_res_layers,
             admin_res_scale=admin_res_scale,
             dropout_rate=dropout_rate,
-            name=f"{prefix}_global_attn_{suffix}" if name else None,
+            name=f"{prefix}_self_attn_{suffix}" if name else None,
             dtype=self.dtype,
         )
 
@@ -48,8 +49,8 @@ class EncoderLayer(tf.keras.layers.Layer):
             dtype=self.dtype,
         )
 
-    def call(self, x, global_attn_mask=None) -> tf.Tensor:
-        f_x = self._global_attn(x, attention_mask=global_attn_mask)
+    def call(self, x, self_attn_mask=None) -> tf.Tensor:
+        f_x = self._self_attn(x, attention_mask=self_attn_mask, use_causal_mask=False)
         out = self._mlp(f_x)
         return out
 
@@ -59,19 +60,19 @@ class EncoderLayer(tf.keras.layers.Layer):
 
     @property
     def num_heads(self) -> int:
-        return self._global_attn.num_heads
+        return self._self_attn.num_heads
 
     @property
     def key_dim(self) -> int:
-        return self._global_attn.key_dim
+        return self._self_attn.key_dim
 
     @property
     def num_res_layers(self) -> int:
-        return self._global_attn.num_res_layers
+        return self._self_attn.num_res_layers
 
     @property
     def admin_res_scale(self) -> str:
-        return self._global_attn.admin_res_scale
+        return self._self_attn.admin_res_scale
 
     @property
     def mlp_units(self) -> int:
@@ -79,10 +80,10 @@ class EncoderLayer(tf.keras.layers.Layer):
 
     @property
     def dropout_rate(self) -> float:
-        return self._global_attn.dropout_rate
+        return self._self_attn.dropout_rate
 
 
-class Encoder(tf.keras.layers.Layer):
+class Encoder(Layer):
     def __init__(
         self,
         output_depth,
@@ -91,7 +92,7 @@ class Encoder(tf.keras.layers.Layer):
         key_dim,
         admin_res_scale="O(n)",
         mlp_units=128,
-        dropout_rate=0.1,
+        dropout_rate=0.0,
         seq_ord_latent_dim=16,
         seq_ord_max_length=512,
         seq_ord_normalization=10_000,
@@ -124,7 +125,7 @@ class Encoder(tf.keras.layers.Layer):
         if self._enable_res_smoothing:
             self._smooth_layer = tf.keras.Sequential(
                 [
-                    tf.keras.layers.Dense(
+                    Dense(
                         units=output_depth,
                         activation="relu",
                         kernel_initializer="glorot_normal",
@@ -132,9 +133,7 @@ class Encoder(tf.keras.layers.Layer):
                         name="enc_sl_dense",
                         dtype=self.dtype,
                     ),
-                    tf.keras.layers.Dropout(
-                        dropout_rate, name="enc_sl_dropout", dtype=self.dtype
-                    ),
+                    Dropout(dropout_rate, name="enc_sl_dropout", dtype=self.dtype),
                 ]
             )
         else:
@@ -156,12 +155,12 @@ class Encoder(tf.keras.layers.Layer):
             for i in range(self._num_layers)
         ]
 
-    def call(self, x, global_attn_mask=None) -> tf.Tensor:
+    def call(self, x, self_attn_mask=None) -> tf.Tensor:
         out = self._seq_ord_embedding(x)
         if self._smooth_layer is not None:
             out = self._smooth_layer(out)
         for i in range(self._num_layers):
-            out = self._encoder_layers[i](out, global_attn_mask)
+            out = self._encoder_layers[i](out, self_attn_mask)
         return out
 
     @property

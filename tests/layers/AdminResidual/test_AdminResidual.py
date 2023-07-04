@@ -1,6 +1,8 @@
 import pytest
 import tensorflow as tf
 
+from calotron.layers.AdminResidual import OUTPUT_CHANGE_SCALES
+
 
 @pytest.fixture
 def layer():
@@ -22,7 +24,7 @@ def test_layer_configuration(layer):
     assert isinstance(layer.output_change_scale, str)
 
 
-@pytest.mark.parametrize("output_change_scale", ["O(n)", "O(logn)", "O(1)"])
+@pytest.mark.parametrize("output_change_scale", OUTPUT_CHANGE_SCALES)
 def test_layer_use(output_change_scale):
     from calotron.layers import AdminResidual
 
@@ -31,7 +33,7 @@ def test_layer_use(output_change_scale):
     )
     x = tf.keras.Input(shape=(16, 24))
     f_x = tf.keras.Input(shape=(16, 24))
-    output = layer(x, f_x)
+    output = layer([x, f_x])
     test_shape = list(x.shape)
     test_shape[-1] = layer.embed_dim
     assert output.shape == tuple(test_shape)

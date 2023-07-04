@@ -1,16 +1,19 @@
 import tensorflow as tf
+from tensorflow.keras.layers import Dense, Dropout, Layer, LayerNormalization
 
 from calotron.layers.AdminResidual import AdminResidual
 
+LN_EPSILON = 0.001
 
-class MultilayerPerceptron(tf.keras.layers.Layer):
+
+class MultilayerPerceptron(Layer):
     def __init__(
         self,
         output_units,
         hidden_units,
         num_res_layers,
         admin_res_scale="O(n)",
-        dropout_rate=0.1,
+        dropout_rate=0.0,
         name=None,
         dtype=None,
     ) -> None:
@@ -39,7 +42,7 @@ class MultilayerPerceptron(tf.keras.layers.Layer):
         # Multilayer perceptron layers
         self._seq = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(
+                Dense(
                     units=self._hidden_units,
                     activation="relu",
                     kernel_initializer="he_normal",
@@ -47,7 +50,7 @@ class MultilayerPerceptron(tf.keras.layers.Layer):
                     name=f"{prefix}_dense_in_{suffix}" if name else None,
                     dtype=self.dtype,
                 ),
-                tf.keras.layers.Dense(
+                Dense(
                     units=self._output_units,
                     activation="linear",
                     kernel_initializer="he_normal",
@@ -55,7 +58,7 @@ class MultilayerPerceptron(tf.keras.layers.Layer):
                     name=f"{prefix}_dense_out_{suffix}" if name else None,
                     dtype=self.dtype,
                 ),
-                tf.keras.layers.Dropout(
+                Dropout(
                     rate=self._dropout_rate,
                     name=f"{prefix}_dropout_{suffix}" if name else None,
                     dtype=self.dtype,
@@ -70,16 +73,16 @@ class MultilayerPerceptron(tf.keras.layers.Layer):
             name=f"{prefix}_res_{suffix}" if name else None,
             dtype=self.dtype,
         )
-        self._ln = tf.keras.layers.LayerNormalization(
+        self._ln = LayerNormalization(
             axis=-1,
-            epsilon=1e-3,
+            epsilon=LN_EPSILON,
             name=f"{prefix}_ln_{suffix}" if name else None,
             dtype=self.dtype,
         )
 
     def call(self, x) -> tf.Tensor:
         f_x = self._seq(x)
-        res = self._res(x, f_x)
+        res = self._res([x, f_x])
         out = self._ln(res)
         return out
 

@@ -1,11 +1,12 @@
 import math
 
 import tensorflow as tf
+from tensorflow.keras.layers import Add, Layer
 
-OUTPUT_CHANGE_SCALE = ["O(n)", "O(logn)", "O(1)"]
+OUTPUT_CHANGE_SCALES = ["O(n)", "O(logn)", "O(1)"]
 
 
-class AdminResidual(tf.keras.layers.Layer):
+class AdminResidual(Layer):
     def __init__(
         self,
         embed_dim,
@@ -28,16 +29,16 @@ class AdminResidual(tf.keras.layers.Layer):
 
         # Output change scale
         assert isinstance(output_change_scale, str)
-        if output_change_scale not in OUTPUT_CHANGE_SCALE:
+        if output_change_scale not in OUTPUT_CHANGE_SCALES:
             raise ValueError(
                 "`output_change_scale` should be selected "
-                f"in {OUTPUT_CHANGE_SCALE}, instead "
+                f"in {OUTPUT_CHANGE_SCALES}, instead "
                 f"'{output_change_scale}' passed"
             )
         self._output_change_scale = output_change_scale
 
         self._omega = self._compute_init_value()
-        self._add = tf.keras.layers.Add()
+        self._add = Add()
 
     def _compute_init_value(self) -> tf.Variable:
         if self._output_change_scale == "O(n)":
@@ -54,10 +55,11 @@ class AdminResidual(tf.keras.layers.Layer):
         omega = tf.ones(shape=(self._embed_dim)) * omega_value**0.5
         return tf.Variable(omega, trainable=trainable, dtype=self.dtype)
 
-    def call(self, x, f_x) -> tf.Tensor:
+    def call(self, inputs) -> tf.Tensor:
+        x, f_x = inputs
         x *= tf.tile(self._omega[None, None, :], (tf.shape(x)[0], tf.shape(x)[1], 1))
-        output = self._add([x, f_x])
-        return output
+        out = self._add([x, f_x])
+        return out
 
     @property
     def embed_dim(self) -> int:

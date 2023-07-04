@@ -1,8 +1,9 @@
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras.layers import Add, Dense, Dropout, Layer
 
 
-class SeqOrderEmbedding(tf.keras.layers.Layer):
+class SeqOrderEmbedding(Layer):
     def __init__(
         self,
         latent_dim=16,
@@ -47,7 +48,7 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
         # Embedding layer
         self._embedding = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(
+                Dense(
                     units=self._latent_dim,
                     activation="relu",
                     kernel_initializer="he_uniform",
@@ -55,7 +56,7 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
                     name=f"{prefix}_seq_ord_dense" if name else None,
                     dtype=self.dtype,
                 ),
-                tf.keras.layers.Dropout(
+                Dropout(
                     rate=self._dropout_rate,
                     name=f"{prefix}_dropout" if name else None,
                     dtype=self.dtype,
@@ -64,7 +65,7 @@ class SeqOrderEmbedding(tf.keras.layers.Layer):
         )
 
         # Add layer
-        self._add = tf.keras.layers.Add()
+        self._add = Add()
 
     def call(self, x) -> tf.Tensor:
         seq_order = tf.tile(
