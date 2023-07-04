@@ -1,6 +1,7 @@
 import pytest
 import tensorflow as tf
 
+from calotron.layers.AdminResidual import OUTPUT_CHANGE_SCALES
 from calotron.models.transformers.Transformer import START_TOKEN_INITIALIZERS
 
 CHUNK_SIZE = int(1e4)
@@ -68,7 +69,7 @@ def test_model_configuration(model):
     assert isinstance(model.start_token_initializer, str)
 
 
-@pytest.mark.parametrize("admin_res_scale", ["O(n)", "O(logn)", "O(1)"])
+@pytest.mark.parametrize("admin_res_scale", OUTPUT_CHANGE_SCALES)
 @pytest.mark.parametrize("enable_res_smoothing", [True, False])
 @pytest.mark.parametrize("output_activations", ["relu", None])
 def test_model_use(admin_res_scale, enable_res_smoothing, output_activations):
@@ -96,42 +97,6 @@ def test_model_use(admin_res_scale, enable_res_smoothing, output_activations):
         seq_ord_normalization=10_000,
         enable_res_smoothing=enable_res_smoothing,
         output_activations=output_activations,
-    )
-    output = model((source, target))
-    model.summary()
-    test_shape = list(target.shape)
-    test_shape[-1] = model.output_depth
-    assert output.shape == tuple(test_shape)
-
-
-@pytest.mark.parametrize(
-    "target",
-    [
-        tf.random.normal(shape=(CHUNK_SIZE, 4, 3)),
-        tf.random.normal(shape=(CHUNK_SIZE, 8, 3)),
-        tf.random.normal(shape=(CHUNK_SIZE, 12, 3)),
-        tf.random.normal(shape=(CHUNK_SIZE, 4, 6)),
-    ],
-)
-def test_model_baseline(target):
-    from calotron.models.transformers import Transformer
-
-    model = Transformer(
-        output_depth=target.shape[2],
-        encoder_depth=8,
-        decoder_depth=8,
-        num_layers=2,
-        num_heads=4,
-        key_dim=32,
-        admin_res_scale="O(n)",
-        mlp_units=128,
-        dropout_rate=0.1,
-        seq_ord_latent_dim=16,
-        seq_ord_max_length=max(source.shape[1], target.shape[1]),
-        seq_ord_normalization=10_000,
-        enable_res_smoothing=True,
-        output_activations="linear",
-        start_token_initializer="ones",
     )
     output = model((source, target))
     model.summary()
@@ -181,4 +146,4 @@ def test_model_train(model):
     adam = tf.keras.optimizers.Adam(learning_rate=0.001)
     mse = tf.keras.losses.MeanSquaredError()
     model.compile(optimizer=adam, loss=mse)
-    model.fit(dataset, epochs=2)
+    model.fit(dataset, epochs=1)

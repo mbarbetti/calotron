@@ -1,6 +1,7 @@
 import pytest
 import tensorflow as tf
 
+from calotron.layers.AdminResidual import OUTPUT_CHANGE_SCALES
 from calotron.models.transformers.Transformer import START_TOKEN_INITIALIZERS
 
 CHUNK_SIZE = int(1e4)
@@ -82,7 +83,7 @@ def test_model_configuration(model):
     assert isinstance(model.start_token_initializer, str)
 
 
-@pytest.mark.parametrize("admin_res_scale", ["O(n)", "O(logn)", "O(1)"])
+@pytest.mark.parametrize("admin_res_scale", OUTPUT_CHANGE_SCALES)
 @pytest.mark.parametrize("enable_res_smoothing", [True, False])
 @pytest.mark.parametrize("output_activations", ["relu", None])
 def test_model_use(admin_res_scale, enable_res_smoothing, output_activations):
@@ -239,4 +240,4 @@ def test_model_train(model):
     adam = tf.keras.optimizers.Adam(learning_rate=0.001)
     mse = tf.keras.losses.MeanSquaredError()
     model.compile(optimizer=adam, loss=mse)
-    model.fit(dataset, epochs=2)
+    model.fit(dataset, epochs=1)

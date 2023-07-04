@@ -1,12 +1,12 @@
 import tensorflow as tf
+from tensorflow.keras.layers import Dense
 
 from calotron.layers import Decoder, Encoder, MultiActivations
-from calotron.models.transformers.BaseTransformer import BaseTransformer
 
 START_TOKEN_INITIALIZERS = ["zeros", "ones", "means"]
 
 
-class Transformer(BaseTransformer):
+class Transformer(tf.keras.Model):
     def __init__(
         self,
         output_depth,
@@ -17,7 +17,7 @@ class Transformer(BaseTransformer):
         key_dim,
         admin_res_scale="O(n)",
         mlp_units=128,
-        dropout_rate=0.1,
+        dropout_rate=0.0,
         seq_ord_latent_dim=16,
         seq_ord_max_length=512,
         seq_ord_normalization=10_000,
@@ -76,28 +76,40 @@ class Transformer(BaseTransformer):
             seq_ord_max_length=seq_ord_max_length,
             seq_ord_normalization=seq_ord_normalization,
             enable_res_smoothing=enable_res_smoothing,
+            autoregressive_mode=True,
             name="decoder",
             dtype=self.dtype,
         )
 
-        # Output layers
-        self._output_layer = tf.keras.layers.Dense(
+        # Final layers
+        self._output_layer, self._multi_activations = self._prepare_final_layers(
+            output_depth=self._output_depth,
+            output_activations=self._output_activations,
+            dtype=self.dtype,
+        )
+
+    @staticmethod
+    def _prepare_final_layers(
+        output_depth, output_activations=None, dtype=None
+    ) -> tuple:
+        output_layer = Dense(
             units=output_depth,
-            activation="linear",
+            activation=None,
             kernel_initializer="he_normal",
             bias_initializer="zeros",
             name="dense_out",
-            dtype=self.dtype,
+            dtype=dtype,
         )
         if output_activations is not None:
-            self._multi_activations = MultiActivations(
+            multi_activations = MultiActivations(
                 activations=output_activations,
                 output_depth=output_depth,
                 name="filter",
-                dtype=self.dtype,
+                dtype=dtype,
             )
         else:
-            self._multi_activations = None
+            multi_activations = None
+        return output_layer, multi_activations
 
     def call(self, inputs) -> tf.Tensor:
         source, target = inputs
@@ -146,27 +158,27 @@ class Transformer(BaseTransformer):
         return self._decoder.output_depth
 
     @property
-    def encoder_num_layers(self) -> list:
+    def encoder_num_layers(self) -> int:
         return self._encoder.num_layers
 
     @property
-    def decoder_num_layers(self) -> list:
+    def decoder_num_layers(self) -> int:
         return self._decoder.num_layers
 
     @property
-    def encoder_num_heads(self) -> list:
+    def encoder_num_heads(self) -> int:
         return self._encoder.num_heads
 
     @property
-    def decoder_num_heads(self) -> list:
+    def decoder_num_heads(self) -> int:
         return self._decoder.num_heads
 
     @property
-    def encoder_key_dim(self) -> list:
+    def encoder_key_dim(self) -> int:
         return self._encoder.key_dim
 
     @property
-    def decoder_key_dim(self) -> list:
+    def decoder_key_dim(self) -> int:
         return self._decoder.key_dim
 
     @property
@@ -178,47 +190,47 @@ class Transformer(BaseTransformer):
         return self._decoder.admin_res_scale
 
     @property
-    def encoder_mlp_units(self) -> list:
+    def encoder_mlp_units(self) -> int:
         return self._encoder.mlp_units
 
     @property
-    def decoder_mlp_units(self) -> list:
+    def decoder_mlp_units(self) -> int:
         return self._decoder.mlp_units
 
     @property
-    def encoder_dropout_rate(self) -> list:
+    def encoder_dropout_rate(self) -> float:
         return self._encoder.dropout_rate
 
     @property
-    def decoder_dropout_rate(self) -> list:
+    def decoder_dropout_rate(self) -> float:
         return self._decoder.dropout_rate
 
     @property
-    def encoder_seq_ord_latent_dim(self) -> list:
+    def encoder_seq_ord_latent_dim(self) -> int:
         return self._encoder.seq_ord_latent_dim
 
     @property
-    def decoder_seq_ord_latent_dim(self) -> list:
+    def decoder_seq_ord_latent_dim(self) -> int:
         return self._decoder.seq_ord_latent_dim
 
     @property
-    def encoder_seq_ord_max_length(self) -> list:
+    def encoder_seq_ord_max_length(self) -> int:
         return self._encoder.seq_ord_max_length
 
     @property
-    def decoder_seq_ord_max_length(self) -> list:
+    def decoder_seq_ord_max_length(self) -> int:
         return self._decoder.seq_ord_max_length
 
     @property
-    def encoder_seq_ord_normalization(self) -> list:
+    def encoder_seq_ord_normalization(self) -> float:
         return self._encoder.seq_ord_normalization
 
     @property
-    def decoder_seq_ord_normalization(self) -> list:
+    def decoder_seq_ord_normalization(self) -> float:
         return self._decoder.seq_ord_normalization
 
     @property
-    def enable_res_smoothing(self) -> list:
+    def enable_res_smoothing(self) -> bool:
         return self._encoder.enable_res_smoothing
 
     @property

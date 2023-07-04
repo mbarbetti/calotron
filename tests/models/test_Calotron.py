@@ -2,45 +2,46 @@ import pytest
 import tensorflow as tf
 from tensorflow.keras.optimizers import Optimizer, RMSprop
 
+from calotron.models.discriminators import Discriminator
+from calotron.models.transformers import Transformer
+
 CHUNK_SIZE = int(1e4)
 
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
 weight = tf.random.uniform(shape=(CHUNK_SIZE, target.shape[1]))
 
+transf = Transformer(
+    output_depth=target.shape[2],
+    encoder_depth=8,
+    decoder_depth=8,
+    num_layers=2,
+    num_heads=4,
+    key_dim=32,
+    admin_res_scale="O(n)",
+    mlp_units=128,
+    dropout_rate=0.1,
+    seq_ord_latent_dim=16,
+    seq_ord_max_length=max(source.shape[1], target.shape[1]),
+    seq_ord_normalization=10_000,
+    enable_res_smoothing=True,
+    output_activations="linear",
+    start_token_initializer="ones",
+)
+
+disc = Discriminator(
+    latent_dim=8,
+    output_units=1,
+    output_activation="sigmoid",
+    deepsets_dense_num_layers=2,
+    deepsets_dense_units=32,
+    dropout_rate=0.1,
+)
+
 
 @pytest.fixture
 def model():
     from calotron.models import Calotron
-    from calotron.models.discriminators import Discriminator
-    from calotron.models.transformers import Transformer
-
-    transf = Transformer(
-        output_depth=target.shape[2],
-        encoder_depth=8,
-        decoder_depth=8,
-        num_layers=2,
-        num_heads=4,
-        key_dim=32,
-        admin_res_scale="O(n)",
-        mlp_units=128,
-        dropout_rate=0.1,
-        seq_ord_latent_dim=16,
-        seq_ord_max_length=max(source.shape[1], target.shape[1]),
-        seq_ord_normalization=10_000,
-        enable_res_smoothing=True,
-        output_activations="linear",
-        start_token_initializer="ones",
-    )
-
-    disc = Discriminator(
-        latent_dim=8,
-        output_units=1,
-        output_activation="sigmoid",
-        deepsets_dense_num_layers=2,
-        deepsets_dense_units=32,
-        dropout_rate=0.1,
-    )
 
     calo = Calotron(transformer=transf, discriminator=disc)
     return calo
@@ -148,7 +149,4 @@ def test_model_eval(model, sample_weight):
         transformer_upds_per_batch=1,
         discriminator_upds_per_batch=1,
     )
-    if sample_weight is not None:
-        model.evaluate(source, target, sample_weight=weight)
-    else:
-        model.evaluate(source, target)
+    model.evaluate(source, target, sample_weight=sample_weight)

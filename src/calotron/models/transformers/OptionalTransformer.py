@@ -1,6 +1,4 @@
-import tensorflow as tf
-
-from calotron.layers import Decoder, Encoder, MultiActivations
+from calotron.layers import Decoder, Encoder
 from calotron.models.transformers.Transformer import (
     START_TOKEN_INITIALIZERS,
     Transformer,
@@ -41,7 +39,9 @@ class OptionalTransformer(Transformer):
 
         # Decoder options
         assert isinstance(decoder_options, dict)
-        encoder_options.update(dict(name="decoder", dtype=self.dtype))
+        decoder_options.update(
+            dict(autoregressive_mode=True, name="decoder", dtype=self.dtype)
+        )
         self._decoder_options = decoder_options
 
         # Output activations
@@ -63,21 +63,9 @@ class OptionalTransformer(Transformer):
         # Decoder
         self._decoder = Decoder(**decoder_options)
 
-        # Output layers
-        self._output_layer = tf.keras.layers.Dense(
-            units=output_depth,
-            activation="linear",
-            kernel_initializer="he_normal",
-            bias_initializer="zeros",
-            name="dense_out",
+        # Final layers
+        self._output_layer, self._multi_activations = self._prepare_final_layers(
+            output_depth=self._output_depth,
+            output_activations=self._output_activations,
             dtype=self.dtype,
         )
-        if output_activations is not None:
-            self._multi_activations = MultiActivations(
-                activations=output_activations,
-                output_depth=output_depth,
-                name="filter",
-                dtype=self.dtype,
-            )
-        else:
-            self._multi_activations = None
