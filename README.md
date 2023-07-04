@@ -33,8 +33,8 @@
 |:---------------------:|:---------:|:--------------:|:----:|:---------------------------------------------------:|
 |     `Transformer`     |     ❌    |       ✅       |  ✅  | [arXiv:1706.03762](https://arxiv.org/abs/1706.03762), [arXiv:2004.08249](https://arxiv.org/abs/2004.08249) |
 | `OptionalTransformer` |     ❌    |       ✅       |  ✅  | [arXiv:1706.03762](https://arxiv.org/abs/1706.03762), [arXiv:2004.08249](https://arxiv.org/abs/2004.08249) |
-|  `MaskedTransformer`  |     ❌    |       ❌       |  ❌  | |
-|    `GigaGenerator`    |     ✅    |       🛠️       |  ❌  | [arXiv:2107.04589](https://arxiv.org/abs/2107.04589), [arXiv:2303.05511](https://arxiv.org/abs/2303.05511) |
+|  `MaskedTransformer`  |     ❌    |       🛠️       |  ❌  | |
+|    `GigaGenerator`    |     ✅    |       ✅       |  ✅  | [arXiv:2107.04589](https://arxiv.org/abs/2107.04589), [arXiv:2303.05511](https://arxiv.org/abs/2303.05511) |
 
 ### Discriminators
 
@@ -42,8 +42,8 @@
 |:-----------------------:|:-----------:|:--------------:|:----:|:---------------------------------------------------:|
 |     `Discriminator`     |   DeepSets  |       ✅       |  ✅  | [ATL-PHYS-PUB-2020-014](https://cds.cern.ch/record/2718948), [arXiv:1703.06114](https://arxiv.org/abs/1703.06114) |
 | `PairwiseDiscriminator` |   DeepSets  |       ✅       |  ✅  | [ATL-PHYS-PUB-2020-014](https://cds.cern.ch/record/2718948), [arXiv:1703.06114](https://arxiv.org/abs/1703.06114) |
-|    `GNNDiscriminator`   |     GNN     |       ❌       |  ❌  | |
-|   `GigaDiscriminator`   | Transformer |       🛠️       |  ❌  | [arXiv:2303.05511](https://arxiv.org/abs/2303.05511), [arXiv:2107.04589](https://arxiv.org/abs/2107.04589) |
+|    `GNNDiscriminator`   |     GNN     |       🛠️       |  ❌  | |
+|   `GigaDiscriminator`   | Transformer |       ✅       |  ❌  | [arXiv:2303.05511](https://arxiv.org/abs/2303.05511), [arXiv:2107.04589](https://arxiv.org/abs/2107.04589) |
 
 ### Credits
 Transformer implementation freely inspired by the TensorFlow tutorial [Neural machine translation with a Transformer and Keras](https://www.tensorflow.org/text/tutorials/transformer).
