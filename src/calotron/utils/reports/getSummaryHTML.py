@@ -16,8 +16,12 @@ def getSummaryHTML(model) -> tuple:
             output_shape = "<td>None</td>\n"  # print "None" in case of errors
         num_params = f"<td>{layer.count_params()}</td>\n"
         rows.append("<tr>\n" + layer_type + output_shape + num_params + "</tr>\n")
-        train_params += int(np.sum([np.prod(v.get_shape()) for v in layer.trainable_weights]))
-        nontrain_params += int(np.sum([np.prod(v.get_shape()) for v in layer.non_trainable_weights]))
+        train_params += int(
+            np.sum([np.prod(v.get_shape()) for v in layer.trainable_weights])
+        )
+        nontrain_params += int(
+            np.sum([np.prod(v.get_shape()) for v in layer.non_trainable_weights])
+        )
     rows_html = "".join([f"{r}" for r in rows])
 
     table_html = '<table width="40%" border="1px solid black">\n \
