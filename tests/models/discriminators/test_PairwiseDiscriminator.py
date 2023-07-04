@@ -16,11 +16,15 @@ def model():
 
     disc = PairwiseDiscriminator(
         output_units=1,
-        output_activation="sigmoid",
         latent_dim=8,
-        deepsets_num_layers=2,
-        deepsets_hidden_units=32,
+        deepsets_dense_num_layers=1,
+        deepsets_dense_units=32,
+        deepsets_conv1D_num_layers=2,
+        deepsets_conv1D_filters=4,
+        deepsets_conv1D_kernel_size=4,
+        deepsets_conv1D_strides=2,
         dropout_rate=0.1,
+        output_activation="sigmoid",
     )
     return disc
 
@@ -34,25 +38,34 @@ def test_model_configuration(model):
     assert isinstance(model, PairwiseDiscriminator)
     assert isinstance(model.output_units, int)
     assert isinstance(model.latent_dim, int)
-    assert isinstance(model.deepsets_num_layers, int)
-    assert isinstance(model.deepsets_hidden_units, int)
+    assert isinstance(model.deepsets_dense_num_layers, int)
+    assert isinstance(model.deepsets_dense_units, int)
+    assert isinstance(model.deepsets_conv1D_num_layers, int)
+    assert isinstance(model.deepsets_conv1D_filters, int)
+    assert isinstance(model.deepsets_conv1D_kernel_size, int)
+    assert isinstance(model.deepsets_conv1D_strides, int)
     assert isinstance(model.dropout_rate, float)
+    assert isinstance(model.condition_aware, bool)
 
 
 @pytest.mark.parametrize("activation", ["sigmoid", None])
-@pytest.mark.parametrize("filter", [weight, None])
-def test_model_use(activation, filter):
+@pytest.mark.parametrize("padding_mask", [weight, None])
+def test_model_use(activation, padding_mask):
     from calotron.models.discriminators import PairwiseDiscriminator
 
     model = PairwiseDiscriminator(
         output_units=1,
-        output_activation=activation,
         latent_dim=8,
-        deepsets_num_layers=2,
-        deepsets_hidden_units=32,
+        deepsets_dense_num_layers=1,
+        deepsets_dense_units=32,
+        deepsets_conv1D_num_layers=2,
+        deepsets_conv1D_filters=4,
+        deepsets_conv1D_kernel_size=4,
+        deepsets_conv1D_strides=2,
         dropout_rate=0.1,
+        output_activation=activation,
     )
-    output = model((source, target), filter=filter)
+    output = model((source, target), padding_mask=padding_mask)
     model.summary()
     test_shape = [target.shape[0]]
     test_shape.append(model.output_units)
@@ -69,4 +82,4 @@ def test_model_train(model):
     adam = tf.keras.optimizers.Adam(learning_rate=0.001)
     bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)
     model.compile(optimizer=adam, loss=bce)
-    model.fit(dataset, epochs=2)
+    model.fit(dataset, epochs=1)

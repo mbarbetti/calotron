@@ -1,24 +1,23 @@
 import tensorflow as tf
+from tensorflow.keras.layers import Dense, Dropout
 
 from calotron.layers import DeepSets
-from calotron.models.discriminators.BaseDiscriminator import BaseDiscriminator
-
-MIN_UNITS = 32.0
 
 
-class Discriminator(BaseDiscriminator):
+class Discriminator(tf.keras.Model):
     def __init__(
         self,
         output_units,
-        output_activation=None,
         latent_dim=64,
-        deepsets_num_layers=5,
-        deepsets_hidden_units=128,
-        dropout_rate=0.1,
+        deepsets_dense_num_layers=4,
+        deepsets_dense_units=128,
+        dropout_rate=0.0,
+        output_activation=None,
         name=None,
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
+        self._condition_aware = False
 
         # Output units
         assert isinstance(output_units, (int, float))
@@ -28,74 +27,71 @@ class Discriminator(BaseDiscriminator):
         # Output activation
         self._output_activation = output_activation
 
-        # Latent space dimension
-        assert isinstance(latent_dim, (int, float))
-        assert latent_dim >= 1
-        self._latent_dim = int(latent_dim)
-
-        # Number of layers for DeepSets
-        assert isinstance(deepsets_num_layers, (int, float))
-        assert deepsets_num_layers >= 1
-        self._deepsets_num_layers = int(deepsets_num_layers)
-
-        # Number of hidden units for DeepSets
-        assert isinstance(deepsets_hidden_units, (int, float))
-        assert deepsets_hidden_units >= 1
-        self._deepsets_hidden_units = int(deepsets_hidden_units)
-
-        # Dropout rate
-        assert isinstance(dropout_rate, (int, float))
-        assert dropout_rate >= 0.0 and dropout_rate < 1.0
-        self._dropout_rate = float(dropout_rate)
-
         # Deep Sets
         self._deep_sets = DeepSets(
-            latent_dim=self._latent_dim,
-            num_layers=self._deepsets_num_layers,
-            hidden_units=self._deepsets_hidden_units,
-            dropout_rate=self._dropout_rate,
-            name="d_deepsets",
+            latent_dim=latent_dim,
+            dense_num_layers=deepsets_dense_num_layers,
+            dense_units=deepsets_dense_units,
+            dropout_rate=dropout_rate,
+            name="deepsets",
             dtype=self.dtype,
         )
 
-        # Latent layers
-        self._seq = list()
-        for i in range(2):
-            seq_units = max(self._latent_dim / (i + 1.0), MIN_UNITS)
-            self._seq.append(
-                tf.keras.layers.Dense(
+        # Final layers
+        self._seq = self._prepare_final_layers(
+            output_units=self._output_units,
+            latent_dim=latent_dim,
+            num_layers=3,
+            min_units=4,
+            dropout_rate=dropout_rate,
+            output_activation=self._output_activation,
+            dtype=self.dtype,
+        )
+
+    @staticmethod
+    def _prepare_final_layers(
+        output_units,
+        latent_dim,
+        num_layers=3,
+        min_units=4,
+        dropout_rate=0.0,
+        output_activation=None,
+        dtype=None,
+    ) -> list:
+        final_layers = list()
+        for i in range(num_layers - 1):
+            seq_units = max(latent_dim / (i + 1.0), min_units)
+            final_layers.append(
+                Dense(
                     units=int(seq_units),
                     activation="relu",
                     kernel_initializer="glorot_uniform",
                     bias_initializer="zeros",
-                    name="d_dense",
-                    dtype=self.dtype,
+                    name=f"dense_{i}",
+                    dtype=dtype,
                 )
             )
-            self._seq.append(
-                tf.keras.layers.Dropout(
-                    rate=self._dropout_rate, name="d_dropout", dtype=self.dtype
-                )
+            final_layers.append(
+                Dropout(rate=dropout_rate, name=f"dropout_{i}", dtype=dtype)
             )
-
-        # Output layer
-        self._seq += [
-            tf.keras.layers.Dense(
-                units=self._output_units,
-                activation=self._output_activation,
-                kernel_initializer="truncated_normal",
+        final_layers += [
+            Dense(
+                units=output_units,
+                activation=output_activation,
+                kernel_initializer="glorot_uniform",
                 bias_initializer="zeros",
-                name="d_output_layer",
-                dtype=self.dtype,
+                name="dense_out",
+                dtype=dtype,
             )
         ]
+        return final_layers
 
-    def call(self, inputs, filter=None) -> tf.Tensor:
+    def call(self, inputs, padding_mask=None) -> tf.Tensor:
         _, target = inputs
-        output = self._deep_sets(target, filter=filter)
+        out = self._deep_sets(target, padding_mask=padding_mask)
         for layer in self._seq:
-            output = layer(output)
-        return output
+            out = layer(out)
+        return out
 
     @property
     def output_units(self) -> int:
@@ -107,16 +103,20 @@ class Discriminator(BaseDiscriminator):
 
     @property
     def latent_dim(self) -> int:
-        return self._latent_dim
+        return self._deep_sets.latent_dim
 
     @property
-    def deepsets_num_layers(self) -> int:
-        return self._deepsets_num_layers
+    def deepsets_dense_num_layers(self) -> int:
+        return self._deep_sets.dense_num_layers
 
     @property
-    def deepsets_hidden_units(self) -> int:
-        return self._deepsets_hidden_units
+    def deepsets_dense_units(self) -> int:
+        return self._deep_sets.dense_units
 
     @property
     def dropout_rate(self) -> float:
-        return self._dropout_rate
+        return self._deep_sets.dropout_rate
+
+    @property
+    def condition_aware(self) -> bool:
+        return self._condition_aware
