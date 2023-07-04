@@ -1,5 +1,6 @@
 from .AdvExpDamping import AdvExpDamping
 from .AdvLinearDamping import AdvLinearDamping
+from .AdvPiecewiseConstDamping import AdvPiecewiseConstDamping
 from .LearnRateAttnDecay import LearnRateAttnDecay
 from .LearnRateCosineDecay import LearnRateCosineDecay
 from .LearnRateExpDecay import LearnRateExpDecay

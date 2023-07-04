@@ -11,6 +11,7 @@ class AdvExpDamping(AdvBaseDamping):
         decay_steps,
         staircase=False,
         min_adv_scale=None,
+        max_adv_scale=None,
         verbose=False,
     ) -> None:
         super().__init__(adv_scale, verbose)
@@ -33,10 +34,20 @@ class AdvExpDamping(AdvBaseDamping):
         # Minimum adversarial scale
         if min_adv_scale is not None:
             assert isinstance(min_adv_scale, (int, float))
-            assert min_adv_scale > 0.0
+            assert min_adv_scale >= 0.0
             self._min_adv_scale = float(min_adv_scale)
         else:
             self._min_adv_scale = None
+
+        # Maximum adversarial scale
+        if max_adv_scale is not None:
+            assert isinstance(max_adv_scale, (int, float))
+            assert max_adv_scale >= 0.0
+            if min_adv_scale is not None:
+                assert max_adv_scale > min_adv_scale
+            self._max_adv_scale = float(max_adv_scale)
+        else:
+            self._max_adv_scale = None
 
     def on_train_begin(self, logs=None) -> None:
         super().on_train_begin(logs=logs)
@@ -50,6 +61,8 @@ class AdvExpDamping(AdvBaseDamping):
         sched_scale = tf.multiply(init_scale, tf.pow(self._tf_decay_rate, p))
         if self._min_adv_scale is not None:
             return tf.maximum(sched_scale, self._min_adv_scale)
+        elif self._max_adv_scale is not None:
+            return tf.minimum(sched_scale, self._max_adv_scale)
         else:
             return sched_scale
 
@@ -68,3 +81,7 @@ class AdvExpDamping(AdvBaseDamping):
     @property
     def min_adv_scale(self) -> float:
         return self._min_adv_scale
+
+    @property
+    def max_adv_scale(self) -> float:
+        return self._max_adv_scale
