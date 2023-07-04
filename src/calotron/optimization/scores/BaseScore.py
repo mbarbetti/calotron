@@ -16,7 +16,7 @@ class BaseScore:
 
     def __call__(self, x_true, x_pred, bins=10, range=None) -> float:
         raise NotImplementedError(
-            "Only `BaseScore` subclasses have the " "`__call__()` method implemented."
+            "Only `BaseScore` subclasses have the `__call__()` method implemented."
         )
 
     @property

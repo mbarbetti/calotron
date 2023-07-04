@@ -3,8 +3,8 @@ import numpy as np
 from calotron.optimization.scores.BaseScore import BaseScore
 
 
-class EMDistance(BaseScore):
-    def __init__(self, name="emd_score", dtype=None) -> None:
+class KSDistance(BaseScore):
+    def __init__(self, name="kst_score", dtype=None) -> None:
         super().__init__(name, dtype)
 
     def __call__(
@@ -27,15 +27,11 @@ class EMDistance(BaseScore):
                 x_pred, bins=bins_, range=None, weights=weights_pred
             )
 
-            pdf_true = pdf_true.astype(self.dtype)
-            pdf_true /= np.sum(pdf_true) + 1e-12
+            cdf_true = np.cumsum(pdf_true).astype(self._dtype)
+            cdf_true /= cdf_true[-1] + 1e-12
 
-            pdf_pred = pdf_pred.astype(self.dtype)
-            pdf_pred /= np.sum(pdf_pred) + 1e-12
+            cdf_pred = np.cumsum(pdf_pred).astype(self._dtype)
+            cdf_pred /= cdf_pred[-1] + 1e-12
 
-            emd_scores = np.zeros(shape=(len(bins_)))
-            for i in np.arange(len(emd_scores) - 1):
-                emd_scores[i + 1] = pdf_true[i] + emd_scores[i] - pdf_pred[i]
-
-            score = np.mean(np.abs(emd_scores))
+            score = np.max(np.abs(cdf_true - cdf_pred))
             return float(score)
