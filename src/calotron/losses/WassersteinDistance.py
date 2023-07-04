@@ -68,12 +68,13 @@ class WassersteinDistance(BaseLoss):
             sample_weight = tf.identity(energy_mask)
         else:
             sample_weight *= energy_mask
+        mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
 
-        y_true = discriminator((source, target), filter=sample_weight, training=False)
-        y_pred = discriminator((source, output), filter=sample_weight, training=False)
+        y_true = discriminator((source, target), padding_mask=mask, training=False)
+        y_pred = discriminator((source, output), padding_mask=mask, training=False)
 
         loss = tf.reduce_mean(y_pred - y_true)
-        loss = tf.cast(loss, dtype=output.dtype)
+        loss = tf.cast(loss, dtype=target.dtype)
         return loss
 
     def discriminator_loss(
@@ -93,15 +94,12 @@ class WassersteinDistance(BaseLoss):
             sample_weight = tf.identity(energy_mask)
         else:
             sample_weight *= energy_mask
+        mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
 
-        y_true = discriminator(
-            (source, target), filter=sample_weight, training=training
-        )
-        y_pred = discriminator(
-            (source, output), filter=sample_weight, training=training
-        )
-
+        y_true = discriminator((source, target), padding_mask=mask, training=training)
+        y_pred = discriminator((source, output), padding_mask=mask, training=training)
         loss = tf.reduce_mean(y_true - y_pred)
+        loss = tf.cast(loss, dtype=target.dtype)
 
         # Initial virtual adversarial direction
         batch_size = tf.shape(target)[0]
@@ -120,13 +118,13 @@ class WassersteinDistance(BaseLoss):
                 d_target, d_output = tf.split(d, 2, axis=0)
                 target_hat = tf.clip_by_value(
                     target + self._fixed_xi * d_target,
-                    clip_value_min=tf.reduce_min(target),
-                    clip_value_max=tf.reduce_max(target),
+                    clip_value_min=tf.reduce_min(target, axis=[0, 1]),
+                    clip_value_max=tf.reduce_max(target, axis=[0, 1]),
                 )
                 output_hat = tf.clip_by_value(
                     output + self._fixed_xi * d_output,
-                    clip_value_min=tf.reduce_min(output),
-                    clip_value_max=tf.reduce_max(output),
+                    clip_value_min=tf.reduce_min(output, axis=[0, 1]),
+                    clip_value_max=tf.reduce_max(output, axis=[0, 1]),
                 )
                 y_true_hat = discriminator((source, target_hat), training=training)
                 y_pred_hat = discriminator((source, output_hat), training=training)
@@ -149,13 +147,13 @@ class WassersteinDistance(BaseLoss):
         d_target, d_output = tf.split(d, 2, axis=0)
         target_hat = tf.clip_by_value(
             target + xi_target * d_target,
-            clip_value_min=tf.reduce_min(target),
-            clip_value_max=tf.reduce_max(target),
+            clip_value_min=tf.reduce_min(target, axis=[0, 1]),
+            clip_value_max=tf.reduce_max(target, axis=[0, 1]),
         )
         output_hat = tf.clip_by_value(
             output + xi_output * d_output,
-            clip_value_min=tf.reduce_min(output),
-            clip_value_max=tf.reduce_max(output),
+            clip_value_min=tf.reduce_min(output, axis=[0, 1]),
+            clip_value_max=tf.reduce_max(output, axis=[0, 1]),
         )
         x_diff = (
             tf.abs(
@@ -177,7 +175,6 @@ class WassersteinDistance(BaseLoss):
         alp_term = tf.maximum(K - LIPSCHITZ_CONSTANT, 0.0)  # one-side penalty
         alp_term = tf.reduce_mean(alp_term)
         loss += self._lipschitz_penalty * alp_term**2  # adversarial Lipschitz penalty
-        loss = tf.cast(loss, dtype=target.dtype)
         return loss
 
     @property

@@ -34,14 +34,6 @@ class BaseLoss:
             "`discriminator_loss()` method implemented."
         )
 
-    def aux_classifier_loss(
-        self, aux_classifier, source, target, sample_weight=None, training=True
-    ) -> tf.Tensor:
-        raise NotImplementedError(
-            "Only some `BaseLoss` subclasses have the "
-            "`aux_classifier_loss()` method implemented."
-        )
-
     @property
     def name(self) -> str:
         return self._name

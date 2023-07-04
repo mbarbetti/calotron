@@ -56,6 +56,7 @@ class BinaryCrossentropy(BaseLoss):
             sample_weight = tf.identity(energy_mask)
         else:
             sample_weight *= energy_mask
+        mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
 
         # Adversarial loss
         if self._inj_noise_std > 0.0:
@@ -65,7 +66,7 @@ class BinaryCrossentropy(BaseLoss):
         else:
             rnd_pred = 0.0
         y_pred = discriminator(
-            (source, output + rnd_pred), filter=sample_weight, training=False
+            (source, output + rnd_pred), padding_mask=mask, training=False
         )
         adv_loss = self._loss(tf.ones_like(y_pred), y_pred)
         adv_loss = tf.cast(adv_loss, dtype=output.dtype)
@@ -88,6 +89,7 @@ class BinaryCrossentropy(BaseLoss):
             sample_weight = tf.identity(energy_mask)
         else:
             sample_weight *= energy_mask
+        mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
 
         # Real target loss
         if self._inj_noise_std > 0.0:
@@ -97,7 +99,7 @@ class BinaryCrossentropy(BaseLoss):
         else:
             rnd_true = 0.0
         y_true = discriminator(
-            (source, target + rnd_true), filter=sample_weight, training=training
+            (source, target + rnd_true), padding_mask=mask, training=training
         )
         real_loss = self._loss(tf.ones_like(y_true), y_true)
         real_loss = tf.cast(real_loss, dtype=target.dtype)
@@ -110,7 +112,7 @@ class BinaryCrossentropy(BaseLoss):
         else:
             rnd_pred = 0.0
         y_pred = discriminator(
-            (source, output + rnd_pred), filter=sample_weight, training=training
+            (source, output + rnd_pred), padding_mask=mask, training=training
         )
         fake_loss = self._loss(tf.zeros_like(y_pred), y_pred)
         fake_loss = tf.cast(fake_loss, dtype=output.dtype)
