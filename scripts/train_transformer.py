@@ -1,6 +1,5 @@
 import os
 import socket
-from argparse import ArgumentParser
 from datetime import datetime
 
 import numpy as np
@@ -8,45 +7,25 @@ import tensorflow as tf
 import yaml
 from html_reports import Report
 from sklearn.utils import shuffle
-from utils import (
-    attention_plot,
-    calorimeter_deposits,
-    energy_sequences,
-    event_example,
-    learn_rate_scheduling,
-    metric_curves,
-    photon2cluster_corr,
-    validation_histogram,
-)
+from utils_argparser import argparser_training
+from utils_training import prepare_training_plots, prepare_validation_plots
 
 from calotron.callbacks.schedulers import LearnRateExpDecay
-from calotron.models.transformers import MaskedTransformer
+from calotron.models.transformers import Transformer
 from calotron.simulators import ExportSimulator, Simulator
-from calotron.utils import getSummaryHTML, initHPSingleton
+from calotron.utils.reports import getSummaryHTML, initHPSingleton
 
 DTYPE = np.float32
-TRAIN_RATIO = 0.7
 BATCHSIZE = 512
-EPOCHS = 500
+EPOCHS = 100
 
 # +------------------+
 # |   Parser setup   |
 # +------------------+
 
-parser = ArgumentParser(description="transformer training setup")
-
-parser.add_argument("--saving", action="store_true")
-parser.add_argument("--no-saving", dest="saving", action="store_false")
-parser.set_defaults(saving=False)
-
-parser.add_argument("--weights", action="store_true")
-parser.add_argument("--no-weights", dest="weights", action="store_false")
-parser.set_defaults(weights=True)
-
-parser.add_argument("--test", action="store_true")
-parser.add_argument("--no-test", dest="test", action="store_false")
-parser.set_defaults(test=False)
-
+parser = argparser_training(
+    model="Transformer", adv_learning=False, description="Transformer training setup"
+)
 args = parser.parse_args()
 
 # +-------------------+
@@ -63,14 +42,18 @@ models_dir = config_dir["models_dir"]
 images_dir = config_dir["images_dir"]
 reports_dir = config_dir["reports_dir"]
 
+chunk_size = int(args.chunk_size)
+train_ratio = float(args.train_ratio)
+
 # +------------------+
 # |   Data loading   |
 # +------------------+
 
 npzfile = np.load(f"{data_dir}/calotron-dataset-demo.npz")
-photon = npzfile["photon"].astype(DTYPE)[:200_000]
-cluster = npzfile["cluster"].astype(DTYPE)[:200_000]
-weight = npzfile["weight"].astype(DTYPE)[:200_000]
+
+photon = npzfile["photon"].astype(DTYPE)[:chunk_size]
+cluster = npzfile["cluster"].astype(DTYPE)[:chunk_size]
+weight = npzfile["weight"].astype(DTYPE)[:chunk_size]
 
 print(f"[INFO] Generated photons - shape: {photon.shape}")
 print(f"[INFO] Reconstructed clusters - shape: {cluster.shape}")
@@ -82,7 +65,7 @@ if not args.weights:
 photon, cluster, weight = shuffle(photon, cluster, weight)
 
 chunk_size = photon.shape[0]
-train_size = int(TRAIN_RATIO * chunk_size)
+train_size = int(train_ratio * chunk_size)
 
 # +-------------------------+
 # |   Dataset preparation   |
@@ -100,7 +83,7 @@ train_ds = (
     .prefetch(tf.data.AUTOTUNE)
 )
 
-if TRAIN_RATIO != 1.0:
+if train_ratio != 1.0:
     photon_val = photon[train_size:]
     cluster_val = cluster[train_size:]
     weight_val = weight[train_size:]
@@ -122,25 +105,23 @@ else:
 # |   Model construction   |
 # +------------------------+
 
-model = MaskedTransformer(
+model = Transformer(
     output_depth=hp.get("output_depth", cluster.shape[2]),
     encoder_depth=hp.get("encoder_depth", 32),
     decoder_depth=hp.get("decoder_depth", 32),
     num_layers=hp.get("num_layers", 5),
     num_heads=hp.get("num_heads", 4),
-    key_dims=hp.get("key_dims", 64),
+    key_dim=hp.get("key_dim", 64),
+    admin_res_scale=hp.get("admin_res_scale", "O(logn)"),
     mlp_units=hp.get("mlp_units", 128),
-    dropout_rates=hp.get("dropout_rates", 0.1),
-    seq_ord_latent_dims=hp.get("seq_ord_latent_dims", 64),
-    seq_ord_max_lengths=hp.get(
-        "seq_ord_max_lengths", [photon.shape[1], cluster.shape[1]]
+    dropout_rate=hp.get("dropout_rate", 0.1),
+    seq_ord_latent_dim=hp.get("seq_ord_latent_dim", 64),
+    seq_ord_max_length=hp.get(
+        "seq_ord_max_length", max(photon.shape[1], cluster.shape[1])
     ),
-    seq_ord_normalizations=hp.get("seq_ord_normalizations", 10_000),
-    attn_mask_init_nonzero_size=hp.get("attn_mask_init_nonzero_size", 8),
-    enable_residual_smoothing=hp.get("enable_residual_smoothing", True),
-    enable_source_baseline=hp.get("enable_source_baseline", True),
-    enable_attention_mask=hp.get("enable_attention_mask", False),
-    output_activations=hp.get("output_activations", None),
+    seq_ord_normalization=hp.get("seq_ord_normalization", 10_000),
+    enable_res_smoothing=hp.get("enable_res_smoothing", True),
+    output_activations=hp.get("output_activations", ["tanh", "tanh", "sigmoid"]),
     start_token_initializer=hp.get("start_toke_initializer", "ones"),
     dtype=DTYPE,
 )
@@ -152,17 +133,19 @@ model.summary()
 # |   Optimizers setup   |
 # +----------------------+
 
-hp.get("optimizer", "RMSprop")
-opt = tf.keras.optimizers.RMSprop(hp.get("lr0", 1e-3))
+opt = tf.keras.optimizers.Adam(learning_rate=hp.get("lr0", 1e-4))
+hp.get("optimizer", opt.name)
 
 # +----------------------------+
 # |   Training configuration   |
 # +----------------------------+
 
-mse = tf.keras.losses.MeanSquaredError()
-hp.get("loss", mse.name)
+loss = tf.keras.losses.MeanSquaredError()
+hp.get("loss", loss.name)
 
-model.compile(loss=mse, optimizer=opt, weighted_metrics=hp.get("metrics", ["mae"]))
+metrics = hp.get("metrics", ["mae"])
+
+model.compile(loss=loss, optimizer=opt, weighted_metrics=metrics)
 
 # +--------------------------+
 # |   Callbacks definition   |
@@ -177,7 +160,7 @@ lr_sched = LearnRateExpDecay(
     min_learning_rate=hp.get("min_learning_rate", 1e-6),
     verbose=True,
 )
-hp.get("lr_sched", "LearnRateExpDecay")
+hp.get("lr_sched", lr_sched.name)
 callbacks.append(lr_sched)
 
 # +------------------------+
@@ -215,6 +198,7 @@ dataset = (
 )
 
 output, attn_weights = [exp_out.numpy() for exp_out in exp_sim(dataset)]
+
 photon_val = photon_val[: len(output)]
 cluster_val = cluster_val[: len(output)]
 weight_val = weight_val[: len(output)]
@@ -242,9 +226,16 @@ export_img_dirname = f"{images_dir}/{prefix}_img"
 
 if args.saving:
     tf.saved_model.save(exp_sim, export_dir=export_model_fname)
-    hp.dump(f"{export_model_fname}/hyperparams.yml")  # export also list of hyperparams
     print(f"[INFO] Trained model correctly exported to {export_model_fname}")
-    os.makedirs(export_img_dirname)  # need to save images
+    hp.dump(f"{export_model_fname}/hyperparams.yml")  # export also list of hyperparams
+    np.savez(
+        f"{export_model_fname}/results.npz",
+        photon=photon_val,
+        cluster=cluster_val,
+        output=output,
+    )  # export training results
+    if not os.path.exists(export_img_dirname):
+        os.makedirs(export_img_dirname)  # need to save images
 
 # +---------------------+
 # |   Training report   |
@@ -280,206 +271,39 @@ report.add_markdown("---")
 ## Transformer architecture
 report.add_markdown('<h2 align="center">Transformer architecture</h2>')
 report.add_markdown(f"**Model name:** {model.name}")
-html_table, num_params = getSummaryHTML(model)
+html_table, params_details = getSummaryHTML(model)
+model_weights = ""
+for k, n in zip(["Total", "Trainable", "Non-trainable"], params_details):
+    model_weights += f"- **{k} params:** {n}\n"
 report.add_markdown(html_table)
-report.add_markdown(f"**Total params:** {num_params}")
+report.add_markdown(model_weights)
 
 report.add_markdown("---")
 
 ## Training plots
-report.add_markdown('<h2 align="center">Training plots</h2>')
-
-start_epoch = int(EPOCHS / 20)
-
-#### Learning curves
-metric_curves(
+prepare_training_plots(
     report=report,
     history=train.history,
-    start_epoch=start_epoch,
-    key="loss",
-    ylabel="Transformer loss",
-    title="Learning curves",
-    validation_set=(TRAIN_RATIO != 1.0),
-    colors=["#d01c8b", "#4dac26"],
-    labels=["training set", "validation set"],
-    legend_loc=None,
-    yscale="linear",
-    save_figure=args.saving,
-    export_fname=f"{export_img_dirname}/learn-curves",
+    metrics=metrics,
+    num_epochs=EPOCHS,
+    attn_weights=attn_weights,
+    show_discriminator_curves=False,
+    is_from_validation_set=(train_ratio != 1.0),
+    save_images=args.saving,
+    images_dirname=export_img_dirname,
 )
-
-#### Learning rate scheduling
-learn_rate_scheduling(
-    report=report,
-    history=train.history,
-    start_epoch=0,
-    keys=["lr"],
-    colors=["#d01c8b"],
-    labels=["transformer"],
-    legend_loc="upper right",
-    save_figure=args.saving,
-    export_fname=f"{export_img_dirname}/lr-sched",
-)
-
-#### Metric curves
-metric_curves(
-    report=report,
-    history=train.history,
-    start_epoch=start_epoch,
-    key="mae",
-    ylabel="Mean absolute error",
-    title="Metric curves",
-    validation_set=(TRAIN_RATIO != 1.0),
-    colors=["#d01c8b", "#4dac26"],
-    labels=["training set", "validation set"],
-    legend_loc=None,
-    yscale="linear",
-    save_figure=args.saving,
-    export_fname=f"{export_img_dirname}/metric-curves",
-)
-
-report.add_markdown("<br>")
-
-#### Attention weights
-for head_id in range(attn_weights.shape[1]):
-    attention_plot(
-        report=report,
-        attn_weights=attn_weights,
-        head_id=head_id,
-        save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/attn-plot",
-    )
-
-report.add_markdown("---")
 
 ## Validation plots
-report.add_markdown('<h2 align="center">Validation plots</h2>')
-
-photon_x = photon_val[:, :, 0].flatten()
-photon_y = photon_val[:, :, 1].flatten()
-photon_energy = photon_val[:, :, 2].flatten()
-
-cluster_x = cluster_val[:, :, 0].flatten()
-cluster_y = cluster_val[:, :, 1].flatten()
-cluster_energy = cluster_val[:, :, 2].flatten()
-
-output_x = output[:, :, 0].flatten()
-output_y = output[:, :, 1].flatten()
-output_energy = output[:, :, 2].flatten()
-
-w = weight_val.flatten()
-
-#### X histogram
-for log_scale in [False, True]:
-    validation_histogram(
-        report=report,
-        data_ref=cluster_x,
-        data_gen=output_x,
-        weights_ref=w,
-        weights_gen=w,
-        xlabel="Preprocessed $x$-coordinate [a.u.]",
-        density=False,
-        ref_label="Training data",
-        gen_label="Transformer output",
-        log_scale=log_scale,
-        legend_loc="upper right",
-        save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/x-hist",
-    )
-
-#### Y histogram
-for log_scale in [False, True]:
-    validation_histogram(
-        report=report,
-        data_ref=cluster_y,
-        data_gen=output_y,
-        weights_ref=w,
-        weights_gen=w,
-        xlabel="Preprocessed $y$-coordinate [a.u.]",
-        density=False,
-        ref_label="Training data",
-        gen_label="Transformer output",
-        log_scale=log_scale,
-        legend_loc="upper right",
-        save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/y-hist",
-    )
-
-#### Energy histogram
-for log_scale in [False, True]:
-    validation_histogram(
-        report=report,
-        data_ref=cluster_energy,
-        data_gen=output_energy,
-        weights_ref=w,
-        weights_gen=w,
-        xlabel="Preprocessed energy [a.u.]",
-        density=False,
-        ref_label="Training data",
-        gen_label="Transformer output",
-        log_scale=log_scale,
-        legend_loc="upper right",
-        save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/energy-hist",
-    )
-
-#### Calorimeter deposits
-for log_scale in [False, True]:
-    calorimeter_deposits(
-        report=report,
-        ref_xy=(cluster_x, cluster_y),
-        gen_xy=(output_x, output_y),
-        ref_energy=cluster_energy * w,
-        gen_energy=output_energy * w,
-        min_energy=0.0,
-        model_name="Transformer",
-        log_scale=log_scale,
-        save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/calo-deposits",
-    )
-
-#### Event examples
-cluster_mean_energy = np.mean(cluster_val[:, :, 2], axis=-1)
-events = np.argsort(cluster_mean_energy)[::-1][:4]
-for i, evt in enumerate(events):
-    event_example(
-        report=report,
-        photon_xy=(photon_val[evt, :, 0].flatten(), photon_val[evt, :, 1].flatten()),
-        cluster_xy=(cluster_val[evt, :, 0].flatten(), cluster_val[evt, :, 1].flatten()),
-        output_xy=(output[evt, :, 0].flatten(), output[evt, :, 1].flatten()),
-        photon_energy=photon_val[evt, :, 2].flatten(),
-        cluster_energy=cluster_val[evt, :, 2].flatten(),
-        output_energy=output[evt, :, 2].flatten(),
-        min_energy=0.0,
-        model_name="Transformer",
-        save_figure=args.saving,
-        export_fname=f"{export_img_dirname}/evt-example-{i}",
-    )
-
-#### Energy sequences
-energy_sequences(
+prepare_validation_plots(
     report=report,
-    ref_energy=cluster_val[:64, :, 2],
-    gen_energy=output[:64, :, 2],
-    min_energy=0.0,
-    model_name="Transformer",
-    save_figure=args.saving,
-    export_fname=f"{export_img_dirname}/energy-seq",
-)
-
-#### Photon-to-cluster correlations
-photon2cluster_corr(
-    report,
     photon=photon_val,
     cluster=cluster_val,
     output=output,
-    min_energy=0.0,
-    log_scale=True,
-    save_figure=args.saving,
-    export_fname=f"{export_img_dirname}/gamma2calo-corr",
+    weight=weight_val,
+    model_name="Transformer",
+    save_images=args.saving,
+    images_dirname=export_img_dirname,
 )
-
-report.add_markdown("---")
 
 report_fname = f"{reports_dir}/{prefix}_train-report.html"
 report.write_report(filename=report_fname)

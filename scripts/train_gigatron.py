@@ -13,13 +13,13 @@ from utils_training import prepare_training_plots, prepare_validation_plots
 from calotron.callbacks.schedulers import LearnRateExpDecay
 from calotron.losses import MeanSquaredError
 from calotron.models import Calotron
-from calotron.models.discriminators import Discriminator
-from calotron.models.transformers import Transformer
+from calotron.models.discriminators import GigaDiscriminator
+from calotron.models.transformers import GigaGenerator
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils.reports import getSummaryHTML, initHPSingleton
 
 DTYPE = np.float32
-BATCHSIZE = 512
+BATCHSIZE = 256
 EPOCHS = 100
 ALPHA = 0.1
 
@@ -28,7 +28,7 @@ ALPHA = 0.1
 # +------------------+
 
 parser = argparser_training(
-    model="Calotron", adv_learning=True, description="Calotron training setup"
+    model="Gigatron", adv_learning=True, description="Gigatron training setup"
 )
 args = parser.parse_args()
 
@@ -105,14 +105,15 @@ else:
 # |   Model construction   |
 # +------------------------+
 
-transformer = Transformer(
+transformer = GigaGenerator(
     output_depth=hp.get("t_output_depth", cluster.shape[2]),
     encoder_depth=hp.get("t_encoder_depth", 32),
-    decoder_depth=hp.get("t_decoder_depth", 32),
+    mapping_latent_dim=hp.get("mapping_latent_dim", 64),
+    synthesis_depth=hp.get("t_synthesis_depth", 32),
     num_layers=hp.get("t_num_layers", 5),
     num_heads=hp.get("t_num_heads", 4),
     key_dim=hp.get("t_key_dim", 64),
-    admin_res_scale=hp.get("t_admin_res_scale", "O(logn)"),
+    admin_res_scale=hp.get("t_admin_res_scale", "O(n)"),
     mlp_units=hp.get("t_mlp_units", 128),
     dropout_rate=hp.get("t_dropout_rate", 0.1),
     seq_ord_latent_dim=hp.get("t_seq_ord_latent_dim", 64),
@@ -126,13 +127,23 @@ transformer = Transformer(
     dtype=DTYPE,
 )
 
-discriminator = Discriminator(
-    latent_dim=hp.get("d_latent_dim", 64),
+discriminator = GigaDiscriminator(
     output_units=hp.get("d_output_units", 1),
-    output_activation=hp.get("d_output_activation", "sigmoid"),
-    deepsets_dense_num_layers=hp.get("d_deepsets_dense_num_layers", 4),
-    deepsets_dense_units=hp.get("d_deepsets_dense_units", 256),
+    encoder_depth=hp.get("d_encoder_depth", 32),
+    decoder_depth=hp.get("d_decoder_depth", 32),
+    num_layers=hp.get("d_num_layers", 4),
+    num_heads=hp.get("d_num_heads", 3),
+    key_dim=hp.get("d_key_dim", 64),
+    admin_res_scale=hp.get("d_admin_res_scale", "O(n)"),
+    mlp_units=hp.get("d_mlp_units", 128),
     dropout_rate=hp.get("d_dropout_rate", 0.1),
+    seq_ord_latent_dim=hp.get("d_seq_ord_latent_dim", 64),
+    seq_ord_max_length=hp.get(
+        "t_seq_ord_max_length", max(photon.shape[1], cluster.shape[1])
+    ),
+    seq_ord_normalization=hp.get("d_seq_ord_normalization", 10_000),
+    enable_res_smoothing=hp.get("d_enable_res_smoothing", True),
+    output_activation=hp.get("d_output_activation", "sigmoid"),
     dtype=DTYPE,
 )
 
@@ -148,7 +159,7 @@ model.summary()
 t_opt = tf.keras.optimizers.Adam(hp.get("t_lr0", 1e-4))
 hp.get("t_optimizer", t_opt.name)
 
-d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", 1e-4))
+d_opt = tf.keras.optimizers.Adam(hp.get("d_lr0", 1e-4))
 hp.get("d_optimizer", d_opt.name)
 
 # +----------------------------+
@@ -267,7 +278,7 @@ else:
     timestamp = timestamp.split(".")[0].replace("-", "").replace(" ", "-")
     for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
         prefix += time + unit  # YYYYMMDD-HHhMMmSSs
-prefix += f"_calotron_{args.adv_metric}"
+prefix += f"_gigatron_{args.adv_metric}"
 
 export_model_fname = f"{models_dir}/{prefix}_model"
 export_img_dirname = f"{images_dir}/{prefix}_img"
@@ -290,7 +301,7 @@ if args.saving:
 # +---------------------+
 
 report = Report()
-report.add_markdown('<h1 align="center">Calotron training report</h1>')
+report.add_markdown('<h1 align="center">Gigatron training report</h1>')
 
 info = [
     f"- Script executed on **{socket.gethostname()}**",
@@ -360,7 +371,7 @@ prepare_validation_plots(
     cluster=cluster_val,
     output=output,
     weight=weight_val,
-    model_name="Calotron",
+    model_name="Gigatron",
     save_images=args.saving,
     images_dirname=export_img_dirname,
 )

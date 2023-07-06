@@ -4,7 +4,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
-my_cmap = copy.copy(mpl.cm.get_cmap("gist_heat"))
+my_cmap = copy.copy(mpl.cm.get_cmap("magma"))
 my_cmap.set_bad((0, 0, 0))
 
 
@@ -263,8 +263,10 @@ def event_example(
     photon_energy=None,
     cluster_energy=None,
     output_energy=None,
+    match_weights=None,
     min_energy=0.0,
     model_name="Calotron",
+    show_errors=True,
     save_figure=False,
     export_fname="./images/evt-example",
 ) -> None:
@@ -273,9 +275,9 @@ def event_example(
     x_output, y_output = output_xy
 
     if (
-        (photon_energy is not None)
-        & (cluster_energy is not None)
-        & (output_energy is not None)
+        np.all(photon_energy is not None)
+        & np.all(cluster_energy is not None)
+        & np.all(output_energy is not None)
     ):
         photon_energy = np.where(photon_energy > min_energy, photon_energy, 0.0)
         cluster_energy = np.where(cluster_energy > min_energy, cluster_energy, 0.0)
@@ -285,7 +287,7 @@ def event_example(
         cluster_size = 50.0 * cluster_energy / cluster_energy.max()
         output_size = 50.0 * output_energy / cluster_energy.max()
     else:
-        photon_size, cluster_size, output_size = [10.0 for _ in range(3)]
+        photon_size, cluster_size, output_size = [30.0 for _ in range(3)]
 
     plt.figure(figsize=(8, 6), dpi=300)
     plt.xlabel("$x$ coordinate", fontsize=12)
@@ -298,7 +300,8 @@ def event_example(
         facecolors="none",
         edgecolors="#d7191c",
         lw=0.75,
-        label="True photon",
+        label="Generated photon",
+        zorder=2,
     )
     plt.scatter(
         x_cluster,
@@ -308,8 +311,21 @@ def event_example(
         facecolors="none",
         edgecolors="#2b83ba",
         lw=0.75,
-        label="Calo neutral cluster",
+        label="Reconstructed cluster",
+        zorder=3,
     )
+    if np.all(match_weights is not None):
+        plt.scatter(
+            np.where(match_weights == 1.0, x_cluster, 0.0),
+            np.where(match_weights == 1.0, y_cluster, 0.0),
+            s=np.where(match_weights == 1.0, cluster_size, 0.0),
+            marker="s",
+            facecolors="yellow",
+            edgecolors="#2b83ba",
+            lw=0.75,
+            label="Photon-matched cluster",
+            zorder=1,
+        )
     plt.scatter(
         x_output,
         y_output,
@@ -319,7 +335,23 @@ def event_example(
         edgecolors="#1a9641",
         lw=0.75,
         label=f"{model_name} output",
+        zorder=4,
     )
+    if np.all(cluster_energy is not None):
+        weights = cluster_energy.copy()
+    else:
+        weights = np.ones_like(x_cluster)
+    if show_errors:
+        for x_true, y_true, x_pred, y_pred, w in zip(
+            x_cluster, y_cluster, x_output, y_output, weights
+        ):
+            plt.plot(
+                [x_true, x_pred],
+                [y_true, y_pred],
+                color="#1a9641",
+                lw=0.5 * w / weights.max(),
+                zorder=5,
+            )
     plt.legend(fontsize=10)
     if save_figure:
         plt.savefig(f"{export_fname}.png")
@@ -371,12 +403,12 @@ def photon2cluster_corr(
 ) -> None:
     reco_objects = [cluster, output]
     energies = list()
-    bins = np.linspace(0, 1, 76)
+    bins = np.linspace(min_energy, 0.8 - min_energy, 76)
     vmin = 1.0 if log_scale else 0.0
     vmax = 0.0
     for object in reco_objects:
         photon_xy = np.tile(photon[:, None, :, :2], (1, object.shape[1], 1, 1))
-        object_xy = np.tile(cluster[:, :, None, :2], (1, 1, photon.shape[1], 1))
+        object_xy = np.tile(object[:, :, None, :2], (1, 1, photon.shape[1], 1))
 
         pairwise_distance = np.linalg.norm(object_xy - photon_xy, axis=-1)
         match_photon_idx = np.argmin(pairwise_distance, axis=-1)
@@ -443,6 +475,70 @@ def attention_plot(
     plt.ylabel("Reconstructed clusters", fontsize=12)
     plt.imshow(attn_weights[head_id], aspect="auto", cmap=my_cmap)
     plt.colorbar()
+    if save_figure:
+        plt.savefig(f"{export_fname}.png")
+    report.add_figure(options="width=45%")
+    plt.close()
+
+
+def energy_center_dist(
+    report,
+    cluster,
+    output,
+    weights=None,
+    density=False,
+    model_name="Calotron",
+    log_scale=False,
+    legend_loc="upper left",
+    save_figure=False,
+    export_fname="./images/energy-center-dist",
+) -> None:
+    cluster_xy_center = np.sum(
+        cluster[:, :, :2] * cluster[:, :, 2][:, :, None], axis=1
+    ) / np.sum(cluster[:, :, 2], axis=1, keepdims=True)
+    output_xy_center = np.sum(
+        output[:, :, :2] * output[:, :, 2][:, :, None], axis=1
+    ) / np.sum(output[:, :, 2], axis=1, keepdims=True)
+
+    cluster_distances = np.linalg.norm(
+        cluster[:, :, :2] - cluster_xy_center[:, None, :], axis=-1
+    ).flatten()
+    output_distances = np.linalg.norm(
+        output[:, :, :2] - output_xy_center[:, None, :], axis=-1
+    ).flatten()
+
+    if np.any(weights is None):
+        weights = np.ones_like(cluster[:, :, 0])
+
+    min_ = cluster_distances.min()
+    max_ = cluster_distances.max()
+    bins = np.linspace(min_, max_, 101)
+
+    plt.figure(figsize=(8, 5), dpi=300)
+    plt.xlabel("Distance from center of energy [a.u.]", fontsize=12)
+    plt.ylabel("Candidates", fontsize=12)
+    plt.hist(
+        cluster_distances,
+        bins=bins,
+        density=density,
+        weights=weights.flatten(),
+        color="#3288bd",
+        label="Training data",
+    )
+    plt.hist(
+        output_distances,
+        bins=bins,
+        density=density,
+        weights=weights.flatten(),
+        histtype="step",
+        color="#fc8d59",
+        lw=2,
+        label=f"{model_name} model",
+    )
+    if log_scale:
+        plt.yscale("log")
+        export_fname += "-log"
+    plt.legend(loc=legend_loc, fontsize=10)
     if save_figure:
         plt.savefig(f"{export_fname}.png")
     report.add_figure(options="width=45%")

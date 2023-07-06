@@ -1,5 +1,4 @@
 import pickle
-from argparse import ArgumentParser
 from glob import glob
 from time import time
 
@@ -11,6 +10,7 @@ import yaml
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.utils import shuffle
 from tqdm import tqdm
+from utils_argparser import argparser_preprocessing
 
 ECAL_W = 8000
 ECAL_H = 6500
@@ -30,20 +30,7 @@ MAX_OUTPUT_CLUSTERS_DEMO = 32
 # |   Parser setup   |
 # +------------------+
 
-parser = ArgumentParser(description="dataset preparation setup")
-
-parser.add_argument("-f", "--filename", default="./data/LamarrTraining.root")
-parser.add_argument("-m", "--max_files", default=10)
-parser.add_argument("-c", "--chunk_size", default=-1)
-
-parser.add_argument("--demo", action="store_true")
-parser.add_argument("--no-demo", dest="saving", action="store_false")
-parser.set_defaults(demo=False)
-
-parser.add_argument("--verbose", action="store_true")
-parser.add_argument("--no-verbose", dest="saving", action="store_false")
-parser.set_defaults(verbose=False)
-
+parser = argparser_preprocessing(description="dataset preparation setup")
 args = parser.parse_args()
 
 # +-------------------+
@@ -211,8 +198,8 @@ photon = np.array(true_photons[event_number])
 cluster = np.array(reco_clusters[event_number])
 
 plt.figure(figsize=(8, 6), dpi=300)
-plt.xlabel("$x$ coordinate", fontsize=12)
-plt.ylabel("$y$ coordinate", fontsize=12)
+plt.xlabel("Preprocessed $x$-coordinate [a.u.]", fontsize=12)
+plt.ylabel("Preprocessed $y$-coordinate [a.u.]", fontsize=12)
 plt.scatter(
     photon[:, 0],
     photon[:, 1],
@@ -231,10 +218,8 @@ plt.scatter(
     facecolors="none",
     edgecolors="#2b83ba",
     lw=0.75,
-    label="Reconstructed calo-cluster",
+    label="Reconstructed cluster",
 )
-plt.xlim([-1.0, 1.0])
-plt.ylim([-1.0, 1.0])
 plt.legend(loc="upper left", fontsize=10)
 plt.savefig(fname=f"{images_dir}/evt-example.png")
 plt.close()
@@ -295,8 +280,8 @@ plt.figure(figsize=(18, 5), dpi=300)
 
 plt.subplot(1, 2, 1)
 plt.title("Generated photons", fontsize=14)
-plt.xlabel("$x$ coordinate", fontsize=12)
-plt.ylabel("$y$ coordinate", fontsize=12)
+plt.xlabel("Preprocessed $x$-coordinate [a.u.]", fontsize=12)
+plt.ylabel("Preprocessed $y$-coordinate [a.u.]", fontsize=12)
 x_bins = np.linspace(-0.4, 0.4, 41)
 y_bins = np.linspace(-0.4, 0.4, 41)
 plt.hist2d(
@@ -305,14 +290,14 @@ plt.hist2d(
     weights=pad_photons[:, :, 2].flatten(),
     bins=(x_bins, y_bins),
     cmin=0,
-    cmap="gist_heat",
+    cmap="magma",
 )
 plt.colorbar()
 
 plt.subplot(1, 2, 2)
 plt.title("Reconstructed calo-clusters", fontsize=14)
-plt.xlabel("$x$ coordinate", fontsize=12)
-plt.ylabel("$y$ coordinate", fontsize=12)
+plt.xlabel("Preprocessed $x$-coordinate [a.u.]", fontsize=12)
+plt.ylabel("Preprocessed $y$-coordinate [a.u.]", fontsize=12)
 x_bins = np.linspace(-0.4, 0.4, 41)
 y_bins = np.linspace(-0.4, 0.4, 41)
 plt.hist2d(
@@ -321,7 +306,7 @@ plt.hist2d(
     weights=pad_clusters[:, :, 2].flatten(),
     bins=(x_bins, y_bins),
     cmin=0,
-    cmap="gist_heat",
+    cmap="magma",
 )
 plt.colorbar()
 
@@ -341,16 +326,16 @@ plt.figure(figsize=(18, 10), dpi=300)
 
 plt.subplot(1, 2, 1)
 plt.title("Generated photons", fontsize=14)
-plt.xlabel("Photon energy", fontsize=12)
+plt.xlabel("Photon preprocessed energy [a.u.]", fontsize=12)
 plt.ylabel("Events", fontsize=12)
-plt.imshow(photon_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap="gist_heat")
+plt.imshow(photon_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap="magma")
 plt.colorbar()
 
 plt.subplot(1, 2, 2)
 plt.title("Reconstructed calo-clusters", fontsize=14)
-plt.xlabel("Cluster energy deposits", fontsize=12)
+plt.xlabel("Cluster preprocessed energy [a.u.]", fontsize=12)
 plt.ylabel("Events", fontsize=12)
-plt.imshow(cluster_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap="gist_heat")
+plt.imshow(cluster_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap="magma")
 plt.colorbar()
 
 img_name = "energy-seq-demo" if args.demo else "energy-seq"
@@ -371,6 +356,60 @@ match_weights = MAX_MATCH_DISTANCE / np.maximum(
     min_pairwise_distance, MAX_MATCH_DISTANCE
 )
 match_weights *= pad_clusters[:, :, -1]  # NotPadding boolean
+
+# +---------------------------+
+# |   Reduced event example   |
+# +---------------------------+
+
+x_photon = pad_photons[event_number, :, 0].flatten()
+y_photon = pad_photons[event_number, :, 1].flatten()
+energy_photon = pad_photons[event_number, :, 2].flatten()
+
+x_cluster = pad_clusters[event_number, :, 0].flatten()
+y_cluster = pad_clusters[event_number, :, 1].flatten()
+energy_cluster = pad_clusters[event_number, :, 2].flatten()
+
+w = match_weights[event_number, :].flatten()
+
+plt.figure(figsize=(8, 6), dpi=300)
+plt.xlabel("Preprocessed $x$-coordinate [a.u.]", fontsize=12)
+plt.ylabel("Preprocessed $y$-coordinate [a.u.]", fontsize=12)
+plt.scatter(
+    x_photon,
+    y_photon,
+    s=50.0 * energy_photon / energy_cluster.max(),
+    marker="o",
+    facecolors="none",
+    edgecolors="#d7191c",
+    lw=0.75,
+    label="Generated photon",
+    zorder=2,
+)
+plt.scatter(
+    x_cluster,
+    y_cluster,
+    s=50.0 * energy_cluster / energy_cluster.max(),
+    marker="s",
+    facecolors="none",
+    edgecolors="#2b83ba",
+    lw=0.75,
+    label="Reconstructed cluster",
+    zorder=3,
+)
+plt.scatter(
+    np.where(w == 1.0, x_cluster, 0.0),
+    np.where(w == 1.0, y_cluster, 0.0),
+    s=50.0 * np.where(w == 1.0, energy_cluster / energy_cluster.max(), 0.0),
+    marker="s",
+    facecolors="yellow",
+    edgecolors="#2b83ba",
+    lw=0.75,
+    label="Photon-matched cluster",
+    zorder=1,
+)
+plt.legend(loc="upper left", fontsize=10)
+plt.savefig(fname=f"{images_dir}/reduced-evt-example.png")
+plt.close()
 
 # +--------------------------+
 # |   Training data export   |
@@ -394,18 +433,15 @@ print(
 # |   Preprocessing models export   |
 # +---------------------------------+
 
-export_scaler_fname = "photon-scaler-logE"
-pkl_fname = f"{models_dir}/{export_scaler_fname}.pkl"
+pkl_fname = f"{models_dir}/photon-scaler-logE.pkl"
 pickle.dump(photon_scaler_logE, open(pkl_fname, "wb"))
 print(f"[INFO] Photon energy scaler correctly saved to {pkl_fname}")
 
-export_scaler_fname = "cluster-scaler-logE"
-pkl_fname = f"{models_dir}/{export_scaler_fname}.pkl"
+pkl_fname = f"{models_dir}/cluster-scaler-logE.pkl"
 pickle.dump(cluster_scaler_logE, open(pkl_fname, "wb"))
 print(f"[INFO] Cluster energy scaler correctly saved to {pkl_fname}")
 
 if not args.demo:
-    export_scaler_fname = "cluster-scaler-pid"
-    pkl_fname = f"{models_dir}/{export_scaler_fname}.pkl"
+    pkl_fname = f"{models_dir}/cluster-scaler-pid.pkl"
     pickle.dump(cluster_scaler_pid, open(pkl_fname, "wb"))
     print(f"[INFO] Cluster PID scaler correctly saved to {pkl_fname}")

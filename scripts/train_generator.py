@@ -11,24 +11,20 @@ from utils_argparser import argparser_training
 from utils_training import prepare_training_plots, prepare_validation_plots
 
 from calotron.callbacks.schedulers import LearnRateExpDecay
-from calotron.losses import MeanSquaredError
-from calotron.models import Calotron
-from calotron.models.discriminators import Discriminator
-from calotron.models.transformers import Transformer
+from calotron.models.transformers import GigaGenerator
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils.reports import getSummaryHTML, initHPSingleton
 
 DTYPE = np.float32
 BATCHSIZE = 512
 EPOCHS = 100
-ALPHA = 0.1
 
 # +------------------+
 # |   Parser setup   |
 # +------------------+
 
 parser = argparser_training(
-    model="Calotron", adv_learning=True, description="Calotron training setup"
+    model="Generator", adv_learning=False, description="Generator training setup"
 )
 args = parser.parse_args()
 
@@ -79,7 +75,9 @@ photon_train = photon[:train_size]
 cluster_train = cluster[:train_size]
 weight_train = weight[:train_size]
 train_ds = (
-    tf.data.Dataset.from_tensor_slices((photon_train, cluster_train, weight_train))
+    tf.data.Dataset.from_tensor_slices(
+        ((photon_train, cluster_train), cluster_train, weight_train)
+    )
     .batch(hp.get("batch_size", BATCHSIZE), drop_remainder=True)
     .cache()
     .prefetch(tf.data.AUTOTUNE)
@@ -90,7 +88,9 @@ if train_ratio != 1.0:
     cluster_val = cluster[train_size:]
     weight_val = weight[train_size:]
     val_ds = (
-        tf.data.Dataset.from_tensor_slices((photon_val, cluster_val, weight_val))
+        tf.data.Dataset.from_tensor_slices(
+            ((photon_val, cluster_val), cluster_val, weight_val)
+        )
         .batch(BATCHSIZE, drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
@@ -105,14 +105,15 @@ else:
 # |   Model construction   |
 # +------------------------+
 
-transformer = Transformer(
+model = GigaGenerator(
     output_depth=hp.get("t_output_depth", cluster.shape[2]),
     encoder_depth=hp.get("t_encoder_depth", 32),
-    decoder_depth=hp.get("t_decoder_depth", 32),
+    mapping_latent_dim=hp.get("mapping_latent_dim", 64),
+    synthesis_depth=hp.get("t_synthesis_depth", 32),
     num_layers=hp.get("t_num_layers", 5),
     num_heads=hp.get("t_num_heads", 4),
     key_dim=hp.get("t_key_dim", 64),
-    admin_res_scale=hp.get("t_admin_res_scale", "O(logn)"),
+    admin_res_scale=hp.get("t_admin_res_scale", "O(n)"),
     mlp_units=hp.get("t_mlp_units", 128),
     dropout_rate=hp.get("t_dropout_rate", 0.1),
     seq_ord_latent_dim=hp.get("t_seq_ord_latent_dim", 64),
@@ -126,18 +127,6 @@ transformer = Transformer(
     dtype=DTYPE,
 )
 
-discriminator = Discriminator(
-    latent_dim=hp.get("d_latent_dim", 64),
-    output_units=hp.get("d_output_units", 1),
-    output_activation=hp.get("d_output_activation", "sigmoid"),
-    deepsets_dense_num_layers=hp.get("d_deepsets_dense_num_layers", 4),
-    deepsets_dense_units=hp.get("d_deepsets_dense_units", 256),
-    dropout_rate=hp.get("d_dropout_rate", 0.1),
-    dtype=DTYPE,
-)
-
-model = Calotron(transformer=transformer, discriminator=discriminator)
-
 output = model((photon[:BATCHSIZE], cluster[:BATCHSIZE]))
 model.summary()
 
@@ -145,43 +134,19 @@ model.summary()
 # |   Optimizers setup   |
 # +----------------------+
 
-t_opt = tf.keras.optimizers.Adam(hp.get("t_lr0", 1e-4))
-hp.get("t_optimizer", t_opt.name)
-
-d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", 1e-4))
-hp.get("d_optimizer", d_opt.name)
+opt = tf.keras.optimizers.Adam(learning_rate=hp.get("lr0", 1e-4))
+hp.get("optimizer", opt.name)
 
 # +----------------------------+
 # |   Training configuration   |
 # +----------------------------+
 
-adv_metric = (
-    "binary-crossentropy" if args.adv_metric == "bce" else "wasserstein-distance"
-)
-
-loss = MeanSquaredError(
-    warmup_energy=hp.get("warmup_energy", 0.0),
-    alpha=hp.get("loss_alpha", ALPHA),
-    adversarial_metric=hp.get("loss_adversarial_metric", adv_metric),
-    bce_options=hp.get(
-        "loss_bce_options", {"injected_noise_stddev": 0.1, "label_smoothing": 0.0}
-    ),
-    wass_options=hp.get(
-        "loss_wass_options", {"lipschitz_penalty": 100.0, "virtual_direction_upds": 1}
-    ),
-)
+loss = tf.keras.losses.MeanSquaredError()
 hp.get("loss", loss.name)
 
-metrics = ["accuracy", "bce"] if args.adv_metric == "bce" else ["wass_dist"]
+metrics = hp.get("metrics", ["mae"])
 
-model.compile(
-    loss=loss,
-    metrics=hp.get("metrics", metrics),
-    transformer_optimizer=t_opt,
-    discriminator_optimizer=d_opt,
-    transformer_upds_per_batch=hp.get("transformer_upds_per_batch", 1),
-    discriminator_upds_per_batch=hp.get("discriminator_upds_per_batch", 1),
-)
+model.compile(loss=loss, optimizer=opt, weighted_metrics=metrics)
 
 # +--------------------------+
 # |   Callbacks definition   |
@@ -189,27 +154,15 @@ model.compile(
 
 callbacks = list()
 
-t_sched = LearnRateExpDecay(
-    model.transformer_optimizer,
-    decay_rate=hp.get("t_decay_rate", 0.10),
-    decay_steps=hp.get("t_decay_steps", 100_000),
-    min_learning_rate=hp.get("t_min_learning_rate", 1e-6),
+lr_sched = LearnRateExpDecay(
+    model.optimizer,
+    decay_rate=hp.get("decay_rate", 0.10),
+    decay_steps=hp.get("decay_steps", 100_000),
+    min_learning_rate=hp.get("min_learning_rate", 1e-6),
     verbose=True,
-    key="t_lr",
 )
-hp.get("t_sched", t_sched.name)
-callbacks.append(t_sched)
-
-d_sched = LearnRateExpDecay(
-    model.discriminator_optimizer,
-    decay_rate=hp.get("d_decay_rate", 0.10),
-    decay_steps=hp.get("d_decay_steps", 50_000),
-    min_learning_rate=hp.get("d_min_learning_rate", 1e-6),
-    verbose=True,
-    key="d_lr",
-)
-hp.get("d_sched", d_sched.name)
-callbacks.append(d_sched)
+hp.get("lr_sched", lr_sched.name)
+callbacks.append(lr_sched)
 
 # +------------------------+
 # |   Training procedure   |
@@ -235,7 +188,7 @@ print(f"[INFO] Model training completed in {duration}")
 start_token = model.get_start_token(cluster_train)
 start_token = np.mean(start_token, axis=0)
 
-sim = Simulator(model.transformer, start_token=start_token)
+sim = Simulator(model, start_token=start_token)
 exp_sim = ExportSimulator(sim, max_length=cluster.shape[1])
 
 dataset = (
@@ -267,7 +220,7 @@ else:
     timestamp = timestamp.split(".")[0].replace("-", "").replace(" ", "-")
     for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
         prefix += time + unit  # YYYYMMDD-HHhMMmSSs
-prefix += f"_calotron_{args.adv_metric}"
+prefix += f"_generator"
 
 export_model_fname = f"{models_dir}/{prefix}_model"
 export_img_dirname = f"{images_dir}/{prefix}_img"
@@ -290,7 +243,7 @@ if args.saving:
 # +---------------------+
 
 report = Report()
-report.add_markdown('<h1 align="center">Calotron training report</h1>')
+report.add_markdown('<h1 align="center">Generator training report</h1>')
 
 info = [
     f"- Script executed on **{socket.gethostname()}**",
@@ -318,20 +271,8 @@ report.add_markdown("---")
 
 ## Transformer architecture
 report.add_markdown('<h2 align="center">Transformer architecture</h2>')
-report.add_markdown(f"**Model name:** {model.transformer.name}")
-html_table, params_details = getSummaryHTML(model.transformer)
-model_weights = ""
-for k, n in zip(["Total", "Trainable", "Non-trainable"], params_details):
-    model_weights += f"- **{k} params:** {n}\n"
-report.add_markdown(html_table)
-report.add_markdown(model_weights)
-
-report.add_markdown("---")
-
-## Discriminator architecture
-report.add_markdown('<h2 align="center">Discriminator architecture</h2>')
-report.add_markdown(f"**Model name:** {model.discriminator.name}")
-html_table, params_details = getSummaryHTML(model.discriminator)
+report.add_markdown(f"**Model name:** {model.name}")
+html_table, params_details = getSummaryHTML(model)
 model_weights = ""
 for k, n in zip(["Total", "Trainable", "Non-trainable"], params_details):
     model_weights += f"- **{k} params:** {n}\n"
@@ -347,7 +288,7 @@ prepare_training_plots(
     metrics=metrics,
     num_epochs=EPOCHS,
     attn_weights=attn_weights,
-    show_discriminator_curves=True,
+    show_discriminator_curves=False,
     is_from_validation_set=(train_ratio != 1.0),
     save_images=args.saving,
     images_dirname=export_img_dirname,
@@ -360,7 +301,7 @@ prepare_validation_plots(
     cluster=cluster_val,
     output=output,
     weight=weight_val,
-    model_name="Calotron",
+    model_name="Generator",
     save_images=args.saving,
     images_dirname=export_img_dirname,
 )
