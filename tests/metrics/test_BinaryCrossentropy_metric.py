@@ -5,7 +5,7 @@ CHUNK_SIZE = int(1e4)
 y_true = None
 y_pred = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE, 1))
 y_pred_logits = np.random.uniform(-5.0, 5.0, size=(CHUNK_SIZE, 1))
-weight = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE, 4, 1))
+weight = np.random.uniform(0.0, 1.0, size=(CHUNK_SIZE, 4))
 
 
 @pytest.fixture
@@ -27,28 +27,15 @@ def test_metric_configuration(metric):
 
 
 @pytest.mark.parametrize("from_logits", [False, True])
-def test_metric_use_no_weights(from_logits):
+@pytest.mark.parametrize("sample_weight", [weight, None])
+def test_metric_use(from_logits, sample_weight):
     from calotron.metrics import BinaryCrossentropy
 
     metric = BinaryCrossentropy(from_logits=from_logits, label_smoothing=0.0)
     if from_logits:
-        metric.update_state(y_true, y_pred_logits, sample_weight=None)
+        metric.update_state(y_true, y_pred_logits, sample_weight=sample_weight)
         res = metric.result().numpy()
     else:
-        metric.update_state(y_true, y_pred, sample_weight=None)
-        res = metric.result().numpy()
-    assert res
-
-
-@pytest.mark.parametrize("from_logits", [False, True])
-def test_metric_use_with_weights(from_logits):
-    from calotron.metrics import BinaryCrossentropy
-
-    metric = BinaryCrossentropy(from_logits=from_logits, label_smoothing=0.0)
-    if from_logits:
-        metric.update_state(y_true, y_pred_logits, sample_weight=weight)
-        res = metric.result().numpy()
-    else:
-        metric.update_state(y_true, y_pred, sample_weight=weight)
+        metric.update_state(y_true, y_pred, sample_weight=sample_weight)
         res = metric.result().numpy()
     assert res

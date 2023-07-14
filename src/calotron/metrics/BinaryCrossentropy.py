@@ -17,5 +17,6 @@ class BinaryCrossentropy(BaseMetric):
         )
 
     def update_state(self, y_true, y_pred, sample_weight=None) -> None:
-        state = self._bce(tf.ones_like(y_pred), y_pred)
+        weights = self._prepare_weights(sample_weight)
+        state = self._bce(tf.ones_like(y_pred), y_pred, sample_weight=weights)
         self._metric_values.assign(state)

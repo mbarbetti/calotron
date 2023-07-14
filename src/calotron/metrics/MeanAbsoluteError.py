@@ -10,5 +10,6 @@ class MeanAbsoluteError(BaseMetric):
         self._mae = TF_MAE(name=name, dtype=dtype)
 
     def update_state(self, y_true, y_pred, sample_weight=None) -> None:
-        state = self._mae(y_true, y_pred)
+        weights = self._prepare_weights(sample_weight)
+        state = self._mae(y_true, y_pred, sample_weight=weights)
         self._metric_values.assign(state)

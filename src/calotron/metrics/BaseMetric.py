@@ -8,6 +8,14 @@ class BaseMetric(tf.keras.metrics.Metric):
             name=f"{name}_values", initializer="zeros"
         )
 
+    @staticmethod
+    def _prepare_weights(sample_weight=None):
+        if sample_weight is not None:
+            weights = tf.reduce_mean(sample_weight, axis=1)
+        else:
+            weights = None
+        return weights
+
     def update_state(self, y_true, y_pred, sample_weight=None) -> None:
         raise NotImplementedError(
             "Only `BaseMetric` subclasses have the "

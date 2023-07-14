@@ -10,5 +10,6 @@ class Accuracy(BaseMetric):
         self._accuracy = TF_BinaryAccuracy(name=name, dtype=dtype, threshold=threshold)
 
     def update_state(self, y_true, y_pred, sample_weight=None) -> None:
-        state = self._accuracy(tf.ones_like(y_pred), y_pred)
+        weights = self._prepare_weights(sample_weight)
+        state = self._accuracy(tf.ones_like(y_pred), y_pred, sample_weight=weights)
         self._metric_values.assign(state)
