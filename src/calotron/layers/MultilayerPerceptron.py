@@ -52,7 +52,7 @@ class MultilayerPerceptron(Layer):
                 ),
                 Dense(
                     units=self._output_units,
-                    activation="linear",
+                    activation=None,
                     kernel_initializer="he_normal",
                     bias_initializer="zeros",
                     name=f"{prefix}_dense_out_{suffix}" if name else None,

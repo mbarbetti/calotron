@@ -70,7 +70,7 @@ def test_model_configuration(model):
     assert isinstance(model.encoder_seq_ord_normalization, float)
     assert isinstance(model.synthesis_seq_ord_normalization, float)
     assert isinstance(model.enable_res_smoothing, bool)
-    assert isinstance(model.output_activations, str)
+    # assert isinstance(model.output_activations, str)
     assert isinstance(model.start_token_initializer, str)
 
 

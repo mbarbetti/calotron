@@ -82,7 +82,7 @@ class Transformer(tf.keras.Model):
         )
 
         # Final layers
-        self._output_layer, self._multi_activations = self._prepare_final_layers(
+        self._output_layer, self._filter = self._prepare_final_layers(
             output_depth=self._output_depth,
             output_activations=self._output_activations,
             dtype=self.dtype,
@@ -101,15 +101,15 @@ class Transformer(tf.keras.Model):
             dtype=dtype,
         )
         if output_activations is not None:
-            multi_activations = MultiActivations(
+            filter = MultiActivations(
                 activations=output_activations,
                 output_depth=output_depth,
                 name="filter",
                 dtype=dtype,
             )
         else:
-            multi_activations = None
-        return output_layer, multi_activations
+            filter = None
+        return output_layer, filter
 
     def call(self, inputs) -> tf.Tensor:
         source, target = inputs
@@ -117,8 +117,8 @@ class Transformer(tf.keras.Model):
         enc_out = self._encoder(source)
         dec_out = self._decoder(target, condition=enc_out)
         out = self._output_layer(dec_out)
-        if self._multi_activations is not None:
-            out = self._multi_activations(out)
+        if self._filter is not None:
+            out = self._filter(out)
         return out
 
     def _prepare_input_target(self, target) -> tf.Tensor:

@@ -143,7 +143,7 @@ class Decoder(Layer):
             max_length=seq_ord_max_length,
             normalization=seq_ord_normalization,
             dropout_rate=dropout_rate,
-            name="dec_so_embedding",
+            name="dec_so_embedding" if name else None,
             dtype=self.dtype,
         )
 
@@ -156,10 +156,14 @@ class Decoder(Layer):
                         activation="relu",
                         kernel_initializer="glorot_normal",
                         bias_initializer="zeros",
-                        name="dec_sl_dense",
+                        name="dec_sl_dense" if name else None,
                         dtype=self.dtype,
                     ),
-                    Dropout(dropout_rate, name="dec_sl_dropout", dtype=self.dtype),
+                    Dropout(
+                        dropout_rate,
+                        name="dec_sl_dropout" if name else None,
+                        dtype=self.dtype,
+                    ),
                 ]
             )
         else:
@@ -176,7 +180,7 @@ class Decoder(Layer):
                 mlp_units=mlp_units,
                 dropout_rate=dropout_rate,
                 autoregressive_mode=autoregressive_mode,
-                name=f"dec_layer_{i}",
+                name=f"dec_layer_{i}" if name else None,
                 dtype=self.dtype,
             )
             for i in range(self._num_layers)

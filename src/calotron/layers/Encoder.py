@@ -117,7 +117,7 @@ class Encoder(Layer):
             max_length=seq_ord_max_length,
             normalization=seq_ord_normalization,
             dropout_rate=dropout_rate,
-            name="enc_so_embedding",
+            name="enc_so_embedding" if name else None,
             dtype=self.dtype,
         )
 
@@ -130,10 +130,14 @@ class Encoder(Layer):
                         activation="relu",
                         kernel_initializer="glorot_normal",
                         bias_initializer="zeros",
-                        name="enc_sl_dense",
+                        name="enc_sl_dense" if name else None,
                         dtype=self.dtype,
                     ),
-                    Dropout(dropout_rate, name="enc_sl_dropout", dtype=self.dtype),
+                    Dropout(
+                        dropout_rate,
+                        name="enc_sl_dropout" if name else None,
+                        dtype=self.dtype,
+                    ),
                 ]
             )
         else:
@@ -149,7 +153,7 @@ class Encoder(Layer):
                 admin_res_scale=admin_res_scale,
                 mlp_units=mlp_units,
                 dropout_rate=dropout_rate,
-                name=f"enc_layer_{i}",
+                name=f"enc_layer_{i}" if name else None,
                 dtype=self.dtype,
             )
             for i in range(self._num_layers)

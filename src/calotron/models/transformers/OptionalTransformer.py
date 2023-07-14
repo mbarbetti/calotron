@@ -64,7 +64,7 @@ class OptionalTransformer(Transformer):
         self._decoder = Decoder(**decoder_options)
 
         # Final layers
-        self._output_layer, self._multi_activations = self._prepare_final_layers(
+        self._output_layer, self._filter = self._prepare_final_layers(
             output_depth=self._output_depth,
             output_activations=self._output_activations,
             dtype=self.dtype,

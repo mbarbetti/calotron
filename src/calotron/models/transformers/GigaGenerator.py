@@ -73,7 +73,7 @@ class GigaGenerator(Transformer):
             hidden_units=mlp_units,
             dropout_rate=dropout_rate,
             output_activation=None,
-            name="mapping_net",
+            name="map_net",
             dtype=self.dtype,
         )
 
@@ -89,12 +89,12 @@ class GigaGenerator(Transformer):
             seq_ord_max_length=seq_ord_max_length,
             seq_ord_normalization=seq_ord_normalization,
             enable_res_smoothing=enable_res_smoothing,
-            name="synthesis_net",
+            name="synth_net",
             dtype=self.dtype,
         )
 
         # Final layers
-        self._output_layer, self._multi_activations = self._prepare_final_layers(
+        self._output_layer, self._filter = self._prepare_final_layers(
             output_depth=self._output_depth,
             output_activations=self._output_activations,
             dtype=self.dtype,
@@ -107,8 +107,8 @@ class GigaGenerator(Transformer):
         map_out = self._map_net(enc_out[:, -1, :])
         synth_out = self._synth_net(target, w=map_out, condition=enc_out[:, :-1, :])
         out = self._output_layer(synth_out)
-        if self._multi_activations is not None:
-            out = self._multi_activations(out)
+        if self._filter is not None:
+            out = self._filter(out)
         return out
 
     @property

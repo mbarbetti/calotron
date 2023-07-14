@@ -1,19 +1,11 @@
 import tensorflow as tf
-from tensorflow.keras.layers import (
-    Add,
-    Dense,
-    Dropout,
-    Layer,
-    LeakyReLU,
-    MultiHeadAttention,
-)
+from tensorflow.keras.layers import Add, Dense, Dropout, Layer, MultiHeadAttention
 
 from calotron.layers.ModulatedLayerNorm import ModulatedLayerNorm
 from calotron.layers.SeqOrderEmbedding import SeqOrderEmbedding
 
 LN_EPSILON = 0.001
 ATTN_DROPOUT_RATE = 0.0
-LEAKY_ALPHA = 0.1
 
 
 class SynthesisLayer(Layer):
@@ -70,19 +62,19 @@ class SynthesisLayer(Layer):
             name=f"{prefix}_res_{suffix}" if name else None, dtype=self.dtype
         )
 
-        # Causal attention layer
-        self._causal_attn = MultiHeadAttention(
+        # Multi-head self-attention
+        self._self_attn = MultiHeadAttention(
             num_heads=self._num_heads,
             key_dim=self._key_dim,
             value_dim=None,
             dropout=ATTN_DROPOUT_RATE,
             kernel_initializer="he_normal",
             bias_initializer="zeros",
-            name=f"{prefix}_causal_attn_{suffix}" if name else None,
+            name=f"{prefix}_self_attn_{suffix}" if name else None,
             dtype=self.dtype,
         )
 
-        # Cross attention layer
+        # Multi-head cross-attention
         self._cross_attn = MultiHeadAttention(
             num_heads=self._num_heads,
             key_dim=self._key_dim,
@@ -99,12 +91,11 @@ class SynthesisLayer(Layer):
             [
                 Dense(
                     units=self._mlp_units,
-                    activation=None,
+                    activation="relu",
                     kernel_initializer="he_normal",
                     bias_initializer="zeros",
                     dtype=self.dtype,
                 ),
-                LeakyReLU(alpha=LEAKY_ALPHA, dtype=self.dtype),
                 Dense(
                     units=self._output_depth,
                     activation=None,
@@ -118,9 +109,9 @@ class SynthesisLayer(Layer):
         )
 
     def call(self, x, w, condition) -> tf.Tensor:
-        # Causal attn block
+        # Self attn block
         norm_x = self._ln(x, w)
-        f_x = self._causal_attn(
+        f_x = self._self_attn(
             query=norm_x, key=norm_x, value=norm_x, use_causal_mask=True
         )
         x = self._res([x, f_x])
@@ -128,7 +119,11 @@ class SynthesisLayer(Layer):
         # Cross attn block
         norm_x = self._ln(x, w)
         f_x, scores = self._cross_attn(
-            query=norm_x, key=condition, value=condition, return_attention_scores=True
+            query=norm_x,
+            key=condition,
+            value=condition,
+            use_causal_mask=False,
+            return_attention_scores=True,
         )
         self._attn_scores = scores
         x = self._res([x, f_x])
@@ -203,12 +198,11 @@ class SynthesisNet(Layer):
                 [
                     Dense(
                         units=output_depth,
-                        activation=None,
+                        activation="relu",
                         kernel_initializer="glorot_normal",
                         bias_initializer="zeros",
                         dtype=self.dtype,
                     ),
-                    LeakyReLU(alpha=LEAKY_ALPHA, dtype=self.dtype),
                     Dropout(dropout_rate, dtype=self.dtype),
                 ],
                 name="synth_smooth_layer",
