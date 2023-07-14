@@ -4,9 +4,16 @@ import tensorflow as tf
 
 @pytest.fixture
 def layer():
-    from calotron.layers import DeepSets
+    from calotron.layers import ConvDeepSets
 
-    map = DeepSets(latent_dim=16, num_layers=1, hidden_units=32, dropout_rate=0.1)
+    map = ConvDeepSets(
+        latent_dim=16,
+        num_conv_layers=1,
+        filters=8,
+        kernel_size=2,
+        strides=1,
+        dropout_rate=0.1,
+    )
     return map
 
 
@@ -14,12 +21,14 @@ def layer():
 
 
 def test_layer_configuration(layer):
-    from calotron.layers.DeepSets import DeepSets
+    from calotron.layers.ConvDeepSets import ConvDeepSets
 
-    assert isinstance(layer, DeepSets)
+    assert isinstance(layer, ConvDeepSets)
     assert isinstance(layer.latent_dim, int)
-    assert isinstance(layer.num_layers, int)
-    assert isinstance(layer.hidden_units, int)
+    assert isinstance(layer.num_conv_layers, int)
+    assert isinstance(layer.filters, int)
+    assert isinstance(layer.kernel_size, int)
+    assert isinstance(layer.strides, int)
     assert isinstance(layer.dropout_rate, float)
 
 
