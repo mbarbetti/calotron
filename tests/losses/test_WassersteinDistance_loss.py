@@ -1,6 +1,10 @@
 import pytest
 import tensorflow as tf
 
+from calotron.losses.WassersteinDistance import (
+    LIPSCHITZ_REGULARIZERS,
+    PENALTY_STRATEGIES,
+)
 from calotron.models.discriminators import Discriminator
 from calotron.models.transformers import Transformer
 
@@ -29,10 +33,10 @@ transf = Transformer(
 
 disc = Discriminator(
     output_units=1,
-    output_activation=None,
     latent_dim=8,
-    deepsets_dense_num_layers=2,
-    deepsets_dense_units=32,
+    deepsets_num_layers=2,
+    deepsets_hidden_units=32,
+    output_activation=None,
     dropout_rate=0.1,
 )
 
@@ -42,13 +46,10 @@ def loss():
     from calotron.losses import WassersteinDistance
 
     loss_ = WassersteinDistance(
-        warmup_energy=0.0,
+        lipschitz_regularizer="alp",
         lipschitz_penalty=100.0,
-        virtual_direction_upds=1,
-        fixed_xi=10.0,
-        sampled_xi_min=0.0,
-        sampled_xi_max=1.0,
-        epsilon=1e-12,
+        lipschitz_penalty_strategy="one-sided",
+        warmup_energy=0.0,
     )
     return loss_
 
@@ -60,18 +61,26 @@ def test_loss_configuration(loss):
     from calotron.losses import WassersteinDistance
 
     assert isinstance(loss, WassersteinDistance)
-    assert isinstance(loss.warmup_energy, float)
+    assert isinstance(loss.lipschitz_regularizer, str)
     assert isinstance(loss.lipschitz_penalty, float)
-    assert isinstance(loss.virtual_direction_upds, int)
-    assert isinstance(loss.fixed_xi, float)
-    assert isinstance(loss.sampled_xi_min, float)
-    assert isinstance(loss.sampled_xi_max, float)
-    assert isinstance(loss.epsilon, float)
+    assert isinstance(loss.lipschitz_penalty_strategy, str)
+    assert isinstance(loss.warmup_energy, float)
     assert isinstance(loss.name, str)
 
 
+@pytest.mark.parametrize("lp_regularizer", LIPSCHITZ_REGULARIZERS)
+@pytest.mark.parametrize("lp_strategy", PENALTY_STRATEGIES)
 @pytest.mark.parametrize("sample_weight", [weight, None])
-def test_loss_use(loss, sample_weight):
+def test_loss_use(lp_regularizer, lp_strategy, sample_weight):
+    from calotron.losses import WassersteinDistance
+
+    loss = WassersteinDistance(
+        lipschitz_regularizer=lp_regularizer,
+        lipschitz_penalty=100.0,
+        lipschitz_penalty_strategy=lp_strategy,
+        warmup_energy=0.0,
+    )
+
     out = loss.transformer_loss(
         transformer=transf,
         discriminator=disc,

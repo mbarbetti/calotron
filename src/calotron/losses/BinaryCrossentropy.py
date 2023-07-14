@@ -7,10 +7,10 @@ from calotron.losses.BaseLoss import BaseLoss
 class BinaryCrossentropy(BaseLoss):
     def __init__(
         self,
-        warmup_energy=0.0,
         injected_noise_stddev=0.0,
         from_logits=False,
         label_smoothing=0.0,
+        warmup_energy=0.0,
         name="bce_loss",
     ) -> None:
         super().__init__(name)
@@ -48,28 +48,34 @@ class BinaryCrossentropy(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        output = transformer((source, target), training=training)
-        energy_mask = tf.cast(
-            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        _, trainset_pred = self._prepare_adv_trainset(
+            source=source,
+            target=target,
+            transformer=transformer,
+            warmup_energy=self._warmup_energy,
+            sample_weight=sample_weight,
+            training_transformer=training,
         )
-        if sample_weight is None:
-            sample_weight = tf.identity(energy_mask)
-        else:
-            sample_weight *= energy_mask
-        mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
+        source_pred, target_pred, evt_w_pred, mask_pred = trainset_pred
 
-        # Adversarial loss
         if self._inj_noise_std > 0.0:
             rnd_pred = tf.random.normal(
-                tf.shape(output), stddev=self._inj_noise_std, dtype=output.dtype
+                tf.shape(target_pred),
+                stddev=self._inj_noise_std,
+                dtype=target_pred.dtype,
             )
         else:
             rnd_pred = 0.0
+
         y_pred = discriminator(
-            (source, output + rnd_pred), padding_mask=mask, training=False
+            (source_pred, target_pred + rnd_pred),
+            padding_mask=mask_pred,
+            training=False,
         )
-        adv_loss = self._loss(tf.ones_like(y_pred), y_pred)
-        adv_loss = tf.cast(adv_loss, dtype=output.dtype)
+
+        # Adversarial loss
+        adv_loss = self._loss(tf.ones_like(y_pred), y_pred, sample_weight=evt_w_pred)
+        adv_loss = tf.cast(adv_loss, dtype=target_pred.dtype)
         return adv_loss
 
     def discriminator_loss(
@@ -81,42 +87,64 @@ class BinaryCrossentropy(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        output = transformer((source, target), training=False)
-        energy_mask = tf.cast(
-            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        trainset_true, trainset_pred = self._prepare_adv_trainset(
+            source=source,
+            target=target,
+            transformer=transformer,
+            warmup_energy=self._warmup_energy,
+            sample_weight=sample_weight,
+            training_transformer=False,
         )
-        if sample_weight is None:
-            sample_weight = tf.identity(energy_mask)
+        source_true, target_true, evt_w_true, mask_true = trainset_true
+        source_pred, target_pred, evt_w_pred, mask_pred = trainset_pred
+
+        if self._inj_noise_std > 0.0:
+            rnd_noise = tf.random.normal(
+                shape=(
+                    2 * tf.shape(target_true)[0],
+                    tf.shape(target_true)[1],
+                    tf.shape(target_true)[2],
+                ),
+                stddev=self._inj_noise_std,
+                dtype=target.dtype,
+            )
         else:
-            sample_weight *= energy_mask
-        mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
+            rnd_noise = 0.0
+
+        source_concat = tf.concat([source_true, source_pred], axis=0)
+        target_concat = tf.concat([target_true, target_pred], axis=0)
+        mask_concat = tf.concat([mask_true, mask_pred], axis=0)
+        d_out = discriminator(
+            (source_concat, target_concat + rnd_noise),
+            padding_mask=mask_concat,
+            training=training,
+        )
+        y_true, y_pred = tf.split(d_out, 2, axis=0)
 
         # Real target loss
-        if self._inj_noise_std > 0.0:
-            rnd_true = tf.random.normal(
-                tf.shape(target), stddev=self._inj_noise_std, dtype=target.dtype
-            )
-        else:
-            rnd_true = 0.0
-        y_true = discriminator(
-            (source, target + rnd_true), padding_mask=mask, training=training
-        )
-        real_loss = self._loss(tf.ones_like(y_true), y_true)
-        real_loss = tf.cast(real_loss, dtype=target.dtype)
+        real_loss = self._loss(tf.ones_like(y_true), y_true, sample_weight=evt_w_true)
+        real_loss = tf.cast(real_loss, dtype=target_true.dtype)
 
         # Fake target loss
-        if self._inj_noise_std > 0.0:
-            rnd_pred = tf.random.normal(
-                tf.shape(output), stddev=self._inj_noise_std, dtype=output.dtype
+        fake_loss = self._loss(tf.zeros_like(y_pred), y_pred, sample_weight=evt_w_pred)
+        fake_loss = tf.cast(fake_loss, dtype=target_pred.dtype)
+
+        if discriminator.condition_aware:
+            shuffled_source = tf.random.shuffle(source_true)
+            masked_target = target_true * tf.tile(
+                mask_true[:, :, None], (1, 1, tf.shape(target_true)[2])
             )
+            y_pred = discriminator(
+                (shuffled_source, masked_target), padding_mask=None, training=training
+            )
+
+            # Fake source loss
+            source_loss = self._loss(tf.zeros_like(y_pred), y_pred, sample_weight=None)
+            source_loss = tf.cast(source_loss, dtype=target_pred.dtype)
+
+            return (real_loss + fake_loss + source_loss) / 3.0
         else:
-            rnd_pred = 0.0
-        y_pred = discriminator(
-            (source, output + rnd_pred), padding_mask=mask, training=training
-        )
-        fake_loss = self._loss(tf.zeros_like(y_pred), y_pred)
-        fake_loss = tf.cast(fake_loss, dtype=output.dtype)
-        return (real_loss + fake_loss) / 2.0
+            return (real_loss + fake_loss) / 2.0
 
     @property
     def warmup_energy(self) -> float:

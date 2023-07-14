@@ -29,10 +29,10 @@ transf = Transformer(
 
 disc = Discriminator(
     output_units=1,
-    output_activation=None,
     latent_dim=8,
-    deepsets_dense_num_layers=2,
-    deepsets_dense_units=32,
+    deepsets_num_layers=2,
+    deepsets_hidden_units=32,
+    output_activation=None,
     dropout_rate=0.1,
 )
 
@@ -42,16 +42,20 @@ def loss():
     from calotron.losses import Huber
 
     loss_ = Huber(
-        warmup_energy=0.0,
         delta=0.1,
-        alpha=0.1,
+        alpha=1.0,
         adversarial_metric="binary-crossentropy",
         bce_options={
-            "injected_noise_stddev": 0.0,
+            "injected_noise_stddev": 0.01,
             "from_logits": False,
-            "label_smoothing": 0.0,
+            "label_smoothing": 0.1,
         },
-        wass_options={"lipschitz_penalty": 100.0, "virtual_direction_upds": 1},
+        wass_options={
+            "lipschitz_regularizer": "alp",
+            "lipschitz_penalty": 100.0,
+            "lipschitz_penalty_strategy": "one-sided",
+        },
+        warmup_energy=0.0,
     )
     return loss_
 
@@ -63,13 +67,13 @@ def test_loss_configuration(loss):
     from calotron.losses import Huber
 
     assert isinstance(loss, Huber)
-    assert isinstance(loss.warmup_energy, float)
     assert isinstance(loss.delta, float)
     assert isinstance(loss.init_alpha, float)
     assert isinstance(loss.alpha, tf.Variable)
     assert isinstance(loss.adversarial_metric, str)
     assert isinstance(loss.bce_options, dict)
     assert isinstance(loss.wass_options, dict)
+    assert isinstance(loss.warmup_energy, float)
     assert isinstance(loss.name, str)
 
 
@@ -81,12 +85,12 @@ def test_loss_use(adversarial_metric, sample_weight):
     from calotron.losses import Huber
 
     loss = Huber(
-        warmup_energy=0.0,
         delta=0.1,
-        alpha=0.1,
+        alpha=1.0,
         adversarial_metric=adversarial_metric,
-        bce_options={"injected_noise_stddev": 0.1},
+        bce_options={"injected_noise_stddev": 0.01},
         wass_options={"lipschitz_penalty": 100.0},
+        warmup_energy=0.0,
     )
     out = loss.transformer_loss(
         transformer=transf,

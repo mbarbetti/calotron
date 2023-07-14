@@ -25,20 +25,18 @@ class JSDivergence(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        output = transformer((source, target), training=training)
-        energy_mask = tf.cast(
-            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        y_true, y_pred, evt_weights = self._prepare_clf_trainset(
+            source=source,
+            target=target,
+            transformer=transformer,
+            discriminator=discriminator,
+            warmup_energy=self._warmup_energy,
+            sample_weight=sample_weight,
+            training_transformer=training,
+            training_discriminator=False,
         )
-        if sample_weight is None:
-            sample_weight = tf.identity(energy_mask)
-        else:
-            sample_weight *= energy_mask
-        mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
 
-        y_true = discriminator((source, target), padding_mask=mask, training=False)
-        y_pred = discriminator((source, output), padding_mask=mask, training=False)
-
-        loss = self._js_div(y_true, y_pred)
+        loss = self._js_div(y_true, y_pred, sample_weight=evt_weights)
         loss = tf.cast(loss, dtype=target.dtype)
         return loss  # divergence minimization
 
@@ -51,20 +49,18 @@ class JSDivergence(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        output = transformer((source, target), training=False)
-        energy_mask = tf.cast(
-            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        y_true, y_pred, evt_weights = self._prepare_clf_trainset(
+            source=source,
+            target=target,
+            transformer=transformer,
+            discriminator=discriminator,
+            warmup_energy=self._warmup_energy,
+            sample_weight=sample_weight,
+            training_transformer=False,
+            training_discriminator=training,
         )
-        if sample_weight is None:
-            sample_weight = tf.identity(energy_mask)
-        else:
-            sample_weight *= energy_mask
-        mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
 
-        y_true = discriminator((source, target), padding_mask=mask, training=training)
-        y_pred = discriminator((source, output), padding_mask=mask, training=training)
-
-        loss = self._js_div(y_true, y_pred)
+        loss = self._js_div(y_true, y_pred, sample_weight=evt_weights)
         loss = tf.cast(loss, dtype=target.dtype)
         return -loss  # divergence maximization
 

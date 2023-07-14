@@ -29,10 +29,10 @@ transf = Transformer(
 
 disc = Discriminator(
     output_units=1,
-    output_activation=None,
     latent_dim=8,
-    deepsets_dense_num_layers=2,
-    deepsets_dense_units=32,
+    deepsets_num_layers=2,
+    deepsets_hidden_units=32,
+    output_activation=None,
     dropout_rate=0.1,
 )
 
@@ -42,10 +42,10 @@ def loss():
     from calotron.losses import BinaryCrossentropy
 
     loss_ = BinaryCrossentropy(
-        warmup_energy=0.0,
         injected_noise_stddev=0.01,
         from_logits=False,
         label_smoothing=0.1,
+        warmup_energy=0.0,
     )
     return loss_
 
@@ -57,10 +57,10 @@ def test_loss_configuration(loss):
     from calotron.losses import BinaryCrossentropy
 
     assert isinstance(loss, BinaryCrossentropy)
-    assert isinstance(loss.warmup_energy, float)
     assert isinstance(loss.injected_noise_stddev, float)
     assert isinstance(loss.from_logits, bool)
     assert isinstance(loss.label_smoothing, float)
+    assert isinstance(loss.warmup_energy, float)
     assert isinstance(loss.name, str)
 
 

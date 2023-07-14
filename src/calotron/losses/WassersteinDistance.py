@@ -2,19 +2,23 @@ import tensorflow as tf
 
 from calotron.losses.BaseLoss import BaseLoss
 
+LIPSCHITZ_REGULARIZERS = ["gp", "alp"]
+PENALTY_STRATEGIES = ["two-sided", "one-sided"]
+VIRTUAL_DIR_UPDS = 1
+FIXED_XI = 1.0
+SAMPLED_XI_MIN = 0.8
+SAMPLED_XI_MAX = 1.2
+EPSILON = 1e-12
 LIPSCHITZ_CONSTANT = 1.0
 
 
 class WassersteinDistance(BaseLoss):
     def __init__(
         self,
-        warmup_energy=0.0,
+        lipschitz_regularizer="alp",
         lipschitz_penalty=100.0,
-        virtual_direction_upds=1,
-        fixed_xi=10.0,
-        sampled_xi_min=0.0,
-        sampled_xi_max=1.0,
-        epsilon=1e-12,
+        lipschitz_penalty_strategy="one-sided",
+        warmup_energy=0.0,
         name="wass_dist_loss",
     ) -> None:
         super().__init__(name)
@@ -24,32 +28,30 @@ class WassersteinDistance(BaseLoss):
         assert warmup_energy >= 0.0
         self._warmup_energy = float(warmup_energy)
 
-        # Adversarial Lipschitz penalty
+        # Lipschitz regularizer
+        assert isinstance(lipschitz_regularizer, str)
+        if lipschitz_regularizer not in LIPSCHITZ_REGULARIZERS:
+            raise ValueError(
+                "`lipschitz_regularizer` should be selected "
+                f"in {PENALTY_STRATEGIES}, instead "
+                f"'{lipschitz_regularizer}' passed"
+            )
+        self._lipschitz_regularizer = lipschitz_regularizer
+
+        # Lipschitz penalty
         assert isinstance(lipschitz_penalty, (int, float))
         assert lipschitz_penalty > 0.0
         self._lipschitz_penalty = float(lipschitz_penalty)
 
-        # Virtual adversarial direction updates
-        assert isinstance(virtual_direction_upds, (int, float))
-        assert virtual_direction_upds > 0
-        self._vir_dir_upds = int(virtual_direction_upds)
-
-        # Additional ALP-system hyperparameters
-        assert isinstance(fixed_xi, (int, float))
-        assert fixed_xi > 0.0
-        self._fixed_xi = float(fixed_xi)
-
-        assert isinstance(sampled_xi_min, (int, float))
-        assert sampled_xi_min >= 0.0
-        self._sampled_xi_min = float(sampled_xi_min)
-
-        assert isinstance(sampled_xi_max, (int, float))
-        assert sampled_xi_max > sampled_xi_min
-        self._sampled_xi_max = float(sampled_xi_max)
-
-        assert isinstance(epsilon, (int, float))
-        assert epsilon > 0.0
-        self._epsilon = float(epsilon)
+        # Penalty strategy
+        assert isinstance(lipschitz_penalty_strategy, str)
+        if lipschitz_penalty_strategy not in PENALTY_STRATEGIES:
+            raise ValueError(
+                "`lipschitz_penalty_strategy` should be selected "
+                f"in {PENALTY_STRATEGIES}, instead "
+                f"'{lipschitz_penalty_strategy}' passed"
+            )
+        self._lipschitz_penalty_strategy = lipschitz_penalty_strategy
 
     def transformer_loss(
         self,
@@ -60,22 +62,34 @@ class WassersteinDistance(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        output = transformer((source, target), training=training)
-        energy_mask = tf.cast(
-            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        trainset_true, trainset_pred = self._prepare_adv_trainset(
+            source=source,
+            target=target,
+            transformer=transformer,
+            warmup_energy=self._warmup_energy,
+            sample_weight=sample_weight,
+            training_transformer=training,
         )
-        if sample_weight is None:
-            sample_weight = tf.identity(energy_mask)
-        else:
-            sample_weight *= energy_mask
-        mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
+        source_true, target_true, evt_w_true, mask_true = trainset_true
+        source_pred, target_pred, evt_w_pred, mask_pred = trainset_pred
 
-        y_true = discriminator((source, target), padding_mask=mask, training=False)
-        y_pred = discriminator((source, output), padding_mask=mask, training=False)
+        source_concat = tf.concat([source_true, source_pred], axis=0)
+        target_concat = tf.concat([target_true, target_pred], axis=0)
+        mask_concat = tf.concat([mask_true, mask_pred], axis=0)
+        d_out = discriminator(
+            (source_concat, target_concat), padding_mask=mask_concat, training=False
+        )
+        y_true, y_pred = tf.split(d_out, 2, axis=0)
 
-        loss = tf.reduce_mean(y_pred - y_true)
-        loss = tf.cast(loss, dtype=target.dtype)
-        return loss
+        # Real target loss
+        real_loss = tf.reduce_sum(evt_w_true * y_true) / tf.reduce_sum(evt_w_true)
+        real_loss = tf.cast(real_loss, dtype=target_true.dtype)
+
+        # Fake target loss
+        fake_loss = tf.reduce_sum(evt_w_pred * y_pred) / tf.reduce_sum(evt_w_pred)
+        fake_loss = tf.cast(fake_loss, dtype=target_pred.dtype)
+
+        return tf.stop_gradient(real_loss) - fake_loss
 
     def discriminator_loss(
         self,
@@ -86,121 +100,183 @@ class WassersteinDistance(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        output = transformer((source, target), training=False)
-        energy_mask = tf.cast(
-            target[:, :, 2] >= self._warmup_energy, dtype=target.dtype
+        trainset_true, trainset_pred = self._prepare_adv_trainset(
+            source=source,
+            target=target,
+            transformer=transformer,
+            warmup_energy=self._warmup_energy,
+            sample_weight=sample_weight,
+            training_transformer=False,
         )
-        if sample_weight is None:
-            sample_weight = tf.identity(energy_mask)
+        source_true, target_true, evt_w_true, mask_true = trainset_true
+        source_pred, target_pred, evt_w_pred, mask_pred = trainset_pred
+
+        source_concat = tf.concat([source_true, source_pred], axis=0)
+        target_concat = tf.concat([target_true, target_pred], axis=0)
+        mask_concat = tf.concat([mask_true, mask_pred], axis=0)
+        d_out = discriminator(
+            (source_concat, target_concat), padding_mask=mask_concat, training=training
+        )
+        y_true, y_pred = tf.split(d_out, 2, axis=0)
+
+        # Real target loss
+        real_loss = tf.reduce_sum(evt_w_true * y_true) / tf.reduce_sum(evt_w_true)
+        real_loss = tf.cast(real_loss, dtype=target_true.dtype)
+
+        # Fake target loss
+        fake_loss = tf.reduce_sum(evt_w_pred * y_pred) / tf.reduce_sum(evt_w_pred)
+        fake_loss = tf.cast(fake_loss, dtype=target_pred.dtype)
+
+        if discriminator.condition_aware:
+            shuffled_source = tf.random.shuffle(source_true)
+            masked_target = target_true * tf.tile(
+                mask_true[:, :, None], (1, 1, tf.shape(target_true)[2])
+            )
+            y_pred = discriminator(
+                (shuffled_source, masked_target), padding_mask=None, training=training
+            )
+
+            # Fake source loss
+            source_loss = tf.reduce_mean(y_pred)
+            source_loss = tf.cast(source_loss, dtype=target_pred.dtype)
+
+            loss = ((fake_loss - real_loss) + (source_loss - real_loss)) / 2.0
         else:
-            sample_weight *= energy_mask
-        mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
+            loss = fake_loss - real_loss
 
-        y_true = discriminator((source, target), padding_mask=mask, training=training)
-        y_pred = discriminator((source, output), padding_mask=mask, training=training)
-        loss = tf.reduce_mean(y_true - y_pred)
-        loss = tf.cast(loss, dtype=target.dtype)
+        reg = self._lipschitz_regularization(
+            sample_true=(source_true, target_true, mask_true, y_true),
+            sample_pred=(source_pred, target_pred, mask_pred, y_pred),
+            discriminator=discriminator,
+            training_discriminator=training,
+        )
+        return loss + reg
 
-        # Initial virtual adversarial direction
-        batch_size = tf.shape(target)[0]
-        length = tf.shape(target)[1]
-        depth = tf.shape(target)[2]
-        with tf.GradientTape() as tape:
-            d = tf.random.uniform(
-                shape=(2 * batch_size, length, depth),
+    def _lipschitz_regularization(
+        self, sample_true, sample_pred, discriminator, training_discriminator=True
+    ) -> tf.Tensor:
+        source_true, target_true, mask_true, y_true = sample_true
+        source_pred, target_pred, mask_pred, y_pred = sample_pred
+
+        if self._lipschitz_regularizer == "gp":
+            target_concat = tf.concat([target_true, target_pred], axis=0)
+
+            with tf.GradientTape() as tape:
+                # Compute interpolated points
+                eps = tf.tile(
+                    tf.random.uniform(
+                        shape=(tf.shape(target_true)[0], tf.shape(target_true)[1]),
+                        minval=0.0,
+                        maxval=1.0,
+                        dtype=target_true.dtype,
+                    )[:, :, None],
+                    (1, 1, tf.shape(target_true)[2]),
+                )
+                target_hat = tf.clip_by_value(
+                    target_pred + eps * (target_true - target_pred),
+                    clip_value_min=tf.reduce_min(target_concat, axis=[0, 1]),
+                    clip_value_max=tf.reduce_max(target_concat, axis=[0, 1]),
+                )
+                tape.watch(target_hat)
+
+                # Value of the discriminator on interpolated points
+                y_hat = discriminator(
+                    (source_pred, target_hat),
+                    padding_mask=mask_pred,
+                    training=training_discriminator,
+                )
+                grad = tape.gradient(y_hat, target_hat) + EPSILON  # non-zero gradient
+                norm = tf.norm(grad, axis=-1)
+
+            if self._lipschitz_penalty_strategy == "two-sided":
+                gp_term = (norm - LIPSCHITZ_CONSTANT) ** 2
+            else:
+                gp_term = (tf.maximum(0.0, norm - LIPSCHITZ_CONSTANT)) ** 2
+            return self._lipschitz_penalty * tf.reduce_mean(gp_term)
+
+        else:
+            source_concat = tf.concat([source_true, source_pred], axis=0)
+            target_concat = tf.concat([target_true, target_pred], axis=0)
+            mask_concat = tf.concat([mask_true, mask_pred], axis=0)
+            d_out = tf.concat([y_true, y_pred], axis=0)
+
+            # Initial virtual adversarial direction
+            adv_dir = tf.random.uniform(
+                shape=(
+                    2 * tf.shape(target_true)[0],
+                    tf.shape(target_true)[1],
+                    tf.shape(target_true)[2],
+                ),
                 minval=-1.0,
                 maxval=1.0,
-                dtype=target.dtype,
+                dtype=target_true.dtype,
             )
-            d /= tf.norm(d, axis=[1, 2])[:, None, None]
-            tape.watch(d)
-            for _ in range(self._vir_dir_upds):
-                d_target, d_output = tf.split(d, 2, axis=0)
-                target_hat = tf.clip_by_value(
-                    target + self._fixed_xi * d_target,
-                    clip_value_min=tf.reduce_min(target, axis=[0, 1]),
-                    clip_value_max=tf.reduce_max(target, axis=[0, 1]),
-                )
-                output_hat = tf.clip_by_value(
-                    output + self._fixed_xi * d_output,
-                    clip_value_min=tf.reduce_min(output, axis=[0, 1]),
-                    clip_value_max=tf.reduce_max(output, axis=[0, 1]),
-                )
-                y_true_hat = discriminator((source, target_hat), training=training)
-                y_pred_hat = discriminator((source, output_hat), training=training)
-                y_diff = tf.abs(
-                    tf.concat([y_true, y_pred], axis=0)
-                    - tf.concat([y_true_hat, y_pred_hat], axis=0)
-                )
-                y_diff = tf.reduce_mean(y_diff)
-                grad = tape.gradient(y_diff, d) + self._epsilon  # non-zero gradient
-                d = grad / tf.norm(grad, axis=[1, 2], keepdims=True)
+            adv_dir /= tf.norm(adv_dir, axis=[1, 2], keepdims=True)
 
-        # Virtual adversarial direction
-        xi = tf.random.uniform(
-            shape=(2 * batch_size, length, depth),
-            minval=self._sampled_xi_min,
-            maxval=self._sampled_xi_max,
-            dtype=target.dtype,
-        )
-        xi_target, xi_output = tf.split(xi, 2, axis=0)
-        d_target, d_output = tf.split(d, 2, axis=0)
-        target_hat = tf.clip_by_value(
-            target + xi_target * d_target,
-            clip_value_min=tf.reduce_min(target, axis=[0, 1]),
-            clip_value_max=tf.reduce_max(target, axis=[0, 1]),
-        )
-        output_hat = tf.clip_by_value(
-            output + xi_output * d_output,
-            clip_value_min=tf.reduce_min(output, axis=[0, 1]),
-            clip_value_max=tf.reduce_max(output, axis=[0, 1]),
-        )
-        x_diff = (
-            tf.abs(
-                tf.concat([target, output], axis=0)
-                - tf.concat([target_hat, output_hat], axis=0)
+            for _ in range(VIRTUAL_DIR_UPDS):
+                with tf.GradientTape() as tape:
+                    tape.watch(adv_dir)
+                    target_hat = tf.clip_by_value(
+                        target_concat + FIXED_XI * adv_dir,
+                        clip_value_min=tf.reduce_min(target_concat, axis=[0, 1]),
+                        clip_value_max=tf.reduce_max(target_concat, axis=[0, 1]),
+                    )
+                    d_hat = discriminator(
+                        (source_concat, target_hat),
+                        padding_mask=mask_concat,
+                        training=training_discriminator,
+                    )
+                    y_diff = tf.reduce_mean(tf.abs(d_out - d_hat))
+                    grad = tape.gradient(y_diff, adv_dir) + EPSILON  # non-zero gradient
+                    adv_dir = grad / tf.norm(grad, axis=[1, 2], keepdims=True)
+
+            # Virtual adversarial direction
+            xi = tf.random.uniform(
+                shape=(2 * tf.shape(target_true)[0],),
+                minval=SAMPLED_XI_MIN,
+                maxval=SAMPLED_XI_MAX,
+                dtype=target_true.dtype,
             )
-            + self._epsilon
-        )  # non-zero difference
-        x_diff = tf.norm(x_diff, axis=[1, 2], keepdims=True)
+            xi = tf.tile(
+                xi[:, None, None],
+                (1, tf.shape(target_true)[1], tf.shape(target_true)[2]),
+            )
+            target_hat = tf.clip_by_value(
+                target_concat + xi * adv_dir,
+                clip_value_min=tf.reduce_min(target_concat, axis=[0, 1]),
+                clip_value_max=tf.reduce_max(target_concat, axis=[0, 1]),
+            )
+            d_hat = discriminator(
+                (source_concat, target_hat),
+                padding_mask=mask_concat,
+                training=training_discriminator,
+            )
+            y_diff = tf.abs(d_out - d_hat)
+            x_diff = tf.norm(
+                tf.abs(target_concat - target_hat) + EPSILON,  # non-zero difference
+                axis=[1, 2],
+                keepdims=True,
+            )
 
-        y_true_hat = discriminator((source, target_hat), training=training)
-        y_pred_hat = discriminator((source, output_hat), training=training)
-        y_diff = tf.abs(
-            tf.concat([y_true, y_pred], axis=0)
-            - tf.concat([y_true_hat, y_pred_hat], axis=0)
-        )
-
-        K = y_diff / x_diff
-        alp_term = tf.maximum(K - LIPSCHITZ_CONSTANT, 0.0)  # one-side penalty
-        alp_term = tf.reduce_mean(alp_term)
-        loss += self._lipschitz_penalty * alp_term**2  # adversarial Lipschitz penalty
-        return loss
+            K = y_diff / x_diff  # lipschitz constant
+            if self._lipschitz_penalty_strategy == "two-sided":
+                alp_term = tf.abs(K - LIPSCHITZ_CONSTANT)
+            else:
+                alp_term = tf.maximum(0.0, K - LIPSCHITZ_CONSTANT)
+            return self._lipschitz_penalty * tf.reduce_mean(alp_term) ** 2
 
     @property
     def warmup_energy(self) -> float:
         return self._warmup_energy
 
     @property
+    def lipschitz_regularizer(self) -> str:
+        return self._lipschitz_regularizer
+
+    @property
     def lipschitz_penalty(self) -> float:
         return self._lipschitz_penalty
 
     @property
-    def virtual_direction_upds(self) -> int:
-        return self._vir_dir_upds
-
-    @property
-    def fixed_xi(self) -> float:
-        return self._fixed_xi
-
-    @property
-    def sampled_xi_min(self) -> float:
-        return self._sampled_xi_min
-
-    @property
-    def sampled_xi_max(self) -> float:
-        return self._sampled_xi_max
-
-    @property
-    def epsilon(self) -> float:
-        return self._epsilon
+    def lipschitz_penalty_strategy(self) -> str:
+        return self._lipschitz_penalty_strategy

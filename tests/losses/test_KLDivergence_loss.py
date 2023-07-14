@@ -29,10 +29,10 @@ transf = Transformer(
 
 disc = Discriminator(
     output_units=1,
-    output_activation=None,
     latent_dim=8,
-    deepsets_dense_num_layers=2,
-    deepsets_dense_units=32,
+    deepsets_num_layers=2,
+    deepsets_hidden_units=32,
+    output_activation=None,
     dropout_rate=0.1,
 )
 

@@ -1,5 +1,6 @@
 from .AdminResidual import AdminResidual
 from .Attention import CrossAttention, SelfAttention
+from .ConvDeepSets import ConvDeepSets
 from .Decoder import Decoder
 from .DeepSets import DeepSets
 from .Encoder import Encoder
