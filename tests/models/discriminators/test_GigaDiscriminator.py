@@ -9,6 +9,7 @@ ADDITIONAL_DIM = 2
 
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
+weight = tf.random.uniform(shape=(CHUNK_SIZE, target.shape[1]))
 labels = tf.random.uniform(shape=(CHUNK_SIZE,), minval=0.0, maxval=1.0)
 labels = tf.cast(labels > 0.5, target.dtype)
 
@@ -71,7 +72,8 @@ def test_model_configuration(model):
 
 @pytest.mark.parametrize("admin_res_scale", OUTPUT_CHANGE_SCALES)
 @pytest.mark.parametrize("enable_res_smoothing", [True, False])
-def test_model_use(admin_res_scale, enable_res_smoothing):
+@pytest.mark.parametrize("padding_mask", [weight, None])
+def test_model_use(admin_res_scale, enable_res_smoothing, padding_mask):
     latent_dim = 8
     if enable_res_smoothing:
         encoder_depth = latent_dim + ADDITIONAL_DIM
@@ -97,7 +99,7 @@ def test_model_use(admin_res_scale, enable_res_smoothing):
         enable_res_smoothing=enable_res_smoothing,
         output_activation="sigmoid",
     )
-    output = model((source, target))
+    output = model((source, target), padding_mask=padding_mask)
     model.summary()
     test_shape = [target.shape[0]]
     test_shape.append(model.output_units)

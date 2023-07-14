@@ -17,8 +17,8 @@ def model():
     disc = Discriminator(
         output_units=1,
         latent_dim=8,
-        deepsets_dense_num_layers=2,
-        deepsets_dense_units=32,
+        deepsets_num_layers=2,
+        deepsets_hidden_units=32,
         dropout_rate=0.1,
         output_activation="sigmoid",
     )
@@ -34,8 +34,8 @@ def test_model_configuration(model):
     assert isinstance(model, Discriminator)
     assert isinstance(model.output_units, int)
     assert isinstance(model.latent_dim, int)
-    assert isinstance(model.deepsets_dense_num_layers, int)
-    assert isinstance(model.deepsets_dense_units, int)
+    assert isinstance(model.deepsets_num_layers, int)
+    assert isinstance(model.deepsets_hidden_units, int)
     assert isinstance(model.dropout_rate, float)
     assert isinstance(model.condition_aware, bool)
 
@@ -48,8 +48,8 @@ def test_model_use(activation, padding_mask):
     model = Discriminator(
         output_units=1,
         latent_dim=8,
-        deepsets_dense_num_layers=2,
-        deepsets_dense_units=32,
+        deepsets_num_layers=2,
+        deepsets_hidden_units=32,
         dropout_rate=0.1,
         output_activation=activation,
     )

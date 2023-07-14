@@ -33,8 +33,8 @@ disc = Discriminator(
     latent_dim=8,
     output_units=1,
     output_activation="sigmoid",
-    deepsets_dense_num_layers=2,
-    deepsets_dense_units=32,
+    deepsets_num_layers=2,
+    deepsets_hidden_units=32,
     dropout_rate=0.1,
 )
 
@@ -80,7 +80,7 @@ def test_model_compilation(model, metrics):
     from calotron.losses import MeanSquaredError
 
     loss = MeanSquaredError(
-        warmup_energy=0.0, alpha=0.1, adversarial_metric="binary-crossentropy"
+        alpha=1.0, adversarial_metric="binary-crossentropy", warmup_energy=0.0
     )
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)

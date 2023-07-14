@@ -17,12 +17,10 @@ def model():
     disc = PairwiseDiscriminator(
         output_units=1,
         latent_dim=8,
-        deepsets_dense_num_layers=1,
-        deepsets_dense_units=32,
-        deepsets_conv1D_num_layers=2,
-        deepsets_conv1D_filters=4,
-        deepsets_conv1D_kernel_size=4,
-        deepsets_conv1D_strides=2,
+        deepsets_num_conv_layers=1,
+        deepsets_conv_filters=4,
+        deepsets_conv_kernel_size=4,
+        deepsets_conv_strides=2,
         dropout_rate=0.1,
         output_activation="sigmoid",
     )
@@ -38,12 +36,10 @@ def test_model_configuration(model):
     assert isinstance(model, PairwiseDiscriminator)
     assert isinstance(model.output_units, int)
     assert isinstance(model.latent_dim, int)
-    assert isinstance(model.deepsets_dense_num_layers, int)
-    assert isinstance(model.deepsets_dense_units, int)
-    assert isinstance(model.deepsets_conv1D_num_layers, int)
-    assert isinstance(model.deepsets_conv1D_filters, int)
-    assert isinstance(model.deepsets_conv1D_kernel_size, int)
-    assert isinstance(model.deepsets_conv1D_strides, int)
+    assert isinstance(model.deepsets_num_conv_layers, int)
+    assert isinstance(model.deepsets_conv_filters, int)
+    assert isinstance(model.deepsets_conv_kernel_size, int)
+    assert isinstance(model.deepsets_conv_strides, int)
     assert isinstance(model.dropout_rate, float)
     assert isinstance(model.condition_aware, bool)
 
@@ -56,12 +52,10 @@ def test_model_use(activation, padding_mask):
     model = PairwiseDiscriminator(
         output_units=1,
         latent_dim=8,
-        deepsets_dense_num_layers=1,
-        deepsets_dense_units=32,
-        deepsets_conv1D_num_layers=2,
-        deepsets_conv1D_filters=4,
-        deepsets_conv1D_kernel_size=4,
-        deepsets_conv1D_strides=2,
+        deepsets_num_conv_layers=1,
+        deepsets_conv_filters=4,
+        deepsets_conv_kernel_size=4,
+        deepsets_conv_strides=2,
         dropout_rate=0.1,
         output_activation=activation,
     )

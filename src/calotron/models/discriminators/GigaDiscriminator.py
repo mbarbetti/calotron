@@ -75,19 +75,24 @@ class GigaDiscriminator(Discriminator):
             output_units=self._output_units,
             latent_dim=2 * decoder_depth,
             num_layers=3,
-            min_units=4,
+            min_units=2 * self._output_units,
             dropout_rate=dropout_rate,
             output_activation=self._output_activation,
             dtype=self.dtype,
         )
 
-    def call(self, inputs) -> tf.Tensor:
+    def call(self, inputs, padding_mask=None) -> tf.Tensor:
         source, target = inputs
+        if padding_mask is not None:
+            padding_mask = tf.tile(
+                padding_mask[:, :, None], (1, 1, tf.shape(target)[2])
+            )
+            target *= padding_mask
         enc_out = self._encoder(source)
         dec_out = self._decoder(target, condition=enc_out)
-        max_pool = tf.reduce_max(dec_out, axis=1)
-        mean_pool = tf.reduce_mean(dec_out, axis=1)
-        out = tf.concat([max_pool, mean_pool], axis=-1)
+        out_max = tf.reduce_max(dec_out, axis=1)
+        out_mean = tf.reduce_mean(dec_out, axis=1)
+        out = tf.concat([out_max, out_mean], axis=-1)
         for layer in self._seq:
             out = layer(out)
         return out

@@ -1,17 +1,15 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Conv1D, Dense, Dropout, Layer
+from tensorflow.keras.layers import Dense, Dropout, Layer, LayerNormalization
+
+LN_EPSILON = 0.001
 
 
 class DeepSets(Layer):
     def __init__(
         self,
         latent_dim,
-        dense_num_layers=0,
-        dense_units=128,
-        conv1D_num_layers=0,
-        conv1D_filters=64,
-        conv1D_kernel_size=4,
-        conv1D_strides=4,
+        num_layers,
+        hidden_units=128,
         dropout_rate=0.0,
         name=None,
         dtype=None,
@@ -23,83 +21,57 @@ class DeepSets(Layer):
         assert latent_dim >= 1
         self._latent_dim = int(latent_dim)
 
-        # Number of Dense layers
-        assert isinstance(dense_num_layers, (int, float))
-        assert dense_num_layers >= 0
-        self._dense_num_layers = int(dense_num_layers)
+        # Number of layers
+        assert isinstance(num_layers, (int, float))
+        assert num_layers >= 1
+        self._num_layers = int(num_layers)
 
-        # Number of Dense units
-        assert isinstance(dense_units, (int, float))
-        assert dense_units >= 1
-        self._dense_units = int(dense_units)
-
-        # Number of Conv1D layers
-        assert isinstance(conv1D_num_layers, (int, float))
-        assert conv1D_num_layers >= 0
-        self._conv1D_num_layers = int(conv1D_num_layers)
-
-        # Number of Conv1D filters
-        assert isinstance(conv1D_filters, (int, float))
-        assert conv1D_filters >= 1
-        self._conv1D_filters = int(conv1D_filters)
-
-        # Length of Conv1D kernel size
-        assert isinstance(conv1D_kernel_size, (int, float))
-        assert conv1D_kernel_size >= 1
-        self._conv1D_kernel_size = int(conv1D_kernel_size)
-
-        # Length of Conv1D strides
-        assert isinstance(conv1D_strides, (int, float))
-        assert conv1D_strides >= 1
-        self._conv1D_strides = int(conv1D_strides)
+        # Hidden units
+        assert isinstance(hidden_units, (int, float))
+        assert hidden_units >= 1
+        self._hidden_units = int(hidden_units)
 
         # Dropout rate
         assert isinstance(dropout_rate, (int, float))
         assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
-        # Hidden layers
+        # Deep Sets layers
         self._seq = list()
-        for i in range(self._conv1D_num_layers):
-            self._seq.append(
-                Conv1D(
-                    filters=self._conv1D_filters,
-                    kernel_size=self._conv1D_kernel_size,
-                    strides=self._conv1D_strides,
-                    activation="relu",
-                    kernel_initializer="glorot_uniform",
-                    bias_initializer="zeros",
-                    name=f"ds_conv1D_{i}",
-                    dtype=self.dtype,
-                )
-            )
-
-        for i in range(self._dense_num_layers):
+        for i in range(self._num_layers - 1):
             self._seq.append(
                 Dense(
-                    units=self._dense_units,
+                    units=self._hidden_units,
                     activation="relu",
                     kernel_initializer="glorot_uniform",
                     bias_initializer="zeros",
-                    name=f"ds_dense_{i}",
+                    name=f"ds_dense_{i}" if name else None,
                     dtype=self.dtype,
                 )
             )
             self._seq.append(
-                Dropout(self._dropout_rate, name=f"ds_dropout_{i}", dtype=self.dtype)
+                Dropout(
+                    self._dropout_rate,
+                    name=f"ds_dropout_{i}" if name else None,
+                    dtype=self.dtype,
+                )
             )
-
-        # Output layer
-        self._seq += [
+        self._seq.append(
             Dense(
                 self._latent_dim,
-                activation="relu",
-                kernel_initializer="glorot_uniform",
+                activation=None,
+                kernel_initializer="he_normal",
                 bias_initializer="zeros",
-                name="ds_dense_out",
+                name="ds_dense_out" if name else None,
                 dtype=self.dtype,
             )
-        ]
+        )
+        self._evt_ln = LayerNormalization(
+            axis=1,
+            epsilon=LN_EPSILON,
+            name="ds_layer_norm" if name else None,
+            dtype=self.dtype,
+        )
 
     def call(self, x, padding_mask=None) -> tf.Tensor:
         if padding_mask is not None:
@@ -107,36 +79,21 @@ class DeepSets(Layer):
             x *= padding_mask
         for layer in self._seq:
             x = layer(x)
-        output = tf.reduce_sum(x, axis=1)
-        return output
+        x = self._evt_ln(x)
+        out = tf.reduce_sum(x, axis=1)
+        return out
 
     @property
     def latent_dim(self) -> int:
         return self._latent_dim
 
     @property
-    def dense_num_layers(self) -> int:
-        return self._dense_num_layers
+    def num_layers(self) -> int:
+        return self._num_layers
 
     @property
-    def dense_units(self) -> int:
-        return self._dense_units
-
-    @property
-    def conv1D_num_layers(self) -> int:
-        return self._conv1D_num_layers
-
-    @property
-    def conv1D_filters(self) -> int:
-        return self._conv1D_filters
-
-    @property
-    def conv1D_kernel_size(self) -> int:
-        return self._conv1D_kernel_size
-
-    @property
-    def conv1D_strides(self) -> int:
-        return self._conv1D_strides
+    def hidden_units(self) -> int:
+        return self._hidden_units
 
     @property
     def dropout_rate(self) -> float:

@@ -80,19 +80,20 @@ class Calotron(tf.keras.Model):
         train_dict = dict(t_loss=self._t_loss.result(), d_loss=self._d_loss.result())
         if self._metrics is not None:
             t_out = self._transformer((source, target), training=False)
+            source_concat = tf.concat([source, source], axis=0)
+            target_concat = tf.concat([target, t_out], axis=0)
             if sample_weight is not None:
                 mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
+                mask_concat = tf.concat([mask, mask], axis=0)
             else:
-                mask = None
-            d_out_pred = self._discriminator(
-                (source, t_out), padding_mask=mask, training=False
+                mask_concat = None
+            d_out = self._discriminator(
+                (source_concat, target_concat), padding_mask=mask_concat, training=False
             )
-            d_out_true = self._discriminator(
-                (source, target), padding_mask=mask, training=False
-            )
+            y_true, y_pred = tf.split(d_out, 2, axis=0)
             for metric in self._metrics:
                 metric.update_state(
-                    y_true=d_out_true, y_pred=d_out_pred, sample_weight=sample_weight
+                    y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
                 )
                 train_dict.update({metric.name: metric.result()})
         return train_dict
@@ -162,19 +163,20 @@ class Calotron(tf.keras.Model):
         train_dict = dict(t_loss=self._t_loss.result(), d_loss=self._d_loss.result())
         if self._metrics is not None:
             t_out = self._transformer((source, target), training=False)
+            source_concat = tf.concat([source, source], axis=0)
+            target_concat = tf.concat([target, t_out], axis=0)
             if sample_weight is not None:
                 mask = tf.cast(sample_weight > 0.0, dtype=target.dtype)
+                mask_concat = tf.concat([mask, mask], axis=0)
             else:
-                mask = None
-            d_out_pred = self._discriminator(
-                (source, t_out), padding_mask=mask, training=False
+                mask_concat = None
+            d_out = self._discriminator(
+                (source_concat, target_concat), padding_mask=mask_concat, training=False
             )
-            d_out_true = self._discriminator(
-                (source, target), padding_mask=mask, training=False
-            )
+            y_true, y_pred = tf.split(d_out, 2, axis=0)
             for metric in self._metrics:
                 metric.update_state(
-                    y_true=d_out_true, y_pred=d_out_pred, sample_weight=sample_weight
+                    y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
                 )
                 train_dict.update({metric.name: metric.result()})
         return train_dict

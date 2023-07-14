@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from calotron.layers import DeepSets
+from calotron.layers import ConvDeepSets
 from calotron.models.discriminators.Discriminator import Discriminator
 
 
@@ -9,12 +9,10 @@ class PairwiseDiscriminator(Discriminator):
         self,
         output_units,
         latent_dim=64,
-        deepsets_dense_num_layers=1,
-        deepsets_dense_units=128,
-        deepsets_conv1D_num_layers=3,
-        deepsets_conv1D_filters=64,
-        deepsets_conv1D_kernel_size=4,
-        deepsets_conv1D_strides=4,
+        deepsets_num_conv_layers=3,
+        deepsets_conv_filters=64,
+        deepsets_conv_kernel_size=4,
+        deepsets_conv_strides=4,
         dropout_rate=0.0,
         output_activation=None,
         name=None,
@@ -32,14 +30,12 @@ class PairwiseDiscriminator(Discriminator):
         self._output_activation = output_activation
 
         # Deep Sets
-        self._deep_sets = DeepSets(
+        self._deep_sets = ConvDeepSets(
             latent_dim=latent_dim,
-            dense_num_layers=deepsets_dense_num_layers,
-            dense_units=deepsets_dense_units,
-            conv1D_num_layers=deepsets_conv1D_num_layers,
-            conv1D_filters=deepsets_conv1D_filters,
-            conv1D_kernel_size=deepsets_conv1D_kernel_size,
-            conv1D_strides=deepsets_conv1D_strides,
+            num_conv_layers=deepsets_num_conv_layers,
+            filters=deepsets_conv_filters,
+            kernel_size=deepsets_conv_kernel_size,
+            strides=deepsets_conv_strides,
             dropout_rate=dropout_rate,
             name="deepsets",
             dtype=self.dtype,
@@ -50,7 +46,7 @@ class PairwiseDiscriminator(Discriminator):
             output_units=self._output_units,
             latent_dim=latent_dim,
             num_layers=3,
-            min_units=4,
+            min_units=2 * self._output_units,
             dropout_rate=dropout_rate,
             output_activation=self._output_activation,
             dtype=self.dtype,
@@ -96,17 +92,17 @@ class PairwiseDiscriminator(Discriminator):
         return out
 
     @property
-    def deepsets_conv1D_num_layers(self) -> int:
-        return self._deep_sets.conv1D_num_layers
+    def deepsets_num_conv_layers(self) -> int:
+        return self._deep_sets.num_conv_layers
 
     @property
-    def deepsets_conv1D_filters(self) -> int:
-        return self._deep_sets.conv1D_filters
+    def deepsets_conv_filters(self) -> int:
+        return self._deep_sets.filters
 
     @property
-    def deepsets_conv1D_kernel_size(self) -> int:
-        return self._deep_sets.conv1D_kernel_size
+    def deepsets_conv_kernel_size(self) -> int:
+        return self._deep_sets.kernel_size
 
     @property
-    def deepsets_conv1D_strides(self) -> int:
-        return self._deep_sets.conv1D_strides
+    def deepsets_conv_strides(self) -> int:
+        return self._deep_sets.strides
