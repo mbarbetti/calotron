@@ -1,23 +1,29 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Dropout, Layer, LayerNormalization
+from tensorflow.keras.layers import Dense, Dropout, LeakyReLU
 
-LN_EPSILON = 0.001
+LEAKY_ALPHA = 0.1
+SEED = 42
 
 
-class DeepSets(Layer):
+class MappingNet(tf.keras.Model):
     def __init__(
         self,
+        output_dim,
         latent_dim,
         num_layers,
         hidden_units=128,
         dropout_rate=0.0,
+        output_activation=None,
         name=None,
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
 
+        # Output dimension
+        assert output_dim >= 1
+        self._output_dim = int(output_dim)
+
         # Latent space dimension
-        assert isinstance(latent_dim, (int, float))
         assert latent_dim >= 1
         self._latent_dim = int(latent_dim)
 
@@ -36,52 +42,66 @@ class DeepSets(Layer):
         assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
-        # Deep Sets layers
+        # Output activation
+        self._output_activation = output_activation
+
+        # MappingNet layers
         self._seq = list()
         for i in range(self._num_layers - 1):
             self._seq.append(
                 Dense(
                     units=self._hidden_units,
-                    activation="relu",
+                    activation=None,
                     kernel_initializer="glorot_uniform",
                     bias_initializer="zeros",
-                    name=f"ds_dense_{i}" if name else None,
+                    name=f"dense_{i}" if name else None,
                     dtype=self.dtype,
                 )
             )
             self._seq.append(
-                Dropout(
-                    self._dropout_rate,
-                    name=f"ds_dropout_{i}" if name else None,
-                    dtype=self.dtype,
-                )
+                LeakyReLU(alpha=LEAKY_ALPHA, name=f"leaky_relu_{i}" if name else None)
+            )
+            self._seq.append(
+                Dropout(rate=self._dropout_rate, name=f"dropout_{i}" if name else None)
             )
         self._seq.append(
             Dense(
-                self._latent_dim,
-                activation=None,
-                kernel_initializer="he_normal",
+                units=output_dim,
+                activation=output_activation,
+                kernel_initializer="glorot_uniform",
                 bias_initializer="zeros",
-                name="ds_dense_out" if name else None,
+                name="dense_out" if name else None,
                 dtype=self.dtype,
             )
         )
-        self._evt_ln = LayerNormalization(
-            axis=1,
-            epsilon=LN_EPSILON,
-            name="ds_layer_norm" if name else None,
-            dtype=self.dtype,
-        )
 
-    def call(self, x, padding_mask=None) -> tf.Tensor:
-        if padding_mask is not None:
-            padding_mask = tf.tile(padding_mask[:, :, None], (1, 1, tf.shape(x)[2]))
-            x *= padding_mask
+    def call(self, x) -> tf.Tensor:
+        x = self._prepare_input(x, seed=None)
         for layer in self._seq:
             x = layer(x)
-        x = self._evt_ln(x)
-        out = tf.reduce_sum(x, axis=1)
-        return out
+        return x
+
+    def generate(self, x, seed=None) -> tf.Tensor:
+        tf.random.set_seed(seed=SEED)
+        x = self._prepare_input(x, seed=seed)
+        for layer in self._seq:
+            x = layer(x)
+        return x
+
+    def _prepare_input(self, x, seed=None) -> tf.Tensor:
+        latent_sample = tf.random.normal(
+            shape=(tf.shape(x)[0], self._latent_dim),
+            mean=0.0,
+            stddev=1.0,
+            dtype=self.dtype,
+            seed=seed,
+        )
+        x = tf.concat([x, latent_sample], axis=-1)
+        return x
+
+    @property
+    def output_dim(self) -> int:
+        return self._output_dim
 
     @property
     def latent_dim(self) -> int:
@@ -98,3 +118,7 @@ class DeepSets(Layer):
     @property
     def dropout_rate(self) -> float:
         return self._dropout_rate
+
+    @property
+    def output_activation(self):
+        return self._output_activation

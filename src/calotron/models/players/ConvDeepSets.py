@@ -1,8 +1,15 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Conv1D, Dense, Dropout, Layer
+from tensorflow.keras.layers import (
+    Concatenate,
+    Conv1D,
+    Dense,
+    Dropout,
+    GlobalAveragePooling1D,
+    GlobalMaxPooling1D,
+)
 
 
-class ConvDeepSets(Layer):
+class ConvDeepSets(tf.keras.Model):
     def __init__(
         self,
         latent_dim,
@@ -19,6 +26,7 @@ class ConvDeepSets(Layer):
         # Latent space dimension
         assert isinstance(latent_dim, (int, float))
         assert latent_dim >= 1
+        assert (latent_dim % 2) == 0
         self._latent_dim = int(latent_dim)
 
         # Number of convolutional layers
@@ -57,37 +65,42 @@ class ConvDeepSets(Layer):
                     activation="relu",
                     kernel_initializer="glorot_uniform",
                     bias_initializer="zeros",
-                    name=f"ds_conv1D_{i}",
+                    name=f"conv1D_{i}" if name else None,
                     dtype=self.dtype,
                 )
             )
         self._seq.append(
             Dense(
-                units=2 * self._latent_dim,
+                units=self._latent_dim,
                 activation="relu",
                 kernel_initializer="glorot_uniform",
                 bias_initializer="zeros",
-                name=f"ds_dense_{self._num_conv_layers}",
+                name=f"dense_{self._num_conv_layers}" if name else None,
                 dtype=self.dtype,
             )
         )
         self._seq.append(
             Dropout(
                 self._dropout_rate,
-                name=f"ds_dropout_{self._num_conv_layers}",
+                name=f"dropout_{self._num_conv_layers}" if name else None,
                 dtype=self.dtype,
             )
         )
         self._seq.append(
             Dense(
-                self._latent_dim,
+                int(self._latent_dim / 2),
                 activation=None,
-                kernel_initializer="truncated_normal",
+                kernel_initializer="he_normal",
                 bias_initializer="zeros",
-                name="ds_dense_out",
+                name="dense_out" if name else None,
                 dtype=self.dtype,
             )
         )
+
+        # Final layers
+        self._avg_pool = GlobalAveragePooling1D(name="avg_pool" if name else None)
+        self._max_pool = GlobalMaxPooling1D(name="max_pool" if name else None)
+        self._concat = Concatenate(name="concat" if name else None)
 
     def call(self, x, padding_mask=None) -> tf.Tensor:
         if padding_mask is not None:
@@ -95,8 +108,10 @@ class ConvDeepSets(Layer):
             x *= padding_mask
         for layer in self._seq:
             x = layer(x)
-        output = tf.reduce_sum(x, axis=1)
-        return output
+        x_avg = self._avg_pool(x)
+        x_max = self._max_pool(x)
+        out = self._concat([x_avg, x_max])
+        return out
 
     @property
     def latent_dim(self) -> int:

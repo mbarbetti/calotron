@@ -1,30 +1,29 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Dropout, Layer, LeakyReLU
+from tensorflow.keras.layers import (
+    Concatenate,
+    Dense,
+    Dropout,
+    GlobalAveragePooling1D,
+    GlobalMaxPooling1D,
+)
 
-LEAKY_ALPHA = 0.1
-SEED = 42
 
-
-class MappingNet(Layer):
+class DeepSets(tf.keras.Model):
     def __init__(
         self,
-        output_dim,
         latent_dim,
         num_layers,
         hidden_units=128,
         dropout_rate=0.0,
-        output_activation=None,
         name=None,
         dtype=None,
     ) -> None:
         super().__init__(name=name, dtype=dtype)
 
-        # Output dimension
-        assert output_dim >= 1
-        self._output_dim = int(output_dim)
-
         # Latent space dimension
+        assert isinstance(latent_dim, (int, float))
         assert latent_dim >= 1
+        assert (latent_dim % 2) == 0
         self._latent_dim = int(latent_dim)
 
         # Number of layers
@@ -42,70 +41,52 @@ class MappingNet(Layer):
         assert dropout_rate >= 0.0 and dropout_rate < 1.0
         self._dropout_rate = float(dropout_rate)
 
-        # Output activation
-        self._output_activation = output_activation
-
-        # MappingNet layers
+        # Deep Sets layers
         self._seq = list()
         for i in range(self._num_layers - 1):
             self._seq.append(
                 Dense(
                     units=self._hidden_units,
-                    activation=None,
+                    activation="relu",
                     kernel_initializer="glorot_uniform",
                     bias_initializer="zeros",
-                    name=f"map_dense_{i}" if name else None,
+                    name=f"dense_{i}" if name else None,
                     dtype=self.dtype,
                 )
             )
             self._seq.append(
-                LeakyReLU(
-                    alpha=LEAKY_ALPHA, name=f"map_leaky_relu_{i}" if name else None
-                )
-            )
-            self._seq.append(
                 Dropout(
-                    rate=self._dropout_rate, name=f"map_dropout_{i}" if name else None
+                    self._dropout_rate,
+                    name=f"dropout_{i}" if name else None,
+                    dtype=self.dtype,
                 )
             )
         self._seq.append(
             Dense(
-                units=output_dim,
-                activation=output_activation,
-                kernel_initializer="glorot_uniform",
+                int(self._latent_dim / 2),
+                activation=None,
+                kernel_initializer="he_normal",
                 bias_initializer="zeros",
-                name="map_dense_out" if name else None,
+                name="dense_out" if name else None,
                 dtype=self.dtype,
             )
         )
 
-    def call(self, x) -> tf.Tensor:
-        x = self._prepare_input(x, seed=None)
+        # Final layers
+        self._avg_pool = GlobalAveragePooling1D(name="avg_pool" if name else None)
+        self._max_pool = GlobalMaxPooling1D(name="max_pool" if name else None)
+        self._concat = Concatenate(name="concat" if name else None)
+
+    def call(self, x, padding_mask=None) -> tf.Tensor:
+        if padding_mask is not None:
+            padding_mask = tf.tile(padding_mask[:, :, None], (1, 1, tf.shape(x)[2]))
+            x *= padding_mask
         for layer in self._seq:
             x = layer(x)
-        return x
-
-    def generate(self, x, seed=None) -> tf.Tensor:
-        tf.random.set_seed(seed=SEED)
-        x = self._prepare_input(x, seed=seed)
-        for layer in self._seq:
-            x = layer(x)
-        return x
-
-    def _prepare_input(self, x, seed=None) -> tf.Tensor:
-        latent_sample = tf.random.normal(
-            shape=(tf.shape(x)[0], self._latent_dim),
-            mean=0.0,
-            stddev=1.0,
-            dtype=self.dtype,
-            seed=seed,
-        )
-        x = tf.concat([x, latent_sample], axis=-1)
-        return x
-
-    @property
-    def output_dim(self) -> int:
-        return self._output_dim
+        x_avg = self._avg_pool(x)
+        x_max = self._max_pool(x)
+        out = self._concat([x_avg, x_max])
+        return out
 
     @property
     def latent_dim(self) -> int:
@@ -122,7 +103,3 @@ class MappingNet(Layer):
     @property
     def dropout_rate(self) -> float:
         return self._dropout_rate
-
-    @property
-    def output_activation(self):
-        return self._output_activation

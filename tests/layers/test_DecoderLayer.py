@@ -4,7 +4,7 @@ import tensorflow as tf
 
 @pytest.fixture
 def layer():
-    from calotron.layers.Decoder import DecoderLayer
+    from calotron.layers import DecoderLayer
 
     dec = DecoderLayer(
         output_depth=12,
@@ -23,7 +23,7 @@ def layer():
 
 
 def test_layer_configuration(layer):
-    from calotron.layers.Decoder import DecoderLayer
+    from calotron.layers import DecoderLayer
 
     assert isinstance(layer, DecoderLayer)
     assert isinstance(layer.output_depth, int)
@@ -38,7 +38,7 @@ def test_layer_configuration(layer):
 
 @pytest.mark.parametrize("autoregressive_mode", [True, False])
 def test_layer_use(autoregressive_mode):
-    from calotron.layers.Decoder import DecoderLayer
+    from calotron.layers import DecoderLayer
 
     layer = DecoderLayer(
         output_depth=12,

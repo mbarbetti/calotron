@@ -4,7 +4,7 @@ import tensorflow as tf
 
 @pytest.fixture
 def layer():
-    from calotron.layers.Encoder import EncoderLayer
+    from calotron.layers import EncoderLayer
 
     enc = EncoderLayer(
         output_depth=24,
@@ -22,7 +22,7 @@ def layer():
 
 
 def test_layer_configuration(layer):
-    from calotron.layers.Encoder import EncoderLayer
+    from calotron.layers import EncoderLayer
 
     assert isinstance(layer, EncoderLayer)
     assert isinstance(layer.output_depth, int)

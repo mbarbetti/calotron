@@ -4,7 +4,7 @@ import tensorflow as tf
 
 @pytest.fixture
 def layer():
-    from calotron.layers.SynthesisNet import SynthesisLayer
+    from calotron.layers import SynthesisLayer
 
     synth = SynthesisLayer(
         output_depth=12, num_heads=8, key_dim=32, mlp_units=128, dropout_rate=0.1
@@ -16,7 +16,7 @@ def layer():
 
 
 def test_layer_configuration(layer):
-    from calotron.layers.SynthesisNet import SynthesisLayer
+    from calotron.layers import SynthesisLayer
 
     assert isinstance(layer, SynthesisLayer)
     assert isinstance(layer.output_depth, int)
