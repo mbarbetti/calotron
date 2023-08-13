@@ -6,6 +6,7 @@ from calotron.models.discriminators import Discriminator
 from calotron.models.transformers import Transformer
 
 CHUNK_SIZE = int(1e4)
+BATCH_SIZE = 500
 
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
@@ -79,9 +80,7 @@ def test_model_use(model):
 def test_model_compilation(model, metrics):
     from calotron.losses import MeanSquaredError
 
-    loss = MeanSquaredError(
-        alpha=1.0, adversarial_metric="binary-crossentropy", warmup_energy=0.0
-    )
+    loss = MeanSquaredError(alpha=0.5, adversarial_metric="binary-crossentropy")
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     model.compile(
@@ -110,15 +109,13 @@ def test_model_train(model, adversarial_metrics, sample_weight):
         slices = (source, target)
     dataset = (
         tf.data.Dataset.from_tensor_slices(slices)
-        .batch(batch_size=512, drop_remainder=True)
+        .batch(batch_size=BATCH_SIZE, drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
     )
     from calotron.losses import MeanSquaredError
 
-    loss = MeanSquaredError(
-        warmup_energy=0.0, alpha=0.1, adversarial_metric=adversarial_metrics
-    )
+    loss = MeanSquaredError(alpha=0.5, adversarial_metric=adversarial_metrics)
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     model.compile(
@@ -136,9 +133,7 @@ def test_model_train(model, adversarial_metrics, sample_weight):
 def test_model_eval(model, sample_weight):
     from calotron.losses import MeanSquaredError
 
-    loss = MeanSquaredError(
-        warmup_energy=0.0, alpha=0.1, adversarial_metric="binary-crossentropy"
-    )
+    loss = MeanSquaredError(alpha=0.5, adversarial_metric="binary-crossentropy")
     t_opt = RMSprop(learning_rate=0.001)
     d_opt = RMSprop(learning_rate=0.001)
     model.compile(

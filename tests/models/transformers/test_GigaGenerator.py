@@ -1,3 +1,4 @@
+import os
 import pytest
 import tensorflow as tf
 
@@ -8,6 +9,9 @@ CHUNK_SIZE = int(1e4)
 BATCH_SIZE = 500
 ADDITIONAL_DIM = 2
 
+here = os.path.dirname(__file__)
+encoder_dir = f"{here}/../players/tmp/encoder"
+
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
 
@@ -17,7 +21,7 @@ def model():
     from calotron.models.transformers import GigaGenerator
 
     trans = GigaGenerator(
-        output_depth=target.shape[2],
+        output_depth=target.shape[-1],
         encoder_depth=8,
         mapping_latent_dim=16,
         synthesis_depth=8,
@@ -33,6 +37,8 @@ def model():
         enable_res_smoothing=True,
         output_activations="linear",
         start_token_initializer="ones",
+        pretrained_encoder_dir=None,
+        additional_encoder_layers=None,
     )
     return trans
 
@@ -72,19 +78,32 @@ def test_model_configuration(model):
     assert isinstance(model.enable_res_smoothing, bool)
     # assert isinstance(model.output_activations, str)
     assert isinstance(model.start_token_initializer, str)
+    # assert isinstance(model.pretrained_encoder_dir, str)
+    assert isinstance(model.additional_encoder_layers, int)
 
 
 @pytest.mark.parametrize("admin_res_scale", OUTPUT_CHANGE_SCALES)
 @pytest.mark.parametrize("enable_res_smoothing", [True, False])
 @pytest.mark.parametrize("output_activations", ["relu", None])
-def test_model_use(admin_res_scale, enable_res_smoothing, output_activations):
+@pytest.mark.parametrize("pretrained_encoder_dir", [encoder_dir, None])
+def test_model_use(
+    admin_res_scale, enable_res_smoothing, output_activations, pretrained_encoder_dir
+):
     latent_dim = 8
     if enable_res_smoothing:
         encoder_depth = latent_dim + ADDITIONAL_DIM
         synthesis_depth = latent_dim + ADDITIONAL_DIM
+        if pretrained_encoder_dir is not None:
+            export_dir = f"{pretrained_encoder_dir}_with_smoothing"
+        else:
+            export_dir = None
     else:
         encoder_depth = latent_dim
         synthesis_depth = latent_dim
+        if pretrained_encoder_dir is not None:
+            export_dir = f"{pretrained_encoder_dir}_no_smoothing"
+        else:
+            export_dir = None
     from calotron.models.transformers import GigaGenerator
 
     model = GigaGenerator(
@@ -104,6 +123,8 @@ def test_model_use(admin_res_scale, enable_res_smoothing, output_activations):
         enable_res_smoothing=enable_res_smoothing,
         output_activations=output_activations,
         start_token_initializer="ones",
+        pretrained_encoder_dir=export_dir,
+        additional_encoder_layers=None,
     )
     output = model((source, target))
     model.summary()
@@ -133,6 +154,8 @@ def test_model_start_token(start_token_initializer):
         enable_res_smoothing=True,
         output_activations="linear",
         start_token_initializer=start_token_initializer,
+        pretrained_encoder_dir=None,
+        additional_encoder_layers=None,
     )
     output = model((source, target))
     model.summary()

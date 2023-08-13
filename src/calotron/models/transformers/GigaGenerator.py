@@ -1,6 +1,12 @@
 import tensorflow as tf
+from tensorflow.keras.layers import (
+    Concatenate,
+    GlobalAveragePooling1D,
+    GlobalMaxPooling1D,
+)
 
-from calotron.layers import Encoder, MappingNet, SynthesisNet
+from calotron.layers import SeqOrderEmbedding
+from calotron.models.players import Encoder, MappingNet, SynthesisNet, PretrainedEncoder
 from calotron.models.transformers.Transformer import (
     START_TOKEN_INITIALIZERS,
     Transformer,
@@ -26,6 +32,8 @@ class GigaGenerator(Transformer):
         enable_res_smoothing=True,
         output_activations=None,
         start_token_initializer="ones",
+        pretrained_encoder_dir=None,
+        additional_encoder_layers=None,
         name=None,
         dtype=None,
     ) -> None:
@@ -49,23 +57,46 @@ class GigaGenerator(Transformer):
         self._start_token_initializer = start_token_initializer
 
         # Encoder
-        self._encoder = Encoder(
-            output_depth=encoder_depth,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            key_dim=key_dim,
-            admin_res_scale=admin_res_scale,
-            mlp_units=mlp_units,
-            dropout_rate=dropout_rate,
-            seq_ord_latent_dim=seq_ord_latent_dim,
-            seq_ord_max_length=seq_ord_max_length,
-            seq_ord_normalization=seq_ord_normalization,
-            enable_res_smoothing=enable_res_smoothing,
-            name="encoder",
-            dtype=self.dtype,
-        )
+        if pretrained_encoder_dir is not None:
+            self._encoder = PretrainedEncoder(
+                output_depth=encoder_depth,
+                num_layers=additional_encoder_layers
+                if additional_encoder_layers
+                else num_layers,
+                num_heads=num_heads,
+                key_dim=key_dim,
+                admin_res_scale=admin_res_scale,
+                mlp_units=mlp_units,
+                dropout_rate=dropout_rate,
+                seq_ord_latent_dim=seq_ord_latent_dim,
+                seq_ord_max_length=seq_ord_max_length,
+                seq_ord_normalization=seq_ord_normalization,
+                enable_res_smoothing=enable_res_smoothing,
+                pretrained_model_dir=pretrained_encoder_dir,
+                name="pretrain_encoder",
+                dtype=self.dtype,
+            )
+        else:
+            self._encoder = Encoder(
+                output_depth=encoder_depth,
+                num_layers=num_layers,
+                num_heads=num_heads,
+                key_dim=key_dim,
+                admin_res_scale=admin_res_scale,
+                mlp_units=mlp_units,
+                dropout_rate=dropout_rate,
+                seq_ord_latent_dim=seq_ord_latent_dim,
+                seq_ord_max_length=seq_ord_max_length,
+                seq_ord_normalization=seq_ord_normalization,
+                enable_res_smoothing=enable_res_smoothing,
+                name="encoder",
+                dtype=self.dtype,
+            )
 
         # MappingNet
+        self._avg_pool = GlobalAveragePooling1D(name="avg_pool")
+        self._max_pool = GlobalMaxPooling1D(name="max_pool")
+        self._concat = Concatenate(name="concat")
         self._map_net = MappingNet(
             output_dim=synthesis_depth,
             latent_dim=mapping_latent_dim,
@@ -74,6 +105,16 @@ class GigaGenerator(Transformer):
             dropout_rate=dropout_rate,
             output_activation=None,
             name="map_net",
+            dtype=self.dtype,
+        )
+
+        # Sequence order embedding
+        self._seq_ord_embed = SeqOrderEmbedding(
+            latent_dim=encoder_depth,
+            max_length=seq_ord_max_length,
+            normalization=seq_ord_normalization,
+            dropout_rate=dropout_rate,
+            name="seq_ord_embed",
             dtype=self.dtype,
         )
 
@@ -104,8 +145,11 @@ class GigaGenerator(Transformer):
         source, target = inputs
         target = self._prepare_input_target(target)
         enc_out = self._encoder(source)
-        map_out = self._map_net(enc_out[:, -1, :])
-        synth_out = self._synth_net(target, w=map_out, condition=enc_out[:, :-1, :])
+        enc_out_avg = self._avg_pool(enc_out)
+        enc_out_max = self._max_pool(enc_out)
+        map_out = self._map_net(self._concat([enc_out_avg, enc_out_max]))
+        enc_out = self._seq_ord_embed(enc_out)
+        synth_out = self._synth_net((target, map_out, enc_out))
         out = self._output_layer(synth_out)
         if self._filter is not None:
             out = self._filter(out)

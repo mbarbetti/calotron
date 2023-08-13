@@ -1,7 +1,13 @@
 import tensorflow as tf
+from tensorflow.keras.layers import (
+    Concatenate,
+    GlobalAveragePooling1D,
+    GlobalMaxPooling1D,
+)
 
-from calotron.layers import Decoder, Encoder
+from calotron.layers import SeqOrderEmbedding
 from calotron.models.discriminators import Discriminator
+from calotron.models.players import Decoder, Encoder, PretrainedEncoder
 
 
 class GigaDiscriminator(Discriminator):
@@ -21,6 +27,8 @@ class GigaDiscriminator(Discriminator):
         seq_ord_normalization=10_000,
         enable_res_smoothing=True,
         output_activation=None,
+        pretrained_encoder_dir=None,
+        additional_encoder_layers=None,
         name=None,
         dtype=None,
     ) -> None:
@@ -36,19 +44,49 @@ class GigaDiscriminator(Discriminator):
         self._output_activation = output_activation
 
         # Encoder
-        self._encoder = Encoder(
-            output_depth=encoder_depth,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            key_dim=key_dim,
-            admin_res_scale=admin_res_scale,
-            mlp_units=mlp_units,
+        if pretrained_encoder_dir is not None:
+            self._encoder = PretrainedEncoder(
+                output_depth=encoder_depth,
+                num_layers=additional_encoder_layers
+                if additional_encoder_layers
+                else num_layers,
+                num_heads=num_heads,
+                key_dim=key_dim,
+                admin_res_scale=admin_res_scale,
+                mlp_units=mlp_units,
+                dropout_rate=dropout_rate,
+                seq_ord_latent_dim=seq_ord_latent_dim,
+                seq_ord_max_length=seq_ord_max_length,
+                seq_ord_normalization=seq_ord_normalization,
+                enable_res_smoothing=enable_res_smoothing,
+                pretrained_model_dir=pretrained_encoder_dir,
+                name="pretrain_encoder",
+                dtype=self.dtype,
+            )
+        else:
+            self._encoder = Encoder(
+                output_depth=encoder_depth,
+                num_layers=num_layers,
+                num_heads=num_heads,
+                key_dim=key_dim,
+                admin_res_scale=admin_res_scale,
+                mlp_units=mlp_units,
+                dropout_rate=dropout_rate,
+                seq_ord_latent_dim=seq_ord_latent_dim,
+                seq_ord_max_length=seq_ord_max_length,
+                seq_ord_normalization=seq_ord_normalization,
+                enable_res_smoothing=enable_res_smoothing,
+                name="encoder",
+                dtype=self.dtype,
+            )
+
+        # Sequence order embedding
+        self._seq_ord_embed = SeqOrderEmbedding(
+            latent_dim=encoder_depth,
+            max_length=seq_ord_max_length,
+            normalization=seq_ord_normalization,
             dropout_rate=dropout_rate,
-            seq_ord_latent_dim=seq_ord_latent_dim,
-            seq_ord_max_length=seq_ord_max_length,
-            seq_ord_normalization=seq_ord_normalization,
-            enable_res_smoothing=enable_res_smoothing,
-            name="encoder",
+            name="seq_ord_embed",
             dtype=self.dtype,
         )
 
@@ -71,6 +109,9 @@ class GigaDiscriminator(Discriminator):
         )
 
         # Final layers
+        self._avg_pool = GlobalAveragePooling1D(name="avg_pool")
+        self._max_pool = GlobalMaxPooling1D(name="max_pool")
+        self._concat = Concatenate(name="concat")
         self._seq = self._prepare_final_layers(
             output_units=self._output_units,
             latent_dim=2 * decoder_depth,
@@ -89,10 +130,11 @@ class GigaDiscriminator(Discriminator):
             )
             target *= padding_mask
         enc_out = self._encoder(source)
-        dec_out = self._decoder(target, condition=enc_out)
-        out_max = tf.reduce_max(dec_out, axis=1)
-        out_mean = tf.reduce_mean(dec_out, axis=1)
-        out = tf.concat([out_max, out_mean], axis=-1)
+        enc_out = self._seq_ord_embed(enc_out)
+        dec_out = self._decoder((target, enc_out))
+        out_avg = self._avg_pool(dec_out)
+        out_max = self._max_pool(dec_out)
+        out = self._concat([out_avg, out_max])
         for layer in self._seq:
             out = layer(out)
         return out
@@ -180,6 +222,18 @@ class GigaDiscriminator(Discriminator):
     @property
     def enable_res_smoothing(self) -> bool:
         return self._encoder.enable_res_smoothing
+    
+    @property
+    def output_activation(self):  # TODO: add Union[str, Activation]
+        return self._output_activation
+    
+    @property
+    def pretrained_encoder_dir(self):  # TODO: add Union[str, None]
+        return self._encoder.pretrained_model_dir
+    
+    @property
+    def additional_encoder_layers(self) -> int:
+        return self._encoder.num_layers
 
     @property
     def attention_weights(self) -> tf.Tensor:
