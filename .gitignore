@@ -6,6 +6,7 @@
 *.pdf
 *.html
 scripts/models/
+tests/models/players/tmp/
 tests/*/tmp/
 
 # VS Code

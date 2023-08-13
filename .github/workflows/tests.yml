@@ -43,6 +43,7 @@ jobs:
           HOPAAS_TOKEN: ${{ secrets.HOPAAS_TOKEN }}
         run: |
           python tests/config/config.py --no-interactive -t "$HOPAAS_TOKEN"
+          pytest tests/models/players/test_Encoder.py
           pytest --cov tests/
 
       - name: Upload coverage to Codecov
