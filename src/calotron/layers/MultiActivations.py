@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Layer
+from tensorflow.keras.layers import Concatenate, Layer
 
 from calotron.utils.checks import checkActivations
 
@@ -16,6 +16,8 @@ class MultiActivations(Layer):
         # Output activations
         self._output_activations = checkActivations(activations, output_depth, dtype)
 
+        self._concat = Concatenate(name="ma_concat" if name else None)
+
     def call(self, x) -> tf.Tensor:
         if x.shape[2] != self._output_depth:
             raise ValueError(
@@ -26,8 +28,9 @@ class MultiActivations(Layer):
             concat = list()
             for i, activation in enumerate(self._output_activations):
                 concat.append(activation(x[:, :, i])[:, :, None])
-            x = tf.concat(concat, axis=-1)
-        return x
+            return self._concat(concat)
+        else:
+            return x
 
     @property
     def output_activations(self):  # TODO: add Union[list, None]

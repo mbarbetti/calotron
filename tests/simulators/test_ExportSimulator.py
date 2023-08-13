@@ -1,6 +1,5 @@
 import os
 
-import numpy as np
 import pytest
 import tensorflow as tf
 
@@ -59,7 +58,7 @@ def test_export_simulator_configuration(export_simulator):
     assert isinstance(export_simulator.max_length, int)
 
 
-def test_export_use(export_simulator):
+def test_export_simulator_use(export_simulator):
     output, attn_weights = export_simulator(dataset)
     test_shape = list(target.shape)
     test_shape[0] = BATCH_SIZE

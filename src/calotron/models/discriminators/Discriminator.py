@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.layers import BatchNormalization, Dense, Dropout
 
-from calotron.layers import DeepSets
+from calotron.models.players import DeepSets
 
 
 class Discriminator(tf.keras.Model):

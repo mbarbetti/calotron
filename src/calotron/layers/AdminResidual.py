@@ -38,7 +38,7 @@ class AdminResidual(Layer):
         self._output_change_scale = output_change_scale
 
         self._omega = self._compute_init_value()
-        self._add = Add()
+        self._add = Add(name="admin_add" if name else None)
 
     def _compute_init_value(self) -> tf.Variable:
         if self._output_change_scale == "O(n)":

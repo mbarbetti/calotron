@@ -1,7 +1,7 @@
 import tensorflow as tf
 
-from calotron.layers import ConvDeepSets
 from calotron.models.discriminators.Discriminator import Discriminator
+from calotron.models.players import ConvDeepSets
 
 
 class PairwiseDiscriminator(Discriminator):
@@ -52,10 +52,8 @@ class PairwiseDiscriminator(Discriminator):
             dtype=self.dtype,
         )
 
-    def call(self, inputs, padding_mask=None) -> tf.Tensor:
-        _, target = inputs
-
-        # Pairwise arrangement
+    @staticmethod
+    def _prepare_trainset(target, padding_mask=None) -> tuple:
         target_1 = tf.tile(target[:, :, None, :], (1, 1, tf.shape(target)[1], 1))
         target_2 = tf.tile(target[:, None, :, :], (1, tf.shape(target)[1], 1, 1))
         pairs = tf.concat([target_1, target_2], axis=-1)
@@ -68,7 +66,6 @@ class PairwiseDiscriminator(Discriminator):
             ),
         )
 
-        # Padding mask arrangement
         if padding_mask is not None:
             mask_1 = tf.tile(
                 padding_mask[:, :, None, None], (1, 1, tf.shape(padding_mask)[1], 1)
@@ -85,7 +82,11 @@ class PairwiseDiscriminator(Discriminator):
         else:
             mask_pairs = None
 
-        # Event classification
+        return pairs, mask_pairs
+
+    def call(self, inputs, padding_mask=None) -> tf.Tensor:
+        _, target = inputs
+        pairs, mask_pairs = self._prepare_trainset(target, padding_mask=padding_mask)
         out = self._deep_sets(pairs, padding_mask=mask_pairs)
         for layer in self._seq:
             out = layer(out)

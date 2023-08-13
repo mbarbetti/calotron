@@ -2,6 +2,7 @@ import pytest
 import tensorflow as tf
 
 CHUNK_SIZE = int(1e4)
+BATCH_SIZE = 500
 
 source = tf.random.normal(shape=(CHUNK_SIZE, 8, 5))
 target = tf.random.normal(shape=(CHUNK_SIZE, 4, 3))
@@ -63,7 +64,7 @@ def test_model_use(activation, padding_mask):
 def test_model_train(model):
     dataset = (
         tf.data.Dataset.from_tensor_slices(((source, target), labels))
-        .batch(batch_size=512, drop_remainder=True)
+        .batch(batch_size=BATCH_SIZE, drop_remainder=True)
         .cache()
         .prefetch(tf.data.AUTOTUNE)
     )
