@@ -4,14 +4,16 @@ from datetime import datetime
 
 import numpy as np
 import tensorflow as tf
+from tensorflow import keras
 import yaml
 from html_reports import Report
 from sklearn.utils import shuffle
 from utils_argparser import argparser_training
 from utils_training import prepare_training_plots, prepare_validation_plots
 
+import calotron
 from calotron.callbacks.schedulers import LearnRateExpDecay
-from calotron.losses import MeanSquaredError
+from calotron.losses import GeomReinfMSE
 from calotron.models import Calotron
 from calotron.models.discriminators import Discriminator
 from calotron.models.transformers import Transformer
@@ -19,9 +21,9 @@ from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils.reports import getSummaryHTML, initHPSingleton
 
 DTYPE = np.float32
-BATCHSIZE = 512
+BATCHSIZE = 256
 EPOCHS = 100
-ALPHA = 0.1
+ALPHA = 0.2
 
 # +------------------+
 # |   Parser setup   |
@@ -53,7 +55,7 @@ train_ratio = float(args.train_ratio)
 # |   Data loading   |
 # +------------------+
 
-npzfile = np.load(f"{data_dir}/calotron-dataset-demo.npz")
+npzfile = np.load(f"{data_dir}/calotron-{args.data_sample}data-demo.npz")
 
 photon = npzfile["photon"].astype(DTYPE)[:chunk_size]
 cluster = npzfile["cluster"].astype(DTYPE)[:chunk_size]
@@ -64,12 +66,12 @@ print(f"[INFO] Reconstructed clusters - shape: {cluster.shape}")
 print(f"[INFO] Matching weights - shape: {weight.shape}")
 
 if not args.weights:
-    weight = (weight > 0.0).astype(DTYPE)
+    weight = np.ones_like(weight)
 
 photon, cluster, weight = shuffle(photon, cluster, weight)
 
-chunk_size = photon.shape[0]
-train_size = int(train_ratio * chunk_size)
+chunk_size = hp.get("chunk_size", photon.shape[0])
+train_size = hp.get("train_size", int(train_ratio * chunk_size))
 
 # +-------------------------+
 # |   Dataset preparation   |
@@ -112,7 +114,7 @@ transformer = Transformer(
     num_layers=hp.get("t_num_layers", 5),
     num_heads=hp.get("t_num_heads", 4),
     key_dim=hp.get("t_key_dim", 64),
-    admin_res_scale=hp.get("t_admin_res_scale", "O(logn)"),
+    admin_res_scale=hp.get("t_admin_res_scale", "O(n)"),
     mlp_units=hp.get("t_mlp_units", 128),
     dropout_rate=hp.get("t_dropout_rate", 0.1),
     seq_ord_latent_dim=hp.get("t_seq_ord_latent_dim", 64),
@@ -123,16 +125,21 @@ transformer = Transformer(
     enable_res_smoothing=hp.get("t_enable_res_smoothing", True),
     output_activations=hp.get("t_output_activations", ["tanh", "tanh", "sigmoid"]),
     start_token_initializer=hp.get("t_start_toke_initializer", "ones"),
+    pretrained_encoder_dir=hp.get("t_pretrained_encoder_dir", None),
+    additional_encoder_layers=hp.get("t_additional_encoder_layers", None),
     dtype=DTYPE,
 )
 
+d_activation = "sigmoid" if args.adv_metric == "bce" else None
+
 discriminator = Discriminator(
-    latent_dim=hp.get("d_latent_dim", 64),
     output_units=hp.get("d_output_units", 1),
-    output_activation=hp.get("d_output_activation", "sigmoid"),
-    deepsets_dense_num_layers=hp.get("d_deepsets_dense_num_layers", 4),
-    deepsets_dense_units=hp.get("d_deepsets_dense_units", 256),
-    dropout_rate=hp.get("d_dropout_rate", 0.1),
+    latent_dim=hp.get("d_latent_dim", 64),
+    deepsets_num_layers=hp.get("d_deepsets_num_layers", 5),
+    deepsets_hidden_units=hp.get("d_deepsets_hidden_units", 256),
+    dropout_rate=hp.get("d_dropout_rate", 0.0),
+    enable_batch_norm=hp.get("d_enable_batch_norm", False),
+    output_activation=hp.get("d_output_activation", d_activation),
     dtype=DTYPE,
 )
 
@@ -145,10 +152,10 @@ model.summary()
 # |   Optimizers setup   |
 # +----------------------+
 
-t_opt = tf.keras.optimizers.Adam(hp.get("t_lr0", 1e-4))
+t_opt = keras.optimizers.RMSprop(hp.get("t_lr0", 1e-4))
 hp.get("t_optimizer", t_opt.name)
 
-d_opt = tf.keras.optimizers.RMSprop(hp.get("d_lr0", 1e-4))
+d_opt = keras.optimizers.RMSprop(hp.get("d_lr0", 1e-4))
 hp.get("d_optimizer", d_opt.name)
 
 # +----------------------------+
@@ -159,16 +166,23 @@ adv_metric = (
     "binary-crossentropy" if args.adv_metric == "bce" else "wasserstein-distance"
 )
 
-loss = MeanSquaredError(
-    warmup_energy=hp.get("warmup_energy", 0.0),
+loss = GeomReinfMSE(
+    rho=hp.get("loss_rho", 0.05),
     alpha=hp.get("loss_alpha", ALPHA),
     adversarial_metric=hp.get("loss_adversarial_metric", adv_metric),
     bce_options=hp.get(
-        "loss_bce_options", {"injected_noise_stddev": 0.1, "label_smoothing": 0.0}
+        "loss_bce_options",
+        {"injected_noise_stddev": 0.02, "from_logits": False, "label_smoothing": 0.1},
     ),
     wass_options=hp.get(
-        "loss_wass_options", {"lipschitz_penalty": 100.0, "virtual_direction_upds": 1}
+        "loss_wass_options",
+        {
+            "lipschitz_regularizer": "alp",
+            "lipschitz_penalty": 100.0,
+            "lipschitz_penalty_strategy": "one-sided",
+        },
     ),
+    warmup_energy=hp.get("warmup_energy", 1e-8),
 )
 hp.get("loss", loss.name)
 
@@ -189,7 +203,7 @@ model.compile(
 
 callbacks = list()
 
-t_sched = LearnRateExpDecay(
+t_lr_sched = LearnRateExpDecay(
     model.transformer_optimizer,
     decay_rate=hp.get("t_decay_rate", 0.10),
     decay_steps=hp.get("t_decay_steps", 100_000),
@@ -197,10 +211,10 @@ t_sched = LearnRateExpDecay(
     verbose=True,
     key="t_lr",
 )
-hp.get("t_sched", t_sched.name)
-callbacks.append(t_sched)
+hp.get("t_lr_sched", t_lr_sched.name)
+callbacks.append(t_lr_sched)
 
-d_sched = LearnRateExpDecay(
+d_lr_sched = LearnRateExpDecay(
     model.discriminator_optimizer,
     decay_rate=hp.get("d_decay_rate", 0.10),
     decay_steps=hp.get("d_decay_steps", 50_000),
@@ -208,8 +222,8 @@ d_sched = LearnRateExpDecay(
     verbose=True,
     key="d_lr",
 )
-hp.get("d_sched", d_sched.name)
-callbacks.append(d_sched)
+hp.get("d_lr_sched", d_lr_sched.name)
+callbacks.append(d_lr_sched)
 
 # +------------------------+
 # |   Training procedure   |
@@ -267,7 +281,7 @@ else:
     timestamp = timestamp.split(".")[0].replace("-", "").replace(" ", "-")
     for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
         prefix += time + unit  # YYYYMMDD-HHhMMmSSs
-prefix += f"_calotron_{args.adv_metric}"
+prefix += f"_calotron_{args.adv_metric}_{args.data_sample}"
 
 export_model_fname = f"{models_dir}/{prefix}_model"
 export_img_dirname = f"{images_dir}/{prefix}_img"
@@ -295,6 +309,7 @@ report.add_markdown('<h1 align="center">Calotron training report</h1>')
 info = [
     f"- Script executed on **{socket.gethostname()}**",
     f"- Model training completed in **{duration}**",
+    f"- Model training executed with **calotron v{calotron.__version__}**",
     f"- Report generated on **{date}** at **{hour}**",
 ]
 

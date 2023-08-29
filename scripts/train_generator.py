@@ -4,19 +4,21 @@ from datetime import datetime
 
 import numpy as np
 import tensorflow as tf
+from tensorflow import keras
 import yaml
 from html_reports import Report
 from sklearn.utils import shuffle
 from utils_argparser import argparser_training
 from utils_training import prepare_training_plots, prepare_validation_plots
 
+import calotron
 from calotron.callbacks.schedulers import LearnRateExpDecay
 from calotron.models.transformers import GigaGenerator
 from calotron.simulators import ExportSimulator, Simulator
 from calotron.utils.reports import getSummaryHTML, initHPSingleton
 
 DTYPE = np.float32
-BATCHSIZE = 512
+BATCHSIZE = 256
 EPOCHS = 100
 
 # +------------------+
@@ -49,7 +51,7 @@ train_ratio = float(args.train_ratio)
 # |   Data loading   |
 # +------------------+
 
-npzfile = np.load(f"{data_dir}/calotron-dataset-demo.npz")
+npzfile = np.load(f"{data_dir}/calotron-{args.data_sample}data-demo.npz")
 
 photon = npzfile["photon"].astype(DTYPE)[:chunk_size]
 cluster = npzfile["cluster"].astype(DTYPE)[:chunk_size]
@@ -60,12 +62,12 @@ print(f"[INFO] Reconstructed clusters - shape: {cluster.shape}")
 print(f"[INFO] Matching weights - shape: {weight.shape}")
 
 if not args.weights:
-    weight = (weight > 0.0).astype(DTYPE)
+    weight = np.ones_like(weight)
 
 photon, cluster, weight = shuffle(photon, cluster, weight)
 
-chunk_size = photon.shape[0]
-train_size = int(train_ratio * chunk_size)
+chunk_size = hp.get("chunk_size", photon.shape[0])
+train_size = hp.get("train_size", int(train_ratio * chunk_size))
 
 # +-------------------------+
 # |   Dataset preparation   |
@@ -106,24 +108,26 @@ else:
 # +------------------------+
 
 model = GigaGenerator(
-    output_depth=hp.get("t_output_depth", cluster.shape[2]),
-    encoder_depth=hp.get("t_encoder_depth", 32),
+    output_depth=hp.get("output_depth", cluster.shape[2]),
+    encoder_depth=hp.get("encoder_depth", 32),
     mapping_latent_dim=hp.get("mapping_latent_dim", 64),
-    synthesis_depth=hp.get("t_synthesis_depth", 32),
-    num_layers=hp.get("t_num_layers", 5),
-    num_heads=hp.get("t_num_heads", 4),
-    key_dim=hp.get("t_key_dim", 64),
-    admin_res_scale=hp.get("t_admin_res_scale", "O(n)"),
-    mlp_units=hp.get("t_mlp_units", 128),
-    dropout_rate=hp.get("t_dropout_rate", 0.1),
-    seq_ord_latent_dim=hp.get("t_seq_ord_latent_dim", 64),
+    synthesis_depth=hp.get("synthesis_depth", 32),
+    num_layers=hp.get("num_layers", 5),
+    num_heads=hp.get("num_heads", 4),
+    key_dim=hp.get("key_dim", 64),
+    admin_res_scale=hp.get("admin_res_scale", "O(n)"),
+    mlp_units=hp.get("mlp_units", 128),
+    dropout_rate=hp.get("dropout_rate", 0.1),
+    seq_ord_latent_dim=hp.get("seq_ord_latent_dim", 64),
     seq_ord_max_length=hp.get(
-        "t_seq_ord_max_length", max(photon.shape[1], cluster.shape[1])
+        "seq_ord_max_length", max(photon.shape[1], cluster.shape[1])
     ),
-    seq_ord_normalization=hp.get("t_seq_ord_normalization", 10_000),
-    enable_res_smoothing=hp.get("t_enable_res_smoothing", True),
-    output_activations=hp.get("t_output_activations", ["tanh", "tanh", "sigmoid"]),
-    start_token_initializer=hp.get("t_start_toke_initializer", "ones"),
+    seq_ord_normalization=hp.get("seq_ord_normalization", 10_000),
+    enable_res_smoothing=hp.get("enable_res_smoothing", True),
+    output_activations=hp.get("output_activations", ["tanh", "tanh", "sigmoid"]),
+    start_token_initializer=hp.get("start_toke_initializer", "ones"),
+    pretrained_encoder_dir=hp.get("pretrained_encoder_dir", None),
+    additional_encoder_layers=hp.get("additional_encoder_layers", None),
     dtype=DTYPE,
 )
 
@@ -134,14 +138,14 @@ model.summary()
 # |   Optimizers setup   |
 # +----------------------+
 
-opt = tf.keras.optimizers.Adam(learning_rate=hp.get("lr0", 1e-4))
+opt = keras.optimizers.RMSprop(learning_rate=hp.get("lr0", 1e-4))
 hp.get("optimizer", opt.name)
 
 # +----------------------------+
 # |   Training configuration   |
 # +----------------------------+
 
-loss = tf.keras.losses.MeanSquaredError()
+loss = keras.losses.MeanSquaredError()
 hp.get("loss", loss.name)
 
 metrics = hp.get("metrics", ["mae"])
@@ -220,7 +224,7 @@ else:
     timestamp = timestamp.split(".")[0].replace("-", "").replace(" ", "-")
     for time, unit in zip(timestamp.split(":"), ["h", "m", "s"]):
         prefix += time + unit  # YYYYMMDD-HHhMMmSSs
-prefix += f"_generator"
+prefix += f"_generator_{args.data_sample}"
 
 export_model_fname = f"{models_dir}/{prefix}_model"
 export_img_dirname = f"{images_dir}/{prefix}_img"
@@ -248,6 +252,7 @@ report.add_markdown('<h1 align="center">Generator training report</h1>')
 info = [
     f"- Script executed on **{socket.gethostname()}**",
     f"- Model training completed in **{duration}**",
+    f"- Model training executed with **calotron v{calotron.__version__}**",
     f"- Report generated on **{date}** at **{hour}**",
 ]
 
