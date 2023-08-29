@@ -4,10 +4,10 @@ from datetime import datetime
 
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
 import yaml
 from html_reports import Report
 from sklearn.utils import shuffle
+from tensorflow import keras
 from utils_argparser import argparser_training
 from utils_training import prepare_training_plots, prepare_validation_plots
 

@@ -7,7 +7,10 @@ def checkActivations(
     if activations is None:
         return None
     elif isinstance(activations, str):
-        return [keras.layers.Activation(activations, dtype=dtype) for _ in range(output_length)]
+        return [
+            keras.layers.Activation(activations, dtype=dtype)
+            for _ in range(output_length)
+        ]
     elif isinstance(activations, keras.layers.Layer):
         return [activations for _ in range(output_length)]
     elif isinstance(activations, list):
@@ -20,7 +23,9 @@ def checkActivations(
         checked_activations = list()
         for activation in activations:
             if isinstance(activation, str):
-                checked_activations.append(keras.layers.Activation(activation, dtype=dtype))
+                checked_activations.append(
+                    keras.layers.Activation(activation, dtype=dtype)
+                )
             elif isinstance(activation, keras.layers.Layer):
                 checked_activations.append(activation)
             else:

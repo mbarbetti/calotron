@@ -42,7 +42,9 @@ class Discriminator(keras.Model):
             dtype=self.dtype,
         )
         if self._enable_batch_norm:
-            self._batch_norm = keras.layers.BatchNormalization(name="batch_norm", dtype=self.dtype)
+            self._batch_norm = keras.layers.BatchNormalization(
+                name="batch_norm", dtype=self.dtype
+            )
 
         # Final layers
         self._seq = self._prepare_final_layers(
@@ -79,7 +81,9 @@ class Discriminator(keras.Model):
                 )
             )
             final_layers.append(
-                keras.layers.Dropout(rate=dropout_rate, name=f"dropout_{i}", dtype=dtype)
+                keras.layers.Dropout(
+                    rate=dropout_rate, name=f"dropout_{i}", dtype=dtype
+                )
             )
         final_layers.append(
             keras.layers.Dense(

@@ -59,10 +59,14 @@ class MappingNet(keras.Model):
                 )
             )
             self._seq.append(
-                keras.layers.LeakyReLU(alpha=LEAKY_ALPHA, name=f"leaky_relu_{i}" if name else None)
+                keras.layers.LeakyReLU(
+                    alpha=LEAKY_ALPHA, name=f"leaky_relu_{i}" if name else None
+                )
             )
             self._seq.append(
-                keras.layers.Dropout(rate=self._dropout_rate, name=f"dropout_{i}" if name else None)
+                keras.layers.Dropout(
+                    rate=self._dropout_rate, name=f"dropout_{i}" if name else None
+                )
             )
         self._seq.append(
             keras.layers.Dense(

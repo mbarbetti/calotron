@@ -218,15 +218,15 @@ class GigaDiscriminator(Discriminator):
     @property
     def enable_res_smoothing(self) -> bool:
         return self._encoder.enable_res_smoothing
-    
+
     @property
     def output_activation(self):  # TODO: add Union[str, Activation]
         return self._output_activation
-    
+
     @property
     def pretrained_encoder_dir(self):  # TODO: add Union[str, None]
         return self._encoder.pretrained_model_dir
-    
+
     @property
     def additional_encoder_layers(self) -> int:
         return self._encoder.num_layers

@@ -273,11 +273,11 @@ class Transformer(keras.Model):
     @property
     def start_token_initializer(self) -> str:
         return self._start_token_initializer
-    
+
     @property
     def pretrained_encoder_dir(self):  # TODO: add Union[str, None]
         return self._encoder.pretrained_model_dir
-    
+
     @property
     def additional_encoder_layers(self) -> int:
         return self._encoder.num_layers

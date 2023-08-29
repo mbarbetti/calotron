@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 
 from calotron.layers import SeqOrderEmbedding
-from calotron.models.players import Encoder, MappingNet, SynthesisNet, PretrainedEncoder
+from calotron.models.players import Encoder, MappingNet, PretrainedEncoder, SynthesisNet
 from calotron.models.transformers.Transformer import (
     START_TOKEN_INITIALIZERS,
     Transformer,

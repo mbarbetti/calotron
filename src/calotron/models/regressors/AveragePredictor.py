@@ -87,7 +87,9 @@ class AveragePredictor(keras.Model):
                 )
             )
             final_layers.append(
-                keras.layers.Dropout(rate=dropout_rate, name=f"dropout_{i}", dtype=dtype)
+                keras.layers.Dropout(
+                    rate=dropout_rate, name=f"dropout_{i}", dtype=dtype
+                )
             )
         final_layers.append(
             keras.layers.Dense(

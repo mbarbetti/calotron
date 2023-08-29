@@ -67,8 +67,12 @@ class DeepSets(keras.Model):
         )
 
         # Final layers
-        self._avg_pool = keras.layers.GlobalAveragePooling1D(name="avg_pool" if name else None)
-        self._max_pool = keras.layers.GlobalMaxPooling1D(name="max_pool" if name else None)
+        self._avg_pool = keras.layers.GlobalAveragePooling1D(
+            name="avg_pool" if name else None
+        )
+        self._max_pool = keras.layers.GlobalMaxPooling1D(
+            name="max_pool" if name else None
+        )
         self._concat = keras.layers.Concatenate(name="concat" if name else None)
 
     def call(self, x, padding_mask=None) -> tf.Tensor:
