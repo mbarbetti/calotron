@@ -20,30 +20,6 @@ def learning_curves(
     scale_curves=True,
     export_fname="./images/learn-curves",
 ) -> None:
-    if scale_curves:
-        if "t_loss" in keys:
-            scale_key = "t_loss"
-        else:
-            id_min = np.argmin(
-                [np.abs(np.mean(np.array(history[k])[start_epoch:])) for k in keys]
-            )
-            scale_key = keys[id_min]
-        ratios = [
-            np.array(history[k])[start_epoch:]
-            / np.array(history[scale_key])[start_epoch:]
-            for k in keys
-        ]
-        scales = np.mean(ratios, axis=-1)
-        for i in range(len(scales)):
-            if np.abs(scales[i]) >= 1.0:
-                scales[i] = 1 / np.around(scales[i])
-            else:
-                scales[i] = np.around(1 / scales[i])
-        for i in range(len(labels)):
-            labels[i] += f" [x {scales[i]:.0e}]"
-    else:
-        scales = [1.0 for _ in keys]
-
     if colors is None:
         colors = [None for _ in range(len(keys))]
     else:
@@ -53,6 +29,28 @@ def learning_curves(
         labels = [None for _ in range(len(keys))]
     else:
         assert len(labels) == len(keys)
+
+    if scale_curves:
+        if "t_loss" in keys:
+            main_key = "t_loss"
+        else:
+            main_key = keys[0]
+        exp_dict = dict()
+        for k in keys:
+            exp_dict[k] = np.round(
+                np.mean(
+                    np.log(np.abs(np.array(history[k])[start_epoch:])) / np.log(10.0),
+                    axis=-1,
+                )
+            )
+        scales = list()
+        for i in range(len(keys)):
+            exp = int(exp_dict[main_key] - exp_dict[keys[i]])
+            scales.append(10**exp)
+            if labels[i] is not None:
+                labels[i] += " [x $10^{" + f"{exp}" + "}$]"
+    else:
+        scales = [1.0 for _ in keys]
 
     plt.figure(figsize=(8, 5), dpi=300)
     plt.title("Learning curves", fontsize=14)
@@ -235,8 +233,8 @@ def calorimeter_deposits(
         w = np.where(w > min_energy, w, 0.0)
         plt.subplot(1, 2, i + 1)
         plt.title(title, fontsize=14)
-        plt.xlabel("$x$ coordinate", fontsize=12)
-        plt.ylabel("$y$ coordinate", fontsize=12)
+        plt.xlabel("$x$ position", fontsize=12)
+        plt.ylabel("$y$ position", fontsize=12)
         plt.hist2d(
             x,
             y,
@@ -290,8 +288,8 @@ def event_example(
         photon_size, cluster_size, output_size = [30.0 for _ in range(3)]
 
     plt.figure(figsize=(8, 6), dpi=300)
-    plt.xlabel("$x$ coordinate", fontsize=12)
-    plt.ylabel("$y$ coordinate", fontsize=12)
+    plt.xlabel("$x$ position", fontsize=12)
+    plt.ylabel("$y$ position", fontsize=12)
     plt.scatter(
         x_photon,
         y_photon,
@@ -300,7 +298,7 @@ def event_example(
         facecolors="none",
         edgecolors="#d7191c",
         lw=0.75,
-        label="Generated photon",
+        label="Generated photons",
         zorder=2,
     )
     plt.scatter(
@@ -311,7 +309,7 @@ def event_example(
         facecolors="none",
         edgecolors="#2b83ba",
         lw=0.75,
-        label="Reconstructed cluster",
+        label="Reconstructed clusters",
         zorder=3,
     )
     if np.all(match_weights is not None):
@@ -323,7 +321,7 @@ def event_example(
             facecolors="yellow",
             edgecolors="#2b83ba",
             lw=0.75,
-            label="Photon-matched cluster",
+            label="Photon-matched clusters",
             zorder=1,
         )
     plt.scatter(
@@ -369,19 +367,19 @@ def energy_sequences(
     export_fname="./images/energy-seq",
 ) -> None:
     ref_energy = np.where(ref_energy > min_energy, ref_energy, 0.0)
-    gen_energy = np.where(gen_energy > min_energy, gen_energy, 0.0)
+    gen_energy = np.where(ref_energy > min_energy, gen_energy, 0.0)
     vmax = max(ref_energy.max(), gen_energy.max())
 
     plt.figure(figsize=(18, 10), dpi=300)
     plt.subplot(1, 2, 1)
     plt.title("Reconstructed clusters", fontsize=14)
-    plt.xlabel("Preprocessed energy deposits [a.u.]", fontsize=12)
+    plt.xlabel("Energy deposits", fontsize=12)
     plt.ylabel("Events", fontsize=12)
     plt.imshow(ref_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap=my_cmap)
     plt.colorbar()
     plt.subplot(1, 2, 2)
     plt.title(f"{model_name} output", fontsize=14)
-    plt.xlabel("Preprocessed energy deposits [a.u.]", fontsize=12)
+    plt.xlabel("Energy deposits", fontsize=12)
     plt.ylabel("Events", fontsize=12)
     plt.imshow(gen_energy, aspect="auto", vmin=0.0, vmax=vmax, cmap=my_cmap)
     plt.colorbar()
@@ -420,24 +418,23 @@ def photon2cluster_corr(
         object_energy = object[:, :, 2].flatten()
 
         photon_energy = np.where(photon_energy > min_energy, photon_energy, 0.0)
-        object_energy = np.where(object_energy > min_energy, object_energy, 0.0)
+        object_energy = np.where(
+            cluster[:, :, 2].flatten() > min_energy, object_energy, 0.0
+        )
         energies.append((photon_energy, object_energy))
 
         h, _, _ = np.histogram2d(photon_energy, object_energy, bins=bins)
         vmax = max(h.max(), vmax)
 
     titles = ["Photon-to-cluster correlations", "Photon-to-output correlations"]
-    ylabels = [
-        "Cluster preprocessed energy [a.u.]",
-        "Output preprocessed energy [a.u.]",
-    ]
+    ylabels = ["Clusters energy deposits", "Output energy deposits"]
 
     plt.figure(figsize=(14, 5), dpi=300)
     for i, (energy, title, ylabel) in enumerate(zip(energies, titles, ylabels)):
         photon_energy, object_energy = energy
         plt.subplot(1, 2, i + 1)
         plt.title(title, fontsize=14)
-        plt.xlabel("Photon preprocessed energy [a.u.]", fontsize=12)
+        plt.xlabel("Photons energy deposits", fontsize=12)
         plt.ylabel(ylabel, fontsize=12)
         plt.hist2d(
             photon_energy,
@@ -465,7 +462,7 @@ def attention_plot(
 ) -> None:
     if len(attn_weights.shape) == 4:
         attn_weights = np.mean(attn_weights, axis=0)
-    if attn_weights.shape[1] == attn_weights.shape[2]:
+    if np.abs(attn_weights.shape[1] - attn_weights.shape[2]) < 2:
         figsize = (7, 5)
     else:
         figsize = (8, 4)
@@ -515,7 +512,7 @@ def energy_center_dist(
     bins = np.linspace(min_, max_, 101)
 
     plt.figure(figsize=(8, 5), dpi=300)
-    plt.xlabel("Distance from center of energy [a.u.]", fontsize=12)
+    plt.xlabel("Distance from center of energy", fontsize=12)
     plt.ylabel("Candidates", fontsize=12)
     plt.hist(
         cluster_distances,

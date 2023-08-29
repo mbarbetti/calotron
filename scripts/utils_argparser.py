@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 
 ADV_METRICS = ["bce", "wass"]
+DATA_SAMPLES = ["sim9", "sim10"]
 
 
 def argparser_preprocessing(description=None) -> ArgumentParser:
@@ -21,7 +22,14 @@ def argparser_preprocessing(description=None) -> ArgumentParser:
         "-C",
         "--chunk_size",
         default=-1,
-        help="maximum number of instancens downloaded from the overall files (default:-1)",
+        help="maximum number of instancens downloaded from the overall files (default: -1)",
+    )
+    parser.add_argument(
+        "-D",
+        "--data_sample",
+        required=True,
+        choices=DATA_SAMPLES,
+        help="Gauss version of the simulated samples to be used for training",
     )
     parser.add_argument(
         "--demo",
@@ -61,6 +69,13 @@ def argparser_training(model, adv_learning=True, description=None) -> ArgumentPa
         "--train_ratio",
         default=0.7,
         help="fraction of instances to be used for training (default: 0.7)",
+    )
+    parser.add_argument(
+        "-D",
+        "--data_sample",
+        required=True,
+        choices=DATA_SAMPLES,
+        help="Gauss version of the simulated samples to be used for training",
     )
     parser.set_defaults(fullsim=True)
     parser.add_argument(
