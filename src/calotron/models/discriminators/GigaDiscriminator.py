@@ -1,9 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.layers import (
-    Concatenate,
-    GlobalAveragePooling1D,
-    GlobalMaxPooling1D,
-)
+from tensorflow import keras
 
 from calotron.layers import SeqOrderEmbedding
 from calotron.models.discriminators import Discriminator
@@ -109,9 +105,9 @@ class GigaDiscriminator(Discriminator):
         )
 
         # Final layers
-        self._avg_pool = GlobalAveragePooling1D(name="avg_pool")
-        self._max_pool = GlobalMaxPooling1D(name="max_pool")
-        self._concat = Concatenate(name="concat")
+        self._avg_pool = keras.layers.GlobalAveragePooling1D(name="avg_pool")
+        self._max_pool = keras.layers.GlobalMaxPooling1D(name="max_pool")
+        self._concat = keras.layers.Concatenate(name="concat")
         self._seq = self._prepare_final_layers(
             output_units=self._output_units,
             latent_dim=2 * decoder_depth,

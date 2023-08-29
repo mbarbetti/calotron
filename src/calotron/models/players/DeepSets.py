@@ -1,14 +1,8 @@
 import tensorflow as tf
-from tensorflow.keras.layers import (
-    Concatenate,
-    Dense,
-    Dropout,
-    GlobalAveragePooling1D,
-    GlobalMaxPooling1D,
-)
+from tensorflow import keras
 
 
-class DeepSets(tf.keras.Model):
+class DeepSets(keras.Model):
     def __init__(
         self,
         latent_dim,
@@ -45,7 +39,7 @@ class DeepSets(tf.keras.Model):
         self._seq = list()
         for i in range(self._num_layers - 1):
             self._seq.append(
-                Dense(
+                keras.layers.Dense(
                     units=self._hidden_units,
                     activation="relu",
                     kernel_initializer="glorot_uniform",
@@ -55,14 +49,14 @@ class DeepSets(tf.keras.Model):
                 )
             )
             self._seq.append(
-                Dropout(
+                keras.layers.Dropout(
                     self._dropout_rate,
                     name=f"dropout_{i}" if name else None,
                     dtype=self.dtype,
                 )
             )
         self._seq.append(
-            Dense(
+            keras.layers.Dense(
                 int(self._latent_dim / 2),
                 activation=None,
                 kernel_initializer="he_normal",
@@ -73,9 +67,9 @@ class DeepSets(tf.keras.Model):
         )
 
         # Final layers
-        self._avg_pool = GlobalAveragePooling1D(name="avg_pool" if name else None)
-        self._max_pool = GlobalMaxPooling1D(name="max_pool" if name else None)
-        self._concat = Concatenate(name="concat" if name else None)
+        self._avg_pool = keras.layers.GlobalAveragePooling1D(name="avg_pool" if name else None)
+        self._max_pool = keras.layers.GlobalMaxPooling1D(name="max_pool" if name else None)
+        self._concat = keras.layers.Concatenate(name="concat" if name else None)
 
     def call(self, x, padding_mask=None) -> tf.Tensor:
         if padding_mask is not None:

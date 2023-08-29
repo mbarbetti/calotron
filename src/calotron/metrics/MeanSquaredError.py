@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.metrics import MeanSquaredError as TF_MSE
+from tensorflow import keras
 
 from calotron.metrics.BaseMetric import BaseMetric
 
@@ -7,7 +7,7 @@ from calotron.metrics.BaseMetric import BaseMetric
 class MeanSquaredError(BaseMetric):
     def __init__(self, name="mse", dtype=None, **kwargs) -> None:
         super().__init__(name, dtype, **kwargs)
-        self._mse = TF_MSE(name=name, dtype=dtype)
+        self._mse = keras.metrics.MeanSquaredError(name=name, dtype=dtype)
 
     def update_state(self, y_true, y_pred, sample_weight=None) -> None:
         weights = self._prepare_weights(sample_weight)

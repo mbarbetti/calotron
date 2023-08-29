@@ -1,11 +1,11 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Dropout, LeakyReLU
+from tensorflow import keras
 
 LEAKY_ALPHA = 0.1
 SEED = 42
 
 
-class MappingNet(tf.keras.Model):
+class MappingNet(keras.Model):
     def __init__(
         self,
         output_dim,
@@ -49,7 +49,7 @@ class MappingNet(tf.keras.Model):
         self._seq = list()
         for i in range(self._num_layers - 1):
             self._seq.append(
-                Dense(
+                keras.layers.Dense(
                     units=self._hidden_units,
                     activation=None,
                     kernel_initializer="glorot_uniform",
@@ -59,13 +59,13 @@ class MappingNet(tf.keras.Model):
                 )
             )
             self._seq.append(
-                LeakyReLU(alpha=LEAKY_ALPHA, name=f"leaky_relu_{i}" if name else None)
+                keras.layers.LeakyReLU(alpha=LEAKY_ALPHA, name=f"leaky_relu_{i}" if name else None)
             )
             self._seq.append(
-                Dropout(rate=self._dropout_rate, name=f"dropout_{i}" if name else None)
+                keras.layers.Dropout(rate=self._dropout_rate, name=f"dropout_{i}" if name else None)
             )
         self._seq.append(
-            Dense(
+            keras.layers.Dense(
                 units=output_dim,
                 activation=output_activation,
                 kernel_initializer="glorot_uniform",

@@ -1,4 +1,4 @@
-from tensorflow.keras.layers import Activation, Layer
+from tensorflow import keras
 
 
 def checkActivations(
@@ -7,8 +7,8 @@ def checkActivations(
     if activations is None:
         return None
     elif isinstance(activations, str):
-        return [Activation(activations, dtype=dtype) for _ in range(output_length)]
-    elif isinstance(activations, Layer):
+        return [keras.layers.Activation(activations, dtype=dtype) for _ in range(output_length)]
+    elif isinstance(activations, keras.layers.Layer):
         return [activations for _ in range(output_length)]
     elif isinstance(activations, list):
         if len(activations) != output_length:
@@ -20,8 +20,8 @@ def checkActivations(
         checked_activations = list()
         for activation in activations:
             if isinstance(activation, str):
-                checked_activations.append(Activation(activation, dtype=dtype))
-            elif isinstance(activation, Layer):
+                checked_activations.append(keras.layers.Activation(activation, dtype=dtype))
+            elif isinstance(activation, keras.layers.Layer):
                 checked_activations.append(activation)
             else:
                 raise ValueError(

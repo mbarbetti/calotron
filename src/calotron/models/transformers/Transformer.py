@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Dense
+from tensorflow import keras
 
 from calotron.layers import MultiActivations, SeqOrderEmbedding
 from calotron.models.players import Decoder, Encoder, PretrainedEncoder
@@ -7,7 +7,7 @@ from calotron.models.players import Decoder, Encoder, PretrainedEncoder
 START_TOKEN_INITIALIZERS = ["zeros", "ones", "means"]
 
 
-class Transformer(tf.keras.Model):
+class Transformer(keras.Model):
     def __init__(
         self,
         output_depth,
@@ -125,7 +125,7 @@ class Transformer(tf.keras.Model):
     def _prepare_final_layers(
         output_depth, output_activations=None, dtype=None
     ) -> tuple:
-        output_layer = Dense(
+        output_layer = keras.layers.Dense(
             units=output_depth,
             activation=None,
             kernel_initializer="he_normal",

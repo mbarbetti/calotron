@@ -1,13 +1,13 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Layer, LayerNormalization
+from tensorflow import keras
 
 
-class ModulatedLayerNorm(Layer):
+class ModulatedLayerNorm(keras.layers.Layer):
     def __init__(self, axis=-1, epsilon=0.001, name=None, dtype=None) -> None:
         super().__init__(name=name, dtype=dtype)
 
         # Standard LayerNormalization
-        self._ln = LayerNormalization(axis=axis, epsilon=epsilon)
+        self._ln = keras.layers.LayerNormalization(axis=axis, epsilon=epsilon)
 
         # Affine transformation parameters
         self._gamma = tf.Variable(

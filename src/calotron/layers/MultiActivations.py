@@ -1,10 +1,10 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Concatenate, Layer
+from tensorflow import keras
 
 from calotron.utils.checks import checkActivations
 
 
-class MultiActivations(Layer):
+class MultiActivations(keras.layers.Layer):
     def __init__(self, activations, output_depth, name=None, dtype=None) -> None:
         super().__init__(name=name, dtype=dtype)
 
@@ -16,7 +16,7 @@ class MultiActivations(Layer):
         # Output activations
         self._output_activations = checkActivations(activations, output_depth, dtype)
 
-        self._concat = Concatenate(name="ma_concat" if name else None)
+        self._concat = keras.layers.Concatenate(name="ma_concat" if name else None)
 
     def call(self, x) -> tf.Tensor:
         if x.shape[2] != self._output_depth:

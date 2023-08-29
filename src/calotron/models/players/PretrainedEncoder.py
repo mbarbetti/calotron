@@ -1,7 +1,7 @@
 import os
 
 import tensorflow as tf
-from tensorflow.keras.layers import Add
+from tensorflow import keras
 
 from calotron.models.players.Encoder import Encoder
 
@@ -48,8 +48,8 @@ class PretrainedEncoder(Encoder):
                     f"({pretrained_model_dir}) doesn't exist"
                 )
             self._pretrained_model_dir = pretrained_model_dir
-            self._pretrained_model = tf.keras.models.load_model(pretrained_model_dir)
-            self._add = Add()
+            self._pretrained_model = keras.models.load_model(pretrained_model_dir)
+            self._add = keras.layers.Add()
         else:
             self._pretrained_model_dir = None
             self._pretrained_model = None

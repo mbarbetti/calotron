@@ -1,12 +1,12 @@
 import math
 
 import tensorflow as tf
-from tensorflow.keras.layers import Add, Layer
+from tensorflow import keras
 
 OUTPUT_CHANGE_SCALES = ["O(n)", "O(logn)", "O(1)"]
 
 
-class AdminResidual(Layer):
+class AdminResidual(keras.layers.Layer):
     def __init__(
         self,
         embed_dim,
@@ -38,7 +38,7 @@ class AdminResidual(Layer):
         self._output_change_scale = output_change_scale
 
         self._omega = self._compute_init_value()
-        self._add = Add(name="admin_add" if name else None)
+        self._add = keras.layers.Add(name="admin_add" if name else None)
 
     def _compute_init_value(self) -> tf.Variable:
         if self._output_change_scale == "O(n)":

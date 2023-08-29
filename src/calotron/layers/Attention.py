@@ -1,12 +1,12 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Layer, LayerNormalization, MultiHeadAttention
+from tensorflow import keras
 
 from calotron.layers.AdminResidual import AdminResidual
 
 LN_EPSILON = 0.001
 
 
-class BaseAttention(Layer):
+class BaseAttention(keras.layers.Layer):
     def __init__(
         self,
         num_heads,
@@ -41,7 +41,7 @@ class BaseAttention(Layer):
         self._dropout_rate = float(dropout_rate)
 
         # Attention mechanism layers
-        self._mha = MultiHeadAttention(
+        self._mha = keras.layers.MultiHeadAttention(
             num_heads=num_heads,
             key_dim=key_dim,
             value_dim=None,
@@ -58,7 +58,7 @@ class BaseAttention(Layer):
             name=f"{prefix}_res_{suffix}" if name else None,
             dtype=self.dtype,
         )
-        self._ln = LayerNormalization(
+        self._ln = keras.layers.LayerNormalization(
             axis=-1,
             epsilon=LN_EPSILON,
             name=f"{prefix}_ln_{suffix}" if name else None,

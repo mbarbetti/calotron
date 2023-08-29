@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Add, Dense, Dropout, Layer, MultiHeadAttention
+from tensorflow import keras
 
 from calotron.layers.ModulatedLayerNorm import ModulatedLayerNorm
 
@@ -7,7 +7,7 @@ LN_EPSILON = 0.001
 ATTN_DROPOUT_RATE = 0.0
 
 
-class SynthesisLayer(Layer):
+class SynthesisLayer(keras.layers.Layer):
     def __init__(
         self,
         output_depth,
@@ -57,12 +57,12 @@ class SynthesisLayer(Layer):
         )
 
         # Addition layer
-        self._res = Add(
+        self._res = keras.layers.Add(
             name=f"{prefix}_res_{suffix}" if name else None, dtype=self.dtype
         )
 
         # Multi-head self-attention
-        self._self_attn = MultiHeadAttention(
+        self._self_attn = keras.layers.MultiHeadAttention(
             num_heads=self._num_heads,
             key_dim=self._key_dim,
             value_dim=None,
@@ -74,7 +74,7 @@ class SynthesisLayer(Layer):
         )
 
         # Multi-head cross-attention
-        self._cross_attn = MultiHeadAttention(
+        self._cross_attn = keras.layers.MultiHeadAttention(
             num_heads=self._num_heads,
             key_dim=self._key_dim,
             value_dim=None,
@@ -86,23 +86,23 @@ class SynthesisLayer(Layer):
         )
 
         # Multilayer perceptron layers
-        self._mlp = tf.keras.Sequential(
+        self._mlp = keras.Sequential(
             [
-                Dense(
+                keras.layers.Dense(
                     units=self._mlp_units,
                     activation="relu",
                     kernel_initializer="he_normal",
                     bias_initializer="zeros",
                     dtype=self.dtype,
                 ),
-                Dense(
+                keras.layers.Dense(
                     units=self._output_depth,
                     activation=None,
                     kernel_initializer="he_normal",
                     bias_initializer="zeros",
                     dtype=self.dtype,
                 ),
-                Dropout(rate=self._dropout_rate, dtype=self.dtype),
+                keras.layers.Dropout(rate=self._dropout_rate, dtype=self.dtype),
             ],
             name=f"{prefix}_mlp_{suffix}" if name else None,
         )

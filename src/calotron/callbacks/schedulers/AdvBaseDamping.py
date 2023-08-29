@@ -1,8 +1,8 @@
 import tensorflow as tf
-from tensorflow.keras.callbacks import Callback
+from tensorflow import keras
 
 
-class AdvBaseDamping(Callback):
+class AdvBaseDamping(keras.callbacks.Callback):
     def __init__(self, adv_scale, verbose=False) -> None:
         super().__init__()
         self._name = "AdvBaseDamping"

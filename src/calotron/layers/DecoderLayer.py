@@ -1,11 +1,11 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Layer
+from tensorflow import keras
 
 from calotron.layers.Attention import CrossAttention, SelfAttention
 from calotron.layers.MultilayerPerceptron import MultilayerPerceptron
 
 
-class DecoderLayer(Layer):
+class DecoderLayer(keras.layers.Layer):
     def __init__(
         self,
         output_depth,

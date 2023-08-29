@@ -1,12 +1,12 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Dropout, Layer, LayerNormalization
+from tensorflow import keras
 
 from calotron.layers.AdminResidual import AdminResidual
 
 LN_EPSILON = 0.001
 
 
-class MultilayerPerceptron(Layer):
+class MultilayerPerceptron(keras.layers.Layer):
     def __init__(
         self,
         output_units,
@@ -40,9 +40,9 @@ class MultilayerPerceptron(Layer):
         self._dropout_rate = float(dropout_rate)
 
         # Multilayer perceptron layers
-        self._seq = tf.keras.Sequential(
+        self._seq = keras.Sequential(
             [
-                Dense(
+                keras.layers.Dense(
                     units=self._hidden_units,
                     activation="relu",
                     kernel_initializer="he_normal",
@@ -50,7 +50,7 @@ class MultilayerPerceptron(Layer):
                     name=f"{prefix}_dense_in_{suffix}" if name else None,
                     dtype=self.dtype,
                 ),
-                Dense(
+                keras.layers.Dense(
                     units=self._output_units,
                     activation=None,
                     kernel_initializer="he_normal",
@@ -58,7 +58,7 @@ class MultilayerPerceptron(Layer):
                     name=f"{prefix}_dense_out_{suffix}" if name else None,
                     dtype=self.dtype,
                 ),
-                Dropout(
+                keras.layers.Dropout(
                     rate=self._dropout_rate,
                     name=f"{prefix}_dropout_{suffix}" if name else None,
                     dtype=self.dtype,
@@ -73,7 +73,7 @@ class MultilayerPerceptron(Layer):
             name=f"{prefix}_res_{suffix}" if name else None,
             dtype=self.dtype,
         )
-        self._ln = LayerNormalization(
+        self._ln = keras.layers.LayerNormalization(
             axis=-1,
             epsilon=LN_EPSILON,
             name=f"{prefix}_ln_{suffix}" if name else None,

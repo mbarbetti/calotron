@@ -1,9 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.layers import (
-    Concatenate,
-    GlobalAveragePooling1D,
-    GlobalMaxPooling1D,
-)
+from tensorflow import keras
 
 from calotron.layers import SeqOrderEmbedding
 from calotron.models.players import Encoder, MappingNet, SynthesisNet, PretrainedEncoder
@@ -94,9 +90,9 @@ class GigaGenerator(Transformer):
             )
 
         # MappingNet
-        self._avg_pool = GlobalAveragePooling1D(name="avg_pool")
-        self._max_pool = GlobalMaxPooling1D(name="max_pool")
-        self._concat = Concatenate(name="concat")
+        self._avg_pool = keras.layers.GlobalAveragePooling1D(name="avg_pool")
+        self._max_pool = keras.layers.GlobalMaxPooling1D(name="max_pool")
+        self._concat = keras.layers.Concatenate(name="concat")
         self._map_net = MappingNet(
             output_dim=synthesis_depth,
             latent_dim=mapping_latent_dim,

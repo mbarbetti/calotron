@@ -1,10 +1,10 @@
 import tensorflow as tf
-from tensorflow.keras.layers import BatchNormalization, Dense, Dropout
+from tensorflow import keras
 
 from calotron.models.players import DeepSets
 
 
-class Discriminator(tf.keras.Model):
+class Discriminator(keras.Model):
     def __init__(
         self,
         output_units,
@@ -42,7 +42,7 @@ class Discriminator(tf.keras.Model):
             dtype=self.dtype,
         )
         if self._enable_batch_norm:
-            self._batch_norm = BatchNormalization(name="batch_norm", dtype=self.dtype)
+            self._batch_norm = keras.layers.BatchNormalization(name="batch_norm", dtype=self.dtype)
 
         # Final layers
         self._seq = self._prepare_final_layers(
@@ -69,7 +69,7 @@ class Discriminator(tf.keras.Model):
         for i in range(num_layers - 1):
             seq_units = max(latent_dim / (2 * (i + 1)), min_units)
             final_layers.append(
-                Dense(
+                keras.layers.Dense(
                     units=int(seq_units),
                     activation="relu",
                     kernel_initializer="glorot_uniform",
@@ -79,10 +79,10 @@ class Discriminator(tf.keras.Model):
                 )
             )
             final_layers.append(
-                Dropout(rate=dropout_rate, name=f"dropout_{i}", dtype=dtype)
+                keras.layers.Dropout(rate=dropout_rate, name=f"dropout_{i}", dtype=dtype)
             )
         final_layers.append(
-            Dense(
+            keras.layers.Dense(
                 units=output_units,
                 activation=output_activation,
                 kernel_initializer="he_normal",

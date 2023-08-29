@@ -1,11 +1,11 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Layer
+from tensorflow import keras
 
 from calotron.layers.Attention import SelfAttention
 from calotron.layers.MultilayerPerceptron import MultilayerPerceptron
 
 
-class EncoderLayer(Layer):
+class EncoderLayer(keras.layers.Layer):
     def __init__(
         self,
         output_depth,

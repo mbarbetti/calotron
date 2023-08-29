@@ -1,10 +1,10 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Dropout
+from tensorflow import keras
 
 from calotron.layers import DecoderLayer, SeqOrderEmbedding
 
 
-class Decoder(tf.keras.Model):
+class Decoder(keras.Model):
     def __init__(
         self,
         output_depth,
@@ -46,7 +46,7 @@ class Decoder(tf.keras.Model):
         # Smoothing layer
         if self._enable_res_smoothing:
             self._smooth_seq = [
-                Dense(
+                keras.layers.Dense(
                     units=output_depth,
                     activation="relu",
                     kernel_initializer="glorot_normal",
@@ -54,7 +54,7 @@ class Decoder(tf.keras.Model):
                     name="res_smooth_dense" if name else None,
                     dtype=self.dtype,
                 ),
-                Dropout(
+                keras.layers.Dropout(
                     dropout_rate,
                     name="res_smooth_dropout" if name else None,
                     dtype=self.dtype,
