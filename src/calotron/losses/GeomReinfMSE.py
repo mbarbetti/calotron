@@ -1,12 +1,12 @@
 import tensorflow as tf
-from tensorflow import keras
 
-from calotron.losses.AdvLoss import AdvLoss
+from calotron.losses.MeanSquaredError import MeanSquaredError as MSE
 
 
-class MeanSquaredError(AdvLoss):
+class GeomReinfMSE(MSE):
     def __init__(
         self,
+        rho=0.1,
         alpha=0.5,
         adversarial_metric="binary-crossentropy",
         bce_options={
@@ -20,7 +20,7 @@ class MeanSquaredError(AdvLoss):
             "lipschitz_penalty_strategy": "one-sided",
         },
         warmup_energy=1e-8,
-        name="mse_loss",
+        name="geom_reinf_mse_loss",
     ) -> None:
         super().__init__(
             alpha=alpha,
@@ -31,10 +31,10 @@ class MeanSquaredError(AdvLoss):
             name=name,
         )
 
-        # MSE loss definition
-        self._mse_loss = keras.losses.MeanSquaredError(
-            reduction=tf.keras.losses.Reduction.NONE
-        )
+        # Geometric patience
+        assert isinstance(rho, (int, float))
+        assert rho > 0.0
+        self._rho = float(rho)
 
     def transformer_loss(
         self,
@@ -56,6 +56,20 @@ class MeanSquaredError(AdvLoss):
         )
         mask *= energy_mask
 
+        # Geometric reinforcement
+        distance = tf.math.sqrt(
+            tf.reduce_sum((target[:, :, :2] - output[:, :, :2]) ** 2, axis=-1)
+        )
+        geom_matches = tf.cast(distance < self._rho, dtype=target.dtype)
+        geom_matches *= mask
+
+        # Geometric loss
+        num_target_points = tf.reduce_sum(mask, axis=-1)
+        num_geom_matches = tf.reduce_sum(geom_matches, axis=-1)
+        geom_loss = tf.reduce_mean(
+            tf.abs(num_target_points - num_geom_matches) / num_target_points
+        )
+
         # MSE loss
         mse_loss = self._mse_loss(target, output)
         mse_loss *= mask
@@ -74,5 +88,9 @@ class MeanSquaredError(AdvLoss):
         )
 
         return self._compute_mixed_loss(
-            main_loss=mse_loss, adv_loss=adv_loss, alpha=self._alpha
+            main_loss=geom_loss + mse_loss, adv_loss=adv_loss, alpha=self._alpha
         )
+
+    @property
+    def rho(self) -> float:
+        return self._rho

@@ -41,7 +41,14 @@ class BaseLoss:
             rnd_noise = 0.0
 
         d_out = discriminator(
-            (source_concat, target_concat + rnd_noise),
+            (
+                source_concat,
+                tf.clip_by_value(
+                    target_concat + rnd_noise,
+                    clip_value_min=tf.reduce_min(target_concat, axis=[0, 1]),
+                    clip_value_max=tf.reduce_max(target_concat, axis=[0, 1]),
+                ),
+            ),
             padding_mask=mask_concat,
             training=training_discriminator,
         )

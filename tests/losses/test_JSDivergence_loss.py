@@ -41,7 +41,7 @@ disc = Discriminator(
 def loss():
     from calotron.losses import JSDivergence
 
-    loss_ = JSDivergence(warmup_energy=0.0)
+    loss_ = JSDivergence(warmup_energy=1e-8)
     return loss_
 
 

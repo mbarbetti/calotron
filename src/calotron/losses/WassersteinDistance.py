@@ -18,7 +18,7 @@ class WassersteinDistance(BaseLoss):
         lipschitz_regularizer="alp",
         lipschitz_penalty=100.0,
         lipschitz_penalty_strategy="one-sided",
-        warmup_energy=0.0,
+        warmup_energy=1e-8,
         name="wass_dist_loss",
     ) -> None:
         super().__init__(name)
@@ -62,34 +62,26 @@ class WassersteinDistance(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        trainset_true, trainset_pred = self._prepare_adv_trainset(
+        y_true, y_pred, evt_weights, _ = self._perform_classification(
             source=source,
             target=target,
             transformer=transformer,
+            discriminator=discriminator,
             warmup_energy=self._warmup_energy,
+            inj_noise_std=0.0,
             sample_weight=sample_weight,
             training_transformer=training,
+            training_discriminator=False,
+            return_transformer_output=False,
         )
-        source_true, target_true, evt_w_true, mask_true = trainset_true
-        source_pred, target_pred, evt_w_pred, mask_pred = trainset_pred
 
-        source_concat = tf.concat([source_true, source_pred], axis=0)
-        target_concat = tf.concat([target_true, target_pred], axis=0)
-        mask_concat = tf.concat([mask_true, mask_pred], axis=0)
-        d_out = discriminator(
-            (source_concat, target_concat), padding_mask=mask_concat, training=False
+        real_critic = tf.reduce_sum(evt_weights[:, None] * y_true) / tf.reduce_sum(
+            evt_weights
         )
-        y_true, y_pred = tf.split(d_out, 2, axis=0)
-
-        # Real target loss
-        real_loss = tf.reduce_sum(evt_w_true * y_true) / tf.reduce_sum(evt_w_true)
-        real_loss = tf.cast(real_loss, dtype=target_true.dtype)
-
-        # Fake target loss
-        fake_loss = tf.reduce_sum(evt_w_pred * y_pred) / tf.reduce_sum(evt_w_pred)
-        fake_loss = tf.cast(fake_loss, dtype=target_pred.dtype)
-
-        return tf.stop_gradient(real_loss) - fake_loss
+        fake_critic = tf.reduce_sum(evt_weights[:, None] * y_pred) / tf.reduce_sum(
+            evt_weights
+        )
+        return tf.stop_gradient(real_critic) - fake_critic
 
     def discriminator_loss(
         self,
@@ -100,53 +92,40 @@ class WassersteinDistance(BaseLoss):
         sample_weight=None,
         training=True,
     ) -> tf.Tensor:
-        trainset_true, trainset_pred = self._prepare_adv_trainset(
+        y_true, y_pred, evt_weights, mask, output = self._perform_classification(
             source=source,
             target=target,
             transformer=transformer,
+            discriminator=discriminator,
             warmup_energy=self._warmup_energy,
+            inj_noise_std=0.0,
             sample_weight=sample_weight,
             training_transformer=False,
+            training_discriminator=training,
+            return_transformer_output=True,
         )
-        source_true, target_true, evt_w_true, mask_true = trainset_true
-        source_pred, target_pred, evt_w_pred, mask_pred = trainset_pred
 
-        source_concat = tf.concat([source_true, source_pred], axis=0)
-        target_concat = tf.concat([target_true, target_pred], axis=0)
-        mask_concat = tf.concat([mask_true, mask_pred], axis=0)
-        d_out = discriminator(
-            (source_concat, target_concat), padding_mask=mask_concat, training=training
+        real_critic = tf.reduce_sum(evt_weights[:, None] * y_true) / tf.reduce_sum(
+            evt_weights
         )
-        y_true, y_pred = tf.split(d_out, 2, axis=0)
-
-        # Real target loss
-        real_loss = tf.reduce_sum(evt_w_true * y_true) / tf.reduce_sum(evt_w_true)
-        real_loss = tf.cast(real_loss, dtype=target_true.dtype)
-
-        # Fake target loss
-        fake_loss = tf.reduce_sum(evt_w_pred * y_pred) / tf.reduce_sum(evt_w_pred)
-        fake_loss = tf.cast(fake_loss, dtype=target_pred.dtype)
+        fake_critic = tf.reduce_sum(evt_weights[:, None] * y_pred) / tf.reduce_sum(
+            evt_weights
+        )
 
         if discriminator.condition_aware:
-            shuffled_source = tf.random.shuffle(source_true)
-            masked_target = target_true * tf.tile(
-                mask_true[:, :, None], (1, 1, tf.shape(target_true)[2])
+            source_shuffle = tf.random.shuffle(source)
+            y_source = discriminator(
+                (source_shuffle, target), padding_mask=mask, training=training
             )
-            y_pred = discriminator(
-                (shuffled_source, masked_target), padding_mask=None, training=training
-            )
+            source_critic = tf.reduce_mean(y_source)
 
-            # Fake source loss
-            source_loss = tf.reduce_mean(y_pred)
-            source_loss = tf.cast(source_loss, dtype=target_pred.dtype)
-
-            loss = ((fake_loss - real_loss) + (source_loss - real_loss)) / 2.0
+            loss = ((fake_critic - real_critic) + (source_critic - real_critic)) / 2.0
         else:
-            loss = fake_loss - real_loss
+            loss = fake_critic - real_critic
 
         reg = self._lipschitz_regularization(
-            sample_true=(source_true, target_true, mask_true, y_true),
-            sample_pred=(source_pred, target_pred, mask_pred, y_pred),
+            sample_true=(source, target, mask, y_true),
+            sample_pred=(source, output, mask, y_pred),
             discriminator=discriminator,
             training_discriminator=training,
         )

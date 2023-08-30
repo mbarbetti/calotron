@@ -39,9 +39,10 @@ disc = Discriminator(
 
 @pytest.fixture
 def loss():
-    from calotron.losses import MeanSquaredError
+    from calotron.losses import GeomReinfMSE
 
-    loss_ = MeanSquaredError(
+    loss_ = GeomReinfMSE(
+        rho=0.1,
         alpha=0.5,
         adversarial_metric="binary-crossentropy",
         bce_options={
@@ -63,9 +64,10 @@ def loss():
 
 
 def test_loss_configuration(loss):
-    from calotron.losses import MeanSquaredError
+    from calotron.losses import GeomReinfMSE
 
-    assert isinstance(loss, MeanSquaredError)
+    assert isinstance(loss, GeomReinfMSE)
+    assert isinstance(loss.rho, float)
     assert isinstance(loss.alpha, float)
     assert isinstance(loss.adversarial_metric, str)
     assert isinstance(loss.bce_options, dict)
@@ -79,9 +81,10 @@ def test_loss_configuration(loss):
 )
 @pytest.mark.parametrize("sample_weight", [weight, None])
 def test_loss_use(adversarial_metric, sample_weight):
-    from calotron.losses import MeanSquaredError
+    from calotron.losses import GeomReinfMSE
 
-    loss = MeanSquaredError(
+    loss = GeomReinfMSE(
+        rho=0.1,
         alpha=0.5,
         adversarial_metric=adversarial_metric,
         bce_options={"injected_noise_stddev": 0.01},

@@ -1,5 +1,6 @@
 from .BinaryCrossentropy import BinaryCrossentropy
-from .ConservationLaw import ConservationLaw
+from .GeomReinfMAE import GeomReinfMAE
+from .GeomReinfMSE import GeomReinfMSE
 from .Huber import Huber
 from .JSDivergence import JSDivergence
 from .KLDivergence import KLDivergence

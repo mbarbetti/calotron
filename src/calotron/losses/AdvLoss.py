@@ -22,16 +22,15 @@ class AdvLoss(BaseLoss):
             "lipschitz_penalty": 100.0,
             "lipschitz_penalty_strategy": "one-sided",
         },
-        warmup_energy=0.0,
-        name="mse_loss",
+        warmup_energy=1e-8,
+        name="adv_loss",
     ) -> None:
         super().__init__(name)
 
         # Adversarial scale
         assert isinstance(alpha, (int, float))
-        assert alpha >= 0.0 and alpha < 1.0
+        assert alpha >= 0.0 and alpha <= 1.0
         self._alpha = float(alpha)
-        self._gamma = tf.Variable(self._alpha / (1 - self._alpha), name="gamma")
 
         # Adversarial metric
         assert isinstance(adversarial_metric, str)
@@ -78,11 +77,11 @@ class AdvLoss(BaseLoss):
         )
 
     @staticmethod
-    def _compute_adv_loss(main_loss, adv_loss, gamma=0.5) -> tf.Tensor:
+    def _compute_mixed_loss(main_loss, adv_loss, alpha=0.5) -> tf.Tensor:
         main_scale = tf.math.round(tf.math.log(tf.abs(main_loss)) / tf.math.log(10.0))
         adv_scale = tf.math.round(tf.math.log(tf.abs(adv_loss)) / tf.math.log(10.0))
         scale = tf.stop_gradient(10 ** (main_scale - adv_scale))
-        tot_loss = main_loss + gamma * scale * adv_loss
+        tot_loss = (1 - alpha) * main_loss + alpha * scale * adv_loss
         return tot_loss
 
     def discriminator_loss(
@@ -107,10 +106,6 @@ class AdvLoss(BaseLoss):
     @property
     def alpha(self) -> float:
         return self._alpha
-
-    @property
-    def gamma(self) -> tf.Variable:
-        return self._gamma
 
     @property
     def adversarial_metric(self) -> str:

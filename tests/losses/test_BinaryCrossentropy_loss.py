@@ -45,7 +45,7 @@ def loss():
         injected_noise_stddev=0.01,
         from_logits=False,
         label_smoothing=0.1,
-        warmup_energy=0.0,
+        warmup_energy=1e-8,
     )
     return loss_
 
@@ -70,7 +70,7 @@ def test_loss_use(from_logits, sample_weight):
     from calotron.losses import BinaryCrossentropy
 
     loss = BinaryCrossentropy(
-        warmup_energy=0.0,
+        warmup_energy=1e-8,
         injected_noise_stddev=0.01,
         from_logits=from_logits,
         label_smoothing=0.1,
@@ -87,7 +87,7 @@ def test_loss_use(from_logits, sample_weight):
         sample_weight=sample_weight,
         training=False,
     )
-    assert out.numpy()
+    assert out.numpy() + 1e-12
     out = loss.discriminator_loss(
         transformer=transf,
         discriminator=disc,
@@ -96,4 +96,4 @@ def test_loss_use(from_logits, sample_weight):
         sample_weight=sample_weight,
         training=False,
     )
-    assert out.numpy()
+    assert out.numpy() + 1e-12

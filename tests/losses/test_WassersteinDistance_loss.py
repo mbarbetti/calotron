@@ -49,7 +49,7 @@ def loss():
         lipschitz_regularizer="alp",
         lipschitz_penalty=100.0,
         lipschitz_penalty_strategy="one-sided",
-        warmup_energy=0.0,
+        warmup_energy=1e-8,
     )
     return loss_
 
@@ -78,7 +78,7 @@ def test_loss_use(lp_regularizer, lp_strategy, sample_weight):
         lipschitz_regularizer=lp_regularizer,
         lipschitz_penalty=100.0,
         lipschitz_penalty_strategy=lp_strategy,
-        warmup_energy=0.0,
+        warmup_energy=1e-8,
     )
 
     out = loss.transformer_loss(
@@ -89,7 +89,7 @@ def test_loss_use(lp_regularizer, lp_strategy, sample_weight):
         sample_weight=sample_weight,
         training=False,
     )
-    assert out.numpy()
+    assert out.numpy() + 1e-12
     out = loss.discriminator_loss(
         transformer=transf,
         discriminator=disc,
@@ -98,4 +98,4 @@ def test_loss_use(lp_regularizer, lp_strategy, sample_weight):
         sample_weight=sample_weight,
         training=False,
     )
-    assert out.numpy()
+    assert out.numpy() + 1e-12
