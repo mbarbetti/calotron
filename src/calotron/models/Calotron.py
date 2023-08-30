@@ -1,12 +1,12 @@
 import tensorflow as tf
-from tensorflow.keras.optimizers import Optimizer
+from tensorflow import keras
 
 from calotron.models.discriminators import Discriminator
 from calotron.models.transformers import Transformer
 from calotron.utils.checks import checkLoss, checkMetrics, checkOptimizer
 
 
-class Calotron(tf.keras.Model):
+class Calotron(keras.Model):
     def __init__(self, transformer, discriminator, name=None, dtype=None) -> None:
         super().__init__(name=name, dtype=dtype)
 
@@ -51,8 +51,8 @@ class Calotron(tf.keras.Model):
 
         # Loss metrics
         self._loss = checkLoss(loss)
-        self._t_loss = tf.keras.metrics.Mean(name="t_loss")
-        self._d_loss = tf.keras.metrics.Mean(name="d_loss")
+        self._t_loss = keras.metrics.Mean(name="t_loss")
+        self._d_loss = keras.metrics.Mean(name="d_loss")
         self._metrics = checkMetrics(metrics)
 
         # Optimizers
@@ -122,6 +122,21 @@ class Calotron(tf.keras.Model):
         self._t_opt.apply_gradients(zip(gradients, trainable_vars))
         self._t_loss.update_state(loss)
 
+    def _t_enc_train_step(self, source, target, sample_weight=None) -> None:
+        with tf.GradientTape() as tape:
+            loss = self._loss.transformer_loss(
+                transformer=self._transformer,
+                discriminator=self._discriminator,
+                source=source,
+                target=target,
+                sample_weight=sample_weight,
+                training=True,
+            )
+        trainable_vars = self._transformer._encoder.trainable_variables
+        gradients = tape.gradient(loss, trainable_vars)
+        self._t_opt.apply_gradients(zip(gradients, trainable_vars))
+        self._t_loss.update_state(loss)
+
     def _d_train_step(self, source, target, sample_weight=None) -> None:
         with tf.GradientTape() as tape:
             loss = self._loss.discriminator_loss(
@@ -133,6 +148,21 @@ class Calotron(tf.keras.Model):
                 training=True,
             )
         trainable_vars = self._discriminator.trainable_variables
+        gradients = tape.gradient(loss, trainable_vars)
+        self._d_opt.apply_gradients(zip(gradients, trainable_vars))
+        self._d_loss.update_state(loss)
+
+    def _d_enc_train_step(self, source, target, sample_weight=None) -> None:
+        with tf.GradientTape() as tape:
+            loss = self._loss.discriminator_loss(
+                transformer=self._transformer,
+                discriminator=self._discriminator,
+                source=source,
+                target=target,
+                sample_weight=sample_weight,
+                training=True,
+            )
+        trainable_vars = self._discriminator._encoder.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)
         self._d_opt.apply_gradients(zip(gradients, trainable_vars))
         self._d_loss.update_state(loss)
@@ -200,11 +230,11 @@ class Calotron(tf.keras.Model):
         return reset_states
 
     @property
-    def transformer_optimizer(self) -> Optimizer:
+    def transformer_optimizer(self) -> keras.optimizers.Optimizer:
         return self._t_opt
 
     @property
-    def discriminator_optimizer(self) -> Optimizer:
+    def discriminator_optimizer(self) -> keras.optimizers.Optimizer:
         return self._d_opt
 
     @property

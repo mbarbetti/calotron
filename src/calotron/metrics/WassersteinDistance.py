@@ -10,7 +10,9 @@ class WassersteinDistance(BaseMetric):
     def update_state(self, y_true, y_pred, sample_weight=None) -> None:
         weights = self._prepare_weights(sample_weight)
         if weights is not None:
-            state = tf.reduce_sum(weights * (y_true - y_pred)) / tf.reduce_sum(weights)
+            state = tf.reduce_sum(weights[:, None] * (y_true - y_pred)) / tf.reduce_sum(
+                weights
+            )
         else:
             state = tf.reduce_mean(y_true - y_pred)
         state = tf.cast(state, self.dtype)
